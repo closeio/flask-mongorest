@@ -1,6 +1,5 @@
-Flask-MongoRest
+Flask-MongoRest [![Build Status](https://secure.travis-ci.org/elasticsales/flask-mongorest.png?branch=master)](http://travis-ci.org/elasticsales/flask-mongorest)
 ===============
-
 A Restful API framework wrapped around MongoEngine.
 
 Setup
