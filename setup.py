@@ -27,14 +27,17 @@ setup(
     packages=[
         'flask_mongorest',
     ],
-    test_suite = "tests",
+    test_suite='nose.collector',
     zip_safe=False,
     platforms='any',
     install_requires=[
-        'Flask',
         'Flask-Views',
         'Flask-MongoEngine',
         'mimerender',
+    ],
+    setup_requires=['nose', 'coverage'],
+    dependency_links = [
+        'http://github.com/elasticsales/flask-mongoengine/tarball/master#egg=flask-mongoengine',
     ],
     classifiers=[
         'Development Status :: 4 - Beta',

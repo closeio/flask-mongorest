@@ -1,5 +1,4 @@
-Flask
 Flask-Views
--e git+ssh://git@github.com/elasticsales/flask-mongoengine.git#egg=flask-mongoengine
+git+ssh://git@github.com/elasticsales/flask-mongoengine.git#egg=flask-mongoengine
 mimerender
 
