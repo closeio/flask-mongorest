@@ -11,7 +11,7 @@ from setuptools import setup
 setup(
     name='Flask-MongoRest',
     version='0.1',
-    url='http://github.com/anemitz/flask-mongorest',
+    url='http://github.com/elasticsales/flask-mongorest',
     license='BSD',
     author='Anthony Nemitz',
     author_email='anemitz@gmail.com',
