@@ -30,12 +30,12 @@ setup(
     test_suite='nose.collector',
     zip_safe=False,
     platforms='any',
-    install_requires=[
+    setup_requires=[
         'Flask-Views',
         'Flask-MongoEngine',
         'mimerender',
     ],
-    setup_requires=['nose', 'coverage'],
+    test_requires=['nose', 'coverage'],
     dependency_links = [
         'http://github.com/elasticsales/flask-mongoengine/tarball/master#egg=flask-mongoengine',
     ],
