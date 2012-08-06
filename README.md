@@ -29,20 +29,37 @@ api = MongoRest(app)
 
 class User(db.Document):
     email = db.EmailField(unique=True, required=True)
-    first_name = db.StringField()
-    last_name = db.StringField()
-    email = db.EmailField()
 
-class UserResource(Resource):
-    document = User
+class Content(db.EmbeddedDocument):
+    text = db.StringField()
 
-@api.register()
-class UserView(ResourceView):
-    resource = UserResource
-    methods = [methods.Create, methods.Update, methods.Fetch, methods.List, methods.Delete]    
-    
+class ContentResource(Resource):
+    document = Content
+
+class Post(db.Document):
+    title = db.StringField(max_length=120, required=True)
+    author = db.ReferenceField(User)
+    content = db.EmbeddedDocumentField(Content)
+
+class PostResource(Resource):
+    document = Post
+    related_resources = {
+        'content': ContentResource,
+    }
+    filters = {
+        'title': [ops.Exact, ops.Startswith],
+        'author_id': [ops.Exact],
+    }
+    rename_fields = {
+        'author': 'author_id',
+    }
+
+@api.register(name='posts', url='/posts/')
+class PostView(ResourceView):
+    resource = PostResource
+    methods = [methods.Create, methods.Update, methods.Fetch, methods.List]
+
 ```
-You can then submit GET, POST, PUT, and DELETE requests to the User endpoint located at '/user/'.
 
 Request Params
 ==============
@@ -65,6 +82,37 @@ Resource Configuration
 
 **child_document_resources** => Suppose you have a Person base class which has Male and Female subclasses.  These subclasses and their respective resources share the same MongoDB collection, but have different fields and serialization characteristics.  This dictionary allows you to map class instances to their respective resources to be used during serialization.
 
+Authentication
+==============
+The AuthenticationBase class provides the ability for application's to implement their own API auth.  Two common patterns are shown below along with a BaseResourceView which can be used as the parent View of all of your app's resources.
+``` python
+class SessionAuthentication(AuthenticationBase):
+    def authorized(self):
+        return current_user.is_authenticated()
+
+class ApiKeyAuthentication(AuthenticationBase):
+    """
+    @TODO ApiKey document and key generation left to the specific implementation
+    """
+    def authorized(self):
+        if 'AUTHORIZATION' in request.headers:
+            authorization = request.headers['AUTHORIZATION'].split()
+            if len(authorization) == 2 and authorization[0].lower() == 'basic':
+                try:
+                    authorization_parts = base64.b64decode(authorization[1]).partition(':')
+                    key = smart_unicode(authorization_parts[0])
+                    api_key = ApiKey.objects.get(key__exact=key)
+                    if api_key.user:
+                        login_user(api_key.user)
+                        setattr(current_user, 'api_key', api_key)
+                    return True
+                except (TypeError, UnicodeDecodeError, ApiKey.DoesNotExist):
+                    pass
+        return False
+
+class BaseResourceView(ResourceView):
+    authentication_methods = [SessionAuthentication, ApiKeyAuthentication]
+```
 
 Contributing
 ============
