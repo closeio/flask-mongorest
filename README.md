@@ -57,6 +57,57 @@ class PostResource(Resource):
 class PostView(ResourceView):
     resource = PostResource
     methods = [methods.Create, methods.Update, methods.Fetch, methods.List]
+    
+"""
+With this app, following cURL commands could be used:
+
+Create a Post:
+curl -H "Content-Type: application/json" -X POST -d '{"title": "First post!", "author_id": "author_id_from_a_previous_api_call", "content": {"text": "this is our test post content"}}' http://0.0.0.0:5000/posts/
+response:
+{
+  "id": "1",
+  "title": "First post!",
+  "author_id": "author_id_from_a_previous_api_call",
+  "content": {
+    "text": "this is our test post content"
+  }
+} 
+
+
+Get a Post:
+curl http://0.0.0.0:5000/posts/1/
+response:
+{
+  "id": "1",
+  "title": "First post!",
+  "author_id": "author_id_from_a_previous_api_call",
+  "content": {
+    "text": "this is our test post content"
+  }
+} 
+
+
+List all Posts or filter by the title:
+curl http://0.0.0.0:5000/posts/ or curl http://0.0.0.0:5000/posts/?title__startswith=First%20post
+response:
+{
+  "data": [
+    {
+      "id": "1",
+      "title": "First post!",
+      "author_id": "author_id_from_a_previous_api_call",
+      "content": {
+        "text": "this is our test post content"
+      }
+    },
+    ... other posts
+  ]
+}
+
+
+Delete a Post (fails since PostView.methods does not allow Delete):
+curl -X DELETE http://0.0.0.0:5000/posts/1/
+"""
 
 ```
 
