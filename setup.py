@@ -34,8 +34,9 @@ setup(
         'Flask-Views',
         'Flask-MongoEngine',
         'mimerender',
+        'nose', 
+        'coverage',
     ],
-    tests_requires=['nose', 'coverage'],
     dependency_links = [
         'http://github.com/elasticsales/flask-mongoengine/tarball/master#egg=flask-mongoengine',
     ],
