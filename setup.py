@@ -1,0 +1,44 @@
+"""
+Flask-MongoRest
+---------
+
+Restful API framework for MongoDB/MongoEngine
+
+"""
+from setuptools import setup
+
+
+setup(
+    name='Flask-MongoRest',
+    version='0.1',
+    url='http://github.com/anemitz/flask-mongorest',
+    license='BSD',
+    author='Anthony Nemitz',
+    author_email='anemitz@gmail.com',
+    maintainer='Anthony Nemitz',
+    maintainer_email='anemitz@gmail.com',
+    description='Flask restful API framework for MongoDB/MongoEngine',
+    long_description=__doc__,
+    packages=[
+        'flask_mongorest',
+    ],
+    test_suite = "tests",
+    zip_safe=False,
+    platforms='any',
+    install_requires=[
+        'Flask',
+        'Flask-Views',
+        'Flask-MongoEngine',
+        'mimerender',
+    ],
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Environment :: Web Environment',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: BSD License',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python',
+        'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
+        'Topic :: Software Development :: Libraries :: Python Modules'
+    ]
+)
