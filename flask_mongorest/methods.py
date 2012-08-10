@@ -10,5 +10,7 @@ class Fetch:
 class List:
     method = 'GET'
 
+class Options:
+    method = 'OPTIONS'
 class Delete:
     method = 'DELETE'
