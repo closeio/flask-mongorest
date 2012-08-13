@@ -15,7 +15,7 @@ except:
 
 setup(
     name='Flask-MongoRest',
-    version='0.1',
+    version='0.1.1',
     url='http://github.com/elasticsales/flask-mongorest',
     license='BSD',
     author='Anthony Nemitz',
@@ -36,6 +36,7 @@ setup(
         'mimerender',
         'nose', 
         'coverage',
+        'python-dateutil'
     ],
     dependency_links = [
         'http://github.com/elasticsales/flask-mongoengine/tarball/master#egg=flask-mongoengine',
