@@ -221,9 +221,7 @@ class Resource(object):
                 return field_data_value and field_instance.document_type.objects.get(pk=field_data_value).to_dbref()
 
         elif isinstance(field_instance, DateTimeField):
-            if field_data_value:
-                field_data_value = dateutil.parser.parse(field_data_value)
-            return field_data_value
+            return field_data_value and dateutil.parser.parse(field_data_value) or None
 
         elif isinstance(field_instance, EmbeddedDocumentField):
             if field_name in self._related_resources:

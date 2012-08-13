@@ -30,6 +30,7 @@ class User(db.Document):
     last_name = db.StringField(max_length=50)
     emails = db.ListField(db.EmailField())
     datetime = db.DateTimeField()
+    datetime_local = db.DateTimeField()
 
 class UserResource(Resource):
     document = User

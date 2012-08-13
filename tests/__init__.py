@@ -93,7 +93,8 @@ class MongoRestTestCase(unittest.TestCase):
             'email': 'invalid',
             'first_name': 'joe',
             'last_name': 'baker',
-            'datetime':'2012-08-13T05:25:04.362Z'
+            'datetime':'2012-08-13T05:25:04.362Z',
+            'datetime_local':'2012-08-13T05:25:04.362-03:30'
         }))
         response_error(resp)
         errors = json.loads(resp.data)
