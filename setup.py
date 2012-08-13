@@ -1,10 +1,3 @@
-"""
-Flask-MongoRest
----------
-
-Restful API framework for MongoDB/MongoEngine
-
-"""
 from setuptools import setup
 
 # Stops exit traceback on tests
