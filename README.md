@@ -161,6 +161,10 @@ class BaseResourceView(ResourceView):
     authentication_methods = [SessionAuthentication, ApiKeyAuthentication]
 ```
 
+Running the test suite
+======================
+This package uses nosetests for automated testing. Just run `python setup.py nosetests` to run the tests. No setup or any other prep needed.
+
 Contributing
 ============
 Pull requests are greatly appreciated!
