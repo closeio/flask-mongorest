@@ -15,7 +15,7 @@ except:
 
 setup(
     name='Flask-MongoRest',
-    version='0.1',
+    version='0.1.1',
     url='http://github.com/elasticsales/flask-mongorest',
     license='BSD',
     author='Anthony Nemitz',
