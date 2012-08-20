@@ -117,7 +117,10 @@ class Resource(object):
             if only_fields != None and renamed_field not in only_fields:
                 continue
             if hasattr(self, field):
-                data[renamed_field] = getattr(self, field)(obj)
+                value = getattr(self, field)(obj)
+                if isinstance(value, mongoengine.queryset.QuerySet):
+                    value = [self._related_resources[field]().serialize(o) for o in value]
+                data[renamed_field] = value
             else:
                 data[renamed_field] = get(obj, field)
 
