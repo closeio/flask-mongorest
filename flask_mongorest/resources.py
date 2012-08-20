@@ -25,6 +25,7 @@ class Resource(object):
     paginate = True
     select_related = False
     allowed_ordering = []
+    max_limit = 1000 # cap the number of records in the _limit param to avoid DDoS'ing the API.
 
     __metaclass__ = ResourceMeta
 
@@ -194,7 +195,7 @@ class Resource(object):
             field = self._rename_fields.get(field, field)
             qs = operator().apply(qs, field, value, negate)
         if self.paginate:
-            qs = qs.skip(int(params.get('_skip', 0))).limit(int(params.get('_limit', 100)))
+            qs = qs.skip(int(params.get('_skip', 0))).limit(min(int(params.get('_limit', 100)), self.max_limit))
         if self.allowed_ordering and params.get('_order_by', None) in self.allowed_ordering:
             qs = qs.order_by(params['_order_by'])
         # Needs to be at the end as it returns a list.
