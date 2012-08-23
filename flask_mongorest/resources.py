@@ -5,6 +5,7 @@ from bson.dbref import DBRef
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, DateTimeField
 from flask.ext.mongorest.exceptions import ValidationError
 import dateutil.parser
+from flask.ext.wtf import validators
 
 class ResourceMeta(type):
     def __init__(cls, name, bases, classdict):
@@ -161,9 +162,21 @@ class Resource(object):
             data = MultiDict(json_data)
             form = self.form(data, csrf_enabled=False)
 
+            # We have to dynamically remove fields from the form, if the POST object does not contain these keys and the Optional validator
+            delfields = []
+            for key, value in form._fields.iteritems():
+                required = True
+                for validator in form._fields[key].validators:
+                    if validator.__class__ == validators.optional().__class__:
+                        required = False
+                if not key in data and key != 'csrf_token' and required == False:
+                    delfields.append(key)
+
+            for d in delfields:
+                del form[d]
+
             if not form.validate():
                 raise ValidationError({'field-errors': form.errors})
-
             self.data = form.data
 
     def get_queryset(self):
