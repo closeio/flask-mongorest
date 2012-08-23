@@ -26,5 +26,6 @@ pip-log.txt
 #Mr Developer
 .mr.developer.cfg
 
-
+#sphinx docs
+docs/_build
 venv
