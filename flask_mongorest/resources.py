@@ -158,6 +158,8 @@ class Resource(object):
                     else:
                         if isinstance(v, dict): # DictField
                             v = json.dumps(v)
+                        if isinstance(v, bool) and v == False: # BooleanField
+                            v = []
                         form_data['%s%s' % (prefix, k)] = v
                 return form_data
 
@@ -279,6 +281,7 @@ class Resource(object):
                 setattr(obj, field, self._get('update_object', data, field, parent_resources=parent_resources))
         if save:
             self._save(obj)
+
         return obj
 
     def delete_object(self, obj, parent_resources=None):

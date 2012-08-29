@@ -101,6 +101,7 @@ class TestDocument(db.Document):
     name = db.StringField()
     other = db.StringField()
     dictfield = db.DictField()
+    is_new = db.BooleanField()
 
 from flask.ext.mongoengine.wtf.orm import model_form
 TestBaseForm = model_form(TestDocument)

@@ -154,6 +154,23 @@ class MongoRestTestCase(unittest.TestCase):
             'field3': 123,
         })
 
+        # Test boolean fields
+        resp = self.app.post('/testform/', data=json.dumps({
+            'name': 'okay',
+            'is_new': True
+        }))
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(data['is_new'], True)
+
+        resp = self.app.post('/testform/', data=json.dumps({
+            'name': 'okay',
+            'is_new': False
+        }))
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(data['is_new'], False)
+
     def test_resource_fields(self):
         resp = self.app.post('/testfields/', data=json.dumps({
             'name': 'thename',

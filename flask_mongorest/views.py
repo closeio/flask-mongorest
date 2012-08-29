@@ -51,7 +51,7 @@ class ResourceView(View):
 
     def post(self, **kwargs):
         if 'pk' in kwargs:
-            raise NotFound()
+            raise NotFound("Did you mean to use PUT?")
         self._resource.validate_request()
         obj = self._resource.create_object()
         ret = self._resource.serialize(obj, request.args)
