@@ -130,10 +130,19 @@ class Resource(object):
 
     def validate_request(self, obj=None):
         # @TODO this should rename form fields otherwise in a resource you could say "model_id" and in a form still have to use "model".
+
+        # Do renaming in two passes to prevent potential multiple renames depending on dict traversal order.
+        # E.g. if a -> b, b -> c, then a should never be renamed to c.
+        fields_to_delete = []
+        fields_to_update = {}
         for k, v in self._rename_fields.iteritems():
             if self.data.has_key(v):
-                self.data[k] = self.data[v]
-                del self.data[v]
+                fields_to_update[k] = self.data[v]
+                fields_to_delete.append(v)
+        for k in fields_to_delete:
+            del self.data[k]
+        for k, v in fields_to_update.iteritems():
+            self.data[k] = v
 
         if self.form:
             from werkzeug.datastructures import MultiDict
