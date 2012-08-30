@@ -55,6 +55,7 @@ class Post(db.Document):
     user_lists = db.ListField(db.ListField(db.ReferenceField(User)))
     sections = db.ListField(db.EmbeddedDocumentField(Content))
     content = db.EmbeddedDocumentField(Content)
+    is_published = db.BooleanField()
 
 class PostResource(Resource):
     document = Post
@@ -65,6 +66,7 @@ class PostResource(Resource):
     filters = {
         'title': [ops.Exact, ops.Startswith],
         'author_id': [ops.Exact],
+        'is_published': [ops.Boolean],
     }
     rename_fields = {
         'author': 'author_id',

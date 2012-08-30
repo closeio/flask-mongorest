@@ -1,8 +1,11 @@
 class Operator(object):
     op = 'exact'
 
+    def prepare_queryset_kwargs(self, field, value, negate):
+        return {field+'__'+self.op:value}
+
     def apply(self, queryset, field, value, negate=False):
-        kwargs = {field+'__'+self.op:value} 
+        kwargs = self.prepare_queryset_kwargs(field, value, negate)
         if negate:
             return queryset.exclude(**kwargs)
         qs = queryset.filter(**kwargs)
@@ -35,3 +38,12 @@ class Startswith(Operator):
 class Endswith(Operator):
     op = 'endswith'
 
+class Boolean(Operator):
+    op = 'exact'
+
+    def prepare_queryset_kwargs(self, field, value, negate):
+        if value == 'false':
+            bool_value = False
+        else:
+            bool_value = True
+        return {field:bool_value}

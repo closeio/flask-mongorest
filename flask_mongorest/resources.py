@@ -120,6 +120,8 @@ class Resource(object):
                 value = getattr(self, field)(obj)
                 if isinstance(value, mongoengine.queryset.QuerySet):
                     value = [self._related_resources[field]().serialize(o) for o in value]
+                if isinstance(value, mongoengine.document.Document):
+                    value = self._related_resources[field]().serialize(value)
                 data[renamed_field] = value
             else:
                 data[renamed_field] = get(obj, field)
