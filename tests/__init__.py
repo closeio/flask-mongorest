@@ -15,10 +15,8 @@ def response_error(response, code=400):
 
 def compare_req_resp(req_obj, resp_obj):
     for k,v in req_obj.iteritems():
-        if resp_obj.has_key(k) and resp_obj[k] == v:
-            assert True
-        else:
-            assert False
+        assert k in resp_obj.keys(), 'Key %r not in response (keys are %r)' % (k, resp_obj.keys())
+        assert resp_obj[k] == v, 'Value for key %r should be %r but is %r' % (k, v, resp_obj[k])
 
 class MongoRestTestCase(unittest.TestCase):
 
@@ -51,6 +49,12 @@ class MongoRestTestCase(unittest.TestCase):
             'text': 'this is the content for my first post.',
             'lang': 'cn',
         },
+        'is_published': True,
+    }
+
+    post_2 = {
+        'title': 'Second post',
+        'is_published': False,
     }
 
     def setUp(self):
@@ -231,6 +235,11 @@ class MongoRestTestCase(unittest.TestCase):
         compare_req_resp(self.post_1_obj, json.loads(resp.data))
         self.post_1_obj = json.loads(resp.data)
 
+        resp = self.app.post('/posts/', data=json.dumps(self.post_2))
+        response_success(resp)
+        compare_req_resp(self.post_2, json.loads(resp.data))
+        self.post_2_obj = json.loads(resp.data)
+
         
         #test filtering
 
@@ -248,6 +257,18 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
         data_list = json.loads(resp.data)['data']
         compare_req_resp(self.post_1_obj, data_list[0])
+
+        resp = self.app.get('/posts/?is_published=true')
+        response_success(resp)
+        data_list = json.loads(resp.data)['data']
+        self.assertEqual(len(data_list), 1)
+        compare_req_resp(self.post_1_obj, data_list[0])
+
+        resp = self.app.get('/posts/?is_published=false')
+        response_success(resp)
+        data_list = json.loads(resp.data)['data']
+        self.assertEqual(len(data_list), 1)
+        compare_req_resp(self.post_2_obj, data_list[0])
         
         # default exact filtering
         resp = self.app.get('/posts/?title__exact=first post!')
