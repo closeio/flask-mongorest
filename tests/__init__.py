@@ -5,13 +5,13 @@ import example.app as example
 
 def response_success(response, code=200):
     if 200 <= code < 300:
-        assert 200 <= response.status_code < 300
-    assert code == response.status_code
+        assert 200 <= response.status_code < 300, 'Received %d response: %s' % (response.status_code, response.data)
+    assert code == response.status_code, 'Received %d response: %s' % (response.status_code, response.data)
 
 def response_error(response, code=400):
     if 400 <= code < 500:
-        assert 400 <= response.status_code < 500
-    assert code == response.status_code
+        assert 400 <= response.status_code < 500, 'Received %d response: %s' % (response.status_code, response.data)
+    assert code == response.status_code, 'Received %d response: %s' % (response.status_code, response.data)
 
 def compare_req_resp(req_obj, resp_obj):
     for k,v in req_obj.iteritems():
@@ -251,7 +251,7 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.get('/posts/?title__startswith=second')
         response_success(resp)
         data_list = json.loads(resp.data)['data']
-        assert(data_list == [])
+        self.assertEqual(data_list, [])
 
         resp = self.app.get('/posts/?author_id=%s' % self.user_2_obj['id'])
         response_success(resp)
