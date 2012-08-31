@@ -198,7 +198,7 @@ class Resource(object):
     def get_object(self, pk):
         return self.get_queryset().get(pk=pk)
    
-    def get_objects(self):
+    def get_objects(self, all=False):
         params = request.args
         qs = self.get_queryset()
         for key in params:
@@ -219,14 +219,30 @@ class Resource(object):
             operator = allowed_operators[op_name]
             field = self._reverse_rename_fields.get(field, field)
             qs = operator().apply(qs, field, value, negate)
-        if self.paginate:
-            qs = qs.skip(int(params.get('_skip', 0))).limit(min(int(params.get('_limit', 100)), self.max_limit))
+        limit = None
+        if not all:
+            if self.paginate:
+                limit = min(int(params.get('_limit', 100)), self.max_limit)+1
+                # Fetch one more so we know if there are more results.
+                qs = qs.skip(int(params.get('_skip', 0))).limit(limit)
+            else:
+                qs = qs.limit(self.max_limit)+1
         if self.allowed_ordering and params.get('_order_by', None) in self.allowed_ordering:
             qs = qs.order_by(params['_order_by'])
         # Needs to be at the end as it returns a list.
         if self.select_related:
             qs = qs.select_related()
-        return qs
+
+        if limit:
+            # It is OK to evaluate the queryset as we will do so anyway.
+            qs = list(qs)
+            has_more = len(qs) == limit
+            if has_more:
+                qs = qs[:-1]
+        else:
+            has_more = None
+
+        return qs, has_more
 
     def _get(self, method, data, field_name, field_instance=None, parent_resources=None):
         """

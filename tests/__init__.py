@@ -324,11 +324,15 @@ class MongoRestTestCase(unittest.TestCase):
         
         resp = self.app.get('/posts/?_limit=10') 
         response_success(resp)
-        self.assertEqual(len(json.loads(resp.data)['data']), 10)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 10)
+        self.assertEqual(data['has_more'], True)
 
         resp = self.app.get('/posts/?_skip=100')
         response_success(resp)
-        self.assertEqual(len(json.loads(resp.data)['data']), 1)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 1)
+        self.assertEqual(data['has_more'], False)
 
     def test_fields(self):
         resp = self.app.get('/user/%s/?_fields=email' % self.user_1_obj['id'])

@@ -41,9 +41,13 @@ class ResourceView(View):
     def get(self, **kwargs):
         pk = kwargs.pop('pk', None)
         if pk is None:
-            objs = self._resource.get_objects()
-            ret = [self._resource.serialize(obj, request.args) for obj in objs]
-            return {'data': ret}
+            objs, has_more = self._resource.get_objects()
+            ret = {
+                'data': [self._resource.serialize(obj, request.args) for obj in objs]
+            }
+            if has_more != None:
+                ret['has_more'] = has_more
+            return ret
         else:
             obj = self._resource.get_object(pk)
             ret = self._resource.serialize(obj, request.args)
@@ -72,7 +76,7 @@ class ResourceView(View):
             # is a bulk update, only the count of objects which were updated is
             # returned.
 
-            objs = self._resource.get_objects()
+            objs, has_more = self._resource.get_objects(all=True)
             count = 0
             try:
                 for obj in objs:
