@@ -1,3 +1,4 @@
+import datetime
 import json
 import mongoengine
 from flask import request
@@ -161,6 +162,8 @@ class Resource(object):
             # We need to convert JSON data into form data.
             # e.g. { "people": [ { "name": "A" } ] } into { "people-0-name": "A" }
             def json_to_form_data(prefix, json_data):
+                import datetime
+                from bson.dbref import DBRef
                 form_data = {}
                 for k, v in json_data.iteritems():
                     if isinstance(v, list): # FieldList
@@ -171,6 +174,10 @@ class Resource(object):
                             v = json.dumps(v)
                         if isinstance(v, bool) and v == False: # BooleanField
                             v = []
+                        if isinstance(v, datetime.datetime): # DateTimeField
+                            v = v.strftime('%Y-%m-%d %H:%M:%S')
+                        if isinstance(v, DBRef): # ReferenceField
+                            v = v.id
                         form_data['%s%s' % (prefix, k)] = v
                 return form_data
 
@@ -238,7 +245,10 @@ class Resource(object):
                 return field_data_value and field_instance.document_type.objects.get(pk=field_data_value).to_dbref()
 
         elif isinstance(field_instance, DateTimeField):
-            return field_data_value and dateutil.parser.parse(field_data_value)
+            if isinstance(field_data_value, datetime.datetime):
+                return field_data_value
+            else:
+                return field_data_value and dateutil.parser.parse(field_data_value)
 
         elif isinstance(field_instance, EmbeddedDocumentField):
             if field_name in self._related_resources:
