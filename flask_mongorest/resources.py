@@ -178,6 +178,8 @@ class Resource(object):
                             v = v.strftime('%Y-%m-%d %H:%M:%S')
                         if isinstance(v, DBRef): # ReferenceField
                             v = v.id
+                        if v is None:
+                            v = ''
                         form_data['%s%s' % (prefix, k)] = v
                 return form_data
 
