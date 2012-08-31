@@ -35,6 +35,11 @@ class Resource(object):
             self.fields = doc_fields
         self._related_resources = self.get_related_resources()
         self._rename_fields = self.get_rename_fields()
+        self._reverse_rename_fields = {}
+        for k, v in self._rename_fields.iteritems():
+            self._reverse_rename_fields[v] = k
+        assert len(self._rename_fields) == len(self._reverse_rename_fields), \
+            'Cannot rename multiple fields to the same name'
         self._filters = self.get_filters()
         self._child_document_resources = self.get_child_document_resources()
         self.data = {}
@@ -49,15 +54,9 @@ class Resource(object):
 
     def get_rename_fields(self):
         """
-        Return (k,v) and (v,k) for all renamed fields to support serialization and deserialization
         @TODO should automatically support model_id for reference fields (only) and model for related_resources
         """
-        rename_fields = {}
-        for k, v in self.rename_fields.iteritems():
-            rename_fields[k] = v
-            if not self.rename_fields.has_key(v):
-                rename_fields[v] = k
-        return rename_fields
+        return self.rename_fields
     
     def get_child_document_resources(self):
         return self.child_document_resources
@@ -129,6 +128,20 @@ class Resource(object):
         return data
 
     def validate_request(self, obj=None):
+        if self.form:
+            from werkzeug.datastructures import MultiDict
+
+            if request.method == 'PUT' and obj != None:
+                # We treat 'PUT' like 'PATCH', i.e. when fields are not
+                # specified, existing values are used.
+
+                # TODO: This is not implemented properly for nested objects yet.
+
+                obj_data = self.serialize(obj)
+                obj_data.update(self.data)
+
+                self.data = obj_data
+
         # @TODO this should rename form fields otherwise in a resource you could say "model_id" and in a form still have to use "model".
 
         # Do renaming in two passes to prevent potential multiple renames depending on dict traversal order.
@@ -145,19 +158,6 @@ class Resource(object):
             self.data[k] = v
 
         if self.form:
-            from werkzeug.datastructures import MultiDict
-
-            if request.method == 'PUT' and obj != None:
-                # We treat 'PUT' like 'PATCH', i.e. when fields are not
-                # specified, existing values are used.
-
-                # TODO: This is not implemented properly for nested objects yet.
-
-                obj_data = self.serialize(obj)
-                obj_data.update(self.data)
-
-                self.data = obj_data
-
             # We need to convert JSON data into form data.
             # e.g. { "people": [ { "name": "A" } ] } into { "people-0-name": "A" }
             def json_to_form_data(prefix, json_data):
@@ -208,7 +208,7 @@ class Resource(object):
             if op_name not in allowed_operators.keys():
                 continue
             operator = allowed_operators[op_name]
-            field = self._rename_fields.get(field, field)
+            field = self._reverse_rename_fields.get(field, field)
             qs = operator().apply(qs, field, value, negate)
         if self.paginate:
             qs = qs.skip(int(params.get('_skip', 0))).limit(min(int(params.get('_limit', 100)), self.max_limit))
