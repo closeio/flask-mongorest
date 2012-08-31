@@ -299,6 +299,14 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(data_list[0]['description'], 'Other description')
         self.assertEqual(data_list[1]['description'], 'Other description')
 
+        resp = self.app.put('/posts/', data=json.dumps({
+            'description': 'X'*121 # too long
+        }))
+        response_error(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(data['count'], 0)
+        self.assertEqual(data['field-errors'].keys(), ['description'])
+
 
     def test_dummy_auth(self):
         resp = self.app.get('/auth/')

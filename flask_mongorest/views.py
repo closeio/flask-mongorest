@@ -82,6 +82,7 @@ class ResourceView(View):
                     count += 1
             except ValidationError, e:
                 e.message['count'] = count
+                raise e
             else:
                 return {'count': count}
         else:
