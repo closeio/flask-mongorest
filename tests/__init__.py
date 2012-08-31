@@ -275,7 +275,30 @@ class MongoRestTestCase(unittest.TestCase):
         data_list_1 = json.loads(resp.data)['data']
         resp = self.app.get('/posts/?title=first post!')
         data_list_2 = json.loads(resp.data)['data']
-        assert(data_list_1 == data_list_2)
+        self.assertEqual(data_list_1, data_list_2)
+
+
+        # test bulk update
+        resp = self.app.put('/posts/?title__startswith=first', data=json.dumps({
+            'description': 'Some description'
+        }))
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(data['count'], 1)
+
+        resp = self.app.put('/posts/', data=json.dumps({
+            'description': 'Other description'
+        }))
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(data['count'], 2)
+
+        resp = self.app.get('/posts/')
+        response_success(resp)
+        data_list = json.loads(resp.data)['data']
+        self.assertEqual(data_list[0]['description'], 'Other description')
+        self.assertEqual(data_list[1]['description'], 'Other description')
+
 
     def test_dummy_auth(self):
         resp = self.app.get('/auth/')

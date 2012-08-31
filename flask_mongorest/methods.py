@@ -4,6 +4,9 @@ class Create:
 class Update:
     method = 'PUT'
 
+class BulkUpdate:
+    method = 'PUT'
+
 class Fetch:
     method = 'GET'
 

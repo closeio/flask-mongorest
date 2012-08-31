@@ -49,6 +49,7 @@ class ContentResource(Resource):
 
 class Post(db.Document):
     title = db.StringField(max_length=120, required=True)
+    description = db.StringField(max_length=120, required=False)
     author = db.ReferenceField(User)
     editor = db.ReferenceField(User)
     tags = db.ListField(db.StringField(max_length=30))
@@ -75,7 +76,7 @@ class PostResource(Resource):
 @api.register(name='posts', url='/posts/')
 class PostView(ResourceView):
     resource = PostResource
-    methods = [Create, Update, Fetch, List, Delete]
+    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
 
 class LimitedPostResource(Resource):
     document = Post

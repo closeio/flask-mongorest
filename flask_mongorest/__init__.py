@@ -1,5 +1,5 @@
 from functools import wraps
-from flask_mongorest.methods import Create, Update, Fetch, List, Delete
+from flask_mongorest.methods import Create, Update, BulkUpdate, Fetch, List, Delete
 
 
 class MongoRest(object):
@@ -18,8 +18,8 @@ class MongoRest(object):
             view_func = klass.as_view(name)
             if List in klass.methods: 
                 self.app.add_url_rule(url, defaults={'pk': None}, view_func=view_func, methods=[List.method])
-            if Create in klass.methods:
-                self.app.add_url_rule(url, view_func=view_func, methods=[Create.method])
+            if Create in klass.methods or BulkUpdate in klass.methods:
+                self.app.add_url_rule(url, view_func=view_func, methods=[x.method for x in klass.methods if x in (Create, BulkUpdate)])
             self.app.add_url_rule('%s<%s:%s>/' % (url, pk_type, 'pk'), view_func=view_func, methods=[x.method for x in klass.methods])
             return klass
         return decorator

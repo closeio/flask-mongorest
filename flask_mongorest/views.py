@@ -59,11 +59,37 @@ class ResourceView(View):
 
     def put(self, **kwargs):
         pk = kwargs.pop('pk', None)
-        obj = self._resource.get_object(pk)
-        self._resource.validate_request(obj)
-        obj = self._resource.update_object(obj)
-        ret = self._resource.serialize(obj, request.args)
-        return ret
+        if pk is None:
+            # Bulk update where the body contains the new values for certain
+            # fields.
+
+            # Currently, fetches all the objects and validate them separately.
+            # If one of them fails, a ValidationError for this object will be
+            # triggered.
+            # Ideally, this would be translated into an update statement for
+            # performance reasons and would perform the update either for all
+            # objects, or for none, if (generic) validation fails. Since this
+            # is a bulk update, only the count of objects which were updated is
+            # returned.
+
+            objs = self._resource.get_objects()
+            count = 0
+            try:
+                for obj in objs:
+                    self._resource.validate_request(obj)
+                    obj = self._resource.update_object(obj)
+                    obj.save()
+                    count += 1
+            except ValidationError, e:
+                e.message['count'] = count
+            else:
+                return {'count': count}
+        else:
+            obj = self._resource.get_object(pk)
+            self._resource.validate_request(obj)
+            obj = self._resource.update_object(obj)
+            ret = self._resource.serialize(obj, request.args)
+            return ret
 
     def delete(self, **kwargs):
         pk = kwargs.pop('pk', None)
