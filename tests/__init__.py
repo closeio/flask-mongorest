@@ -32,7 +32,7 @@ class MongoRestTestCase(unittest.TestCase):
         'first_name': 'olivia',
         'last_name': 'baker',
     }
-    
+
     post_1 = {
         'title': 'first post!',
         #author
@@ -242,14 +242,14 @@ class MongoRestTestCase(unittest.TestCase):
         compare_req_resp(self.post_2, json.loads(resp.data))
         self.post_2_obj = json.loads(resp.data)
 
-        
+
         #test filtering
 
         resp = self.app.get('/posts/?title__startswith=first')
         response_success(resp)
         data_list = json.loads(resp.data)['data']
         compare_req_resp(self.post_1_obj, data_list[0])
-        
+
         resp = self.app.get('/posts/?title__startswith=second')
         response_success(resp)
         data_list = json.loads(resp.data)['data']
@@ -271,7 +271,7 @@ class MongoRestTestCase(unittest.TestCase):
         data_list = json.loads(resp.data)['data']
         self.assertEqual(len(data_list), 1)
         compare_req_resp(self.post_2_obj, data_list[0])
-        
+
         # default exact filtering
         resp = self.app.get('/posts/?title__exact=first post!')
         data_list_1 = json.loads(resp.data)['data']
@@ -321,8 +321,8 @@ class MongoRestTestCase(unittest.TestCase):
             post['title'] = 'Post #%d' %i
             resp = self.app.post('/posts/', data=json.dumps(post))
             response_success(resp)
-        
-        resp = self.app.get('/posts/?_limit=10') 
+
+        resp = self.app.get('/posts/?_limit=10')
         response_success(resp)
         data = json.loads(resp.data)
         self.assertEqual(len(data['data']), 10)
@@ -361,7 +361,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
         user = json.loads(resp.data)
         compare_req_resp(test_user_data, user)
-    
+
 if __name__ == '__main__':
     unittest.main()
 

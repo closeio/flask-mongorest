@@ -1,4 +1,4 @@
-import os 
+import os
 import datetime
 
 from flask import Flask
@@ -99,7 +99,7 @@ class DummyAuthView(ResourceView):
     methods = [Create, Update, Fetch, List, Delete]
     authentication_methods = [DummyAuthenication]
 
-from flask.ext.wtf import Form, TextField, length
+from flask.ext.wtf import TextField, length
 class TestDocument(db.Document):
     name = db.StringField()
     other = db.StringField()
@@ -144,6 +144,6 @@ class TestFieldsResource(ResourceView):
     methods = [Create, Update, Fetch, List]
 
 
-if __name__ == "__main__": 
-    port = int(os.environ.get('PORT', 8000)) 
+if __name__ == "__main__":
+    port = int(os.environ.get('PORT', 8000))
     app.run(host='0.0.0.0', port=port)

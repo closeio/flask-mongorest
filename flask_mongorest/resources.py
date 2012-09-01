@@ -9,7 +9,7 @@ import dateutil.parser
 
 class ResourceMeta(type):
     def __init__(cls, name, bases, classdict):
-        if classdict.get('__metaclass__') is not ResourceMeta:  
+        if classdict.get('__metaclass__') is not ResourceMeta:
             for document,resource in cls.child_document_resources.iteritems():
                 if resource == name:
                     cls.child_document_resources[document] = cls
@@ -46,7 +46,7 @@ class Resource(object):
         self.data = {}
         if request.method in ('PUT', 'POST'):
             self.data = json.loads(request.data)
-        
+
     def get_fields(self):
         return self.fields
 
@@ -58,25 +58,25 @@ class Resource(object):
         @TODO should automatically support model_id for reference fields (only) and model for related_resources
         """
         return self.rename_fields
-    
+
     def get_child_document_resources(self):
         return self.child_document_resources
 
     def get_filters(self):
         filters = {}
-        for field, operators in getattr(self, 'filters', {}).iteritems():   
+        for field, operators in getattr(self, 'filters', {}).iteritems():
             field_filters = {}
             for op in operators:
                 if op.op == 'exact':
                     field_filters[''] = op
                 field_filters[op.op] = op
             filters[field] = field_filters
-        return filters 
+        return filters
 
     def serialize(self, obj, params=None):
         if not obj:
             return {}
-        
+
         if obj.__class__ in self._child_document_resources \
         and self._child_document_resources[obj.__class__] != self.__class__:
             return obj and self._child_document_resources[obj.__class__]().serialize(obj)
@@ -197,7 +197,7 @@ class Resource(object):
 
     def get_object(self, pk):
         return self.get_queryset().get(pk=pk)
-   
+
     def get_objects(self, all=False):
         params = request.args
         qs = self.get_queryset()
@@ -302,8 +302,8 @@ class Resource(object):
         kwargs = {}
         data = data or self.data
         for field in self.get_fields():
-            if field in self.document._fields.keys() and field not in self.readonly_fields and (type(data) is list or (type(data) is dict and data.has_key(field))): 
-                kwargs[field] = self._get('create_object', data, field, parent_resources=parent_resources) 
+            if field in self.document._fields.keys() and field not in self.readonly_fields and (type(data) is list or (type(data) is dict and data.has_key(field))):
+                kwargs[field] = self._get('create_object', data, field, parent_resources=parent_resources)
         obj = self.document(**kwargs)
         if save:
             self._save(obj)

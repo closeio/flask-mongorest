@@ -5,7 +5,6 @@ from flask import request
 from flask.ext.views.base import View
 from werkzeug.routing import NotFound
 from werkzeug.exceptions import Unauthorized
-from flask.ext.mongorest.resources import Resource
 from flask.ext.mongorest.utils import MongoEncoder
 from flask.ext.mongorest.exceptions import ValidationError
 
@@ -29,7 +28,7 @@ class ResourceView(View):
             if authentication_method().authorized():
                 authorized = True
         if not authorized:
-            raise Unauthorized 
+            raise Unauthorized
 
         try:
             return super(ResourceView, self).dispatch_request(*args, **kwargs)
