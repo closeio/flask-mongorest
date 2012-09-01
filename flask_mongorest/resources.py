@@ -96,6 +96,11 @@ class Resource(object):
                     return field_value and field_value.to_dbref()
             elif isinstance(field_instance, ListField):
                 return [get(elem, field_name, field_instance=field_instance.field) for elem in field_value]
+            elif field_value and isinstance(field_instance, DateTimeField):
+                # since MongoDB will only return millisecond precision we want POST/PUT
+                # responses to have the same format as future GETs would
+                millis = field_value.microsecond // 1000
+                return '%s.%d' % (field_value.strftime('%Y-%m-%dT%H:%M:%S'), millis)
             elif callable(field_instance):
                 value = field_value()
                 if field_name in self._related_resources:
@@ -175,7 +180,7 @@ class Resource(object):
                         if isinstance(v, bool) and v == False: # BooleanField
                             v = []
                         if isinstance(v, datetime.datetime): # DateTimeField
-                            v = v.strftime('%Y-%m-%d %H:%M:%S')
+                            v = v.strftime('%Y-%m-%d %H:%M:%S.%f')
                         if isinstance(v, DBRef): # ReferenceField
                             v = v.id
                         if v is None:

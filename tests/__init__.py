@@ -1,4 +1,6 @@
 import json
+import copy
+import datetime
 import unittest
 import example.app as example
 
@@ -90,9 +92,20 @@ class MongoRestTestCase(unittest.TestCase):
 
     def test_update_user(self):
         self.user_1_obj['first_name'] = 'anthony'
+        self.user_1_obj['datetime'] = datetime.datetime.utcnow().isoformat()
         resp = self.app.put('/user/%s/' % self.user_1_obj['id'], data=json.dumps(self.user_1_obj))
         response_success(resp)
-        compare_req_resp(self.user_1_obj, json.loads(resp.data))
+
+        # check for request params in response, except for date (since the format will differ)
+        data_to_check = copy.copy(self.user_1_obj)
+        del data_to_check['datetime']
+        compare_req_resp(data_to_check, json.loads(resp.data))
+        resp = json.loads(resp.data)
+
+        # response from PUT should be completely identical as a subsequent GET
+        # (including precision of datetimes)
+        resp2 = json.loads(self.app.get('/user/%s/' % self.user_1_obj['id']).data)
+        self.assertEqual(resp, resp2)
 
     def test_model_validation(self):
         resp = self.app.post('/user/', data=json.dumps({
