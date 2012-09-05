@@ -99,8 +99,9 @@ class Resource(object):
             elif field_value and isinstance(field_instance, DateTimeField):
                 # since MongoDB will only return millisecond precision we want POST/PUT
                 # responses to have the same format as future GETs would
+                # TODO better timezone support, and move this block into MongoEncoder
                 millis = field_value.microsecond // 1000
-                return '%s.%d' % (field_value.strftime('%Y-%m-%dT%H:%M:%S'), millis)
+                return '%s.%d' % (field_value.strftime('%Y-%m-%dT%H:%M:%SZ'), millis)
             elif callable(field_instance):
                 value = field_value()
                 if field_name in self._related_resources:
