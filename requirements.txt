@@ -1,5 +1,5 @@
 Flask-Views
-git+ssh://git@github.com/elasticsales/flask-mongoengine.git#egg=flask-mongoengine
+flask-mongoengine
 mimerender
 python-dateutil
 sphinx

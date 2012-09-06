@@ -31,9 +31,6 @@ setup(
         'coverage',
         'python-dateutil'
     ],
-    dependency_links = [
-        'http://github.com/elasticsales/flask-mongoengine/tarball/master#egg=flask-mongoengine',
-    ],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Web Environment',
