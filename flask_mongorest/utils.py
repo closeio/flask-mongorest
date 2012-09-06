@@ -1,4 +1,5 @@
 import json
+import decimal
 import datetime
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
@@ -16,4 +17,6 @@ class MongoEncoder(json.JSONEncoder):
             return value()
         if isinstance(value, datetime.datetime):
             return value.isoformat()
+        if isinstance(value, decimal.Decimal):
+            return str(value)
         return json.JSONEncoder.default(value, **kwargs)

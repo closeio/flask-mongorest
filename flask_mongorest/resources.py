@@ -1,9 +1,10 @@
-import datetime
 import json
+import decimal
+import datetime
 import mongoengine
 from flask import request
 from bson.dbref import DBRef
-from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, DateTimeField
+from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, DateTimeField, DecimalField
 from flask.ext.mongorest.exceptions import ValidationError
 import dateutil.parser
 
@@ -267,6 +268,12 @@ class Resource(object):
                 return field_data_value
             else:
                 return field_data_value and dateutil.parser.parse(field_data_value)
+
+        elif isinstance(field_instance, DecimalField):
+            if isinstance(field_data_value, decimal.Decimal):
+                return field_data_value
+            else:
+                return field_data_value and decimal.Decimal(field_data_value)
 
         elif isinstance(field_instance, EmbeddedDocumentField):
             if field_name in self._related_resources:
