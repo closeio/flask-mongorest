@@ -294,7 +294,7 @@ class Resource(object):
         except mongoengine.ValidationError, e:
             def serialize_errors(errors):
                 if hasattr(errors, 'iteritems'):
-                    return {k: serialize_errors(v) for k, v in errors.iteritems()}
+                    return dict((k, serialize_errors(v)) for (k, v) in errors.iteritems())
                 else:
                     return str(errors)
             raise ValidationError({'field-errors': serialize_errors(e.errors)})
