@@ -19,5 +19,3 @@ class InvalidFilter(MongoRestException):
  
 class ValidationError(MongoRestException):
     pass
-
-

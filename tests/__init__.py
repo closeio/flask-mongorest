@@ -376,6 +376,12 @@ class MongoRestTestCase(unittest.TestCase):
         user = json.loads(resp.data)
         compare_req_resp(test_user_data, user)
 
+    def test_invalid_json(self):
+        resp = self.app.post('/user/', data='{\"}')
+        response_error(resp, code=400)
+        resp = json.loads(resp.data)
+        self.assertEqual(resp['error'], 'invalid json.')
+
 if __name__ == '__main__':
     unittest.main()
 

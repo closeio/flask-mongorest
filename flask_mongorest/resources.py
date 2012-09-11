@@ -46,7 +46,10 @@ class Resource(object):
         self._child_document_resources = self.get_child_document_resources()
         self.data = {}
         if request.method in ('PUT', 'POST'):
-            self.data = json.loads(request.data)
+            try:
+                self.data = json.loads(request.data)
+            except ValueError, e:
+                raise ValidationError({'error': 'invalid json.'})
 
     def get_fields(self):
         return self.fields
