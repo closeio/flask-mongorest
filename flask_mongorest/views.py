@@ -22,6 +22,8 @@ class ResourceView(View):
 
     @mimerender(default='json', json = render_json)
     def dispatch_request(self, *args, **kwargs):
+        self._resource = self.resource()
+
         authorized = True if len(self.authentication_methods) == 0 else False
         for authentication_method in self.authentication_methods:
             if authentication_method().authorized():
@@ -30,7 +32,6 @@ class ResourceView(View):
             raise Unauthorized
 
         try:
-            self._resource = self.resource()
             return super(ResourceView, self).dispatch_request(*args, **kwargs)
         except mongoengine.queryset.DoesNotExist:
             raise NotFound()

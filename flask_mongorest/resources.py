@@ -6,6 +6,7 @@ from flask import request
 from bson.dbref import DBRef
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, DateTimeField, DecimalField
 from flask.ext.mongorest.exceptions import ValidationError
+from flask.ext.mongorest.validators import Optional
 import dateutil.parser
 
 class ResourceMeta(type):
@@ -20,7 +21,7 @@ class Resource(object):
     document = None # required
     fields = None
     readonly_fields = ['id']
-    form = None
+    validators = {} # see http://wtforms.simplecodes.com/docs/1.0.2/validators.html for more details
     related_resources = {}
     rename_fields = {}
     child_document_resources = {}
@@ -45,11 +46,6 @@ class Resource(object):
         self._filters = self.get_filters()
         self._child_document_resources = self.get_child_document_resources()
         self.data = {}
-        if request.method in ('PUT', 'POST'):
-            try:
-                self.data = json.loads(request.data)
-            except ValueError, e:
-                raise ValidationError({'error': 'invalid json.'})
 
     def get_fields(self):
         return self.fields
@@ -62,6 +58,9 @@ class Resource(object):
         @TODO should automatically support model_id for reference fields (only) and model for related_resources
         """
         return self.rename_fields
+
+    def get_validators(self):
+        return self.validators
 
     def get_child_document_resources(self):
         return self.child_document_resources
@@ -133,21 +132,11 @@ class Resource(object):
         return data
 
     def validate_request(self, obj=None):
-        if self.form:
-            from werkzeug.datastructures import MultiDict
-
-            if request.method == 'PUT' and obj != None:
-                # We treat 'PUT' like 'PATCH', i.e. when fields are not
-                # specified, existing values are used.
-
-                # TODO: This is not implemented properly for nested objects yet.
-
-                obj_data = self.serialize(obj)
-                obj_data.update(self.data)
-
-                self.data = obj_data
-
-        # @TODO this should rename form fields otherwise in a resource you could say "model_id" and in a form still have to use "model".
+        if request.method in ('PUT', 'POST'):
+            try:
+                self.data = json.loads(request.data)
+            except ValueError:
+                raise ValidationError({'error': 'invalid json.'})
 
         # Do renaming in two passes to prevent potential multiple renames depending on dict traversal order.
         # E.g. if a -> b, b -> c, then a should never be renamed to c.
@@ -162,39 +151,21 @@ class Resource(object):
         for k, v in fields_to_update.iteritems():
             self.data[k] = v
 
-        if self.form:
-            # We need to convert JSON data into form data.
-            # e.g. { "people": [ { "name": "A" } ] } into { "people-0-name": "A" }
-            def json_to_form_data(prefix, json_data):
-                import datetime
-                from bson.dbref import DBRef
-                form_data = {}
-                for k, v in json_data.iteritems():
-                    if isinstance(v, list): # FieldList
-                        for n, el in enumerate(v):
-                            form_data.update(json_to_form_data('%s%s-%d-' % (prefix, k, n), el))
-                    else:
-                        if isinstance(v, dict): # DictField
-                            v = json.dumps(v)
-                        if isinstance(v, bool) and v == False: # BooleanField
-                            v = []
-                        if isinstance(v, datetime.datetime): # DateTimeField
-                            v = v.strftime('%Y-%m-%d %H:%M:%S')
-                        if isinstance(v, DBRef): # ReferenceField
-                            v = v.id
-                        if v is None:
-                            v = ''
-                        form_data['%s%s' % (prefix, k)] = v
-                return form_data
+        errors = {}
+        for field, validators in self.validators.iteritems():
+            if Optional in [v.__class__ for v in validators] and not self.data.has_key(field):
+                continue
+            value = self.data.get(field, None)
+            for validator in validators:
+                try:
+                    validator(value)
+                except ValidationError, e:
+                    if field not in errors.keys():
+                        errors[field] = []
+                    errors[field].append(e.message)
 
-            json_data = json_to_form_data('', self.data)
-            data = MultiDict(json_data)
-            form = self.form(data, csrf_enabled=False)
-
-            if not form.validate():
-                raise ValidationError({'field-errors': form.errors})
-
-            self.data = form.data
+        if errors:
+            raise ValidationError({'field-errors': errors})
 
     def get_queryset(self):
         return self.document.objects

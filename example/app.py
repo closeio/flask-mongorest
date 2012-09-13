@@ -9,6 +9,7 @@ from flask.ext.mongorest.resources import Resource
 from flask.ext.mongorest import operators as ops
 from flask.ext.mongorest.methods import *
 from flask.ext.mongorest.authentication import AuthenticationBase
+from flask.ext.mongorest.validators import length, optional, required
 
 
 app = Flask(__name__)
@@ -103,25 +104,25 @@ class DummyAuthView(ResourceView):
     methods = [Create, Update, Fetch, List, Delete]
     authentication_methods = [DummyAuthenication]
 
-from flask.ext.wtf import TextField, length
 class TestDocument(db.Document):
     name = db.StringField()
     other = db.StringField()
     dictfield = db.DictField()
     is_new = db.BooleanField()
 
-from flask.ext.mongoengine.wtf.orm import model_form
-TestBaseForm = model_form(TestDocument)
+class TestValidationResource(Resource):
+    document = TestDocument
+    validators = {
+        'name': [length(min=3, max=8), optional()],
+        'other': [required()],
+    }
 
-class TestForm(TestBaseForm):
-    name = TextField(validators=[length(min=3, max=8)])
+@api.register(name='testvalidation', url='/testvalidation/')
+class TestValidationView(ResourceView):
+    resource = TestValidationResource
+    methods = [Create, Update, Fetch, List]
 
 class TestResource(Resource):
-    form = TestForm
-    document = TestDocument
-
-class TestFormResource(Resource):
-    form = TestForm
     document = TestDocument
 
 class TestFieldsResource(Resource):
@@ -135,12 +136,6 @@ class TestFieldsResource(Resource):
 class TestView(ResourceView):
     resource = TestResource
     methods = [Create, Update, Fetch, List]
-
-@api.register(name='testform', url='/testform/')
-class TestFormView(ResourceView):
-    resource = TestFormResource
-    methods = [Create, Update, Fetch, List]
-
 
 @api.register(name='testfields', url='/testfields/')
 class TestFieldsResource(ResourceView):

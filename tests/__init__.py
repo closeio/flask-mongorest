@@ -140,24 +140,33 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(errors['field-errors'].keys(), ['emails'])
         self.assertEqual(errors['field-errors']['emails'].keys(), ['1', '3'])
 
-    def test_form_validation(self):
-        resp = self.app.post('/testform/', data=json.dumps({
+    def test_length_validation(self):
+        resp = self.app.post('/testvalidation/', data=json.dumps({
+            'name': 'x',
+            'other': 'test',
+        }))
+        response_error(resp)
+        errors = json.loads(resp.data)
+        self.assertEqual(errors.keys(), ['field-errors'])
+        self.assertTrue('name' in errors['field-errors'].keys())
+
+    def test_required_validation(self):
+        resp = self.app.post('/testvalidation/', data=json.dumps({
             'name': 'x',
         }))
         response_error(resp)
         errors = json.loads(resp.data)
         self.assertEqual(errors.keys(), ['field-errors'])
-        self.assertEqual(errors['field-errors'].keys(), ['name'])
-
-        resp = self.app.post('/testform/', data=json.dumps({
-            'name': 'okay',
-        }))
+        self.assertTrue('other' in errors['field-errors'].keys())
+        
+    def test_optional_validation(self):
+        resp = self.app.post('/testvalidation/', data=json.dumps({'other':'yup'}))
         response_success(resp)
-        data = json.loads(resp.data)
-        self.assertEqual(data['name'], 'okay')
-
-        resp = self.app.post('/testform/', data=json.dumps({
+    
+    def test_validation(self):
+        resp = self.app.post('/testvalidation/', data=json.dumps({
             'name': 'okay',
+            'other': 'again',
             'dictfield': {
                 'field1': 'value1',
                 'field2': ['one', 'two', 'three'],
@@ -173,22 +182,6 @@ class MongoRestTestCase(unittest.TestCase):
             'field3': 123,
         })
 
-        # Test boolean fields
-        resp = self.app.post('/testform/', data=json.dumps({
-            'name': 'okay',
-            'is_new': True
-        }))
-        response_success(resp)
-        data = json.loads(resp.data)
-        self.assertEqual(data['is_new'], True)
-
-        resp = self.app.post('/testform/', data=json.dumps({
-            'name': 'okay',
-            'is_new': False
-        }))
-        response_success(resp)
-        data = json.loads(resp.data)
-        self.assertEqual(data['is_new'], False)
 
     def test_resource_fields(self):
         resp = self.app.post('/testfields/', data=json.dumps({
