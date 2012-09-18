@@ -297,9 +297,12 @@ class Resource(object):
         else:
             return field_data_value
 
+    def save_object(self, obj):
+        obj.save()
+
     def _save(self, obj):
         try:
-            obj.save()
+            self.save_object(obj)
             obj.reload()
         except mongoengine.ValidationError, e:
             def serialize_errors(errors):
