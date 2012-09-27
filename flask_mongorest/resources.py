@@ -293,6 +293,8 @@ class Resource(object):
                 return field_data_value and decimal.Decimal(field_data_value)
 
         elif isinstance(field_instance, EmbeddedDocumentField):
+            if field_data_value == None:
+                return # no embedded document
             if field_name in self._related_resources:
                 return self.related_resources[field_name]().create_object(data=field_data_value, save=False, parent_resources=parent_resources+[self])
             else:
