@@ -21,6 +21,7 @@ class Resource(object):
     fields = None
     readonly_fields = ['id']
     form = None
+    schema = None
     related_resources = {}
     rename_fields = {}
     child_document_resources = {}
@@ -133,7 +134,7 @@ class Resource(object):
         return data
 
     def validate_request(self, obj=None):
-        if self.form:
+        if not self.schema and self.form:
             from werkzeug.datastructures import MultiDict
 
             if request.method == 'PUT' and obj != None:
@@ -162,7 +163,20 @@ class Resource(object):
         for k, v in fields_to_update.iteritems():
             self.data[k] = v
 
-        if self.form:
+        if self.schema:
+            from cleancat import ValidationError as SchemaValidationError
+            if request.method == 'PUT' and obj != None:
+                obj_data = dict([(key, getattr(obj, key)) for key in obj._fields.keys()])
+            else:
+                obj_data = None
+
+            schema = self.schema(self.data, obj_data)
+            try:
+                self.data = schema.full_clean()
+            except SchemaValidationError, e:
+                raise ValidationError({'field-errors': schema.errors, 'errors': schema.non_field_errors })
+
+        elif self.form:
             # We need to convert JSON data into form data.
             # e.g. { "people": [ { "name": "A" } ] } into { "people-0-name": "A" }
             def json_to_form_data(prefix, json_data):
