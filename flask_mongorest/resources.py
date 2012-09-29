@@ -333,7 +333,10 @@ class Resource(object):
         data = data or self.data
         for field in self.get_fields():
             if field in self.document._fields.keys() and field not in self.readonly_fields and (type(data) is list or (type(data) is dict and data.has_key(field))):
-                kwargs[field] = self._get('create_object', data, field, parent_resources=parent_resources)
+                if self.schema:
+                    kwargs[field] = data[field]
+                else:
+                    kwargs[field] = self._get('create_object', data, field, parent_resources=parent_resources)
         obj = self.document(**kwargs)
         if save:
             self._save(obj)
@@ -347,7 +350,10 @@ class Resource(object):
                     field_instance = getattr(self.document, field)
                     if isinstance(field_instance, ReferenceField) or (isinstance(field_instance, ListField) and isinstance(field_instance.field, ReferenceField)):
                         continue # Not implemented.
-                setattr(obj, field, self._get('update_object', data, field, parent_resources=parent_resources))
+                if self.schema:
+                    setattr(obj, field, data[field])
+                else:
+                    setattr(obj, field, self._get('update_object', data, field, parent_resources=parent_resources))
         if save:
             self._save(obj)
 
