@@ -246,7 +246,7 @@ class Resource(object):
             else:
                 qs = qs.limit(self.max_limit)+1
         if self.allowed_ordering and params.get('_order_by', None) in self.allowed_ordering:
-            qs = qs.order_by(params['_order_by'])
+            qs = qs.order_by(*params['_order_by'].split(','))
         # Needs to be at the end as it returns a list.
         if self.select_related:
             qs = qs.select_related()
