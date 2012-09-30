@@ -186,7 +186,8 @@ class Resource(object):
                 for k, v in json_data.iteritems():
                     if isinstance(v, list): # FieldList
                         for n, el in enumerate(v):
-                            form_data.update(json_to_form_data('%s%s-%d-' % (prefix, k, n), el))
+                            if isinstance(el, dict): # only dict type is supported
+                                form_data.update(json_to_form_data('%s%s-%d-' % (prefix, k, n), el))
                     else:
                         if isinstance(v, dict): # DictField
                             v = json.dumps(v)
