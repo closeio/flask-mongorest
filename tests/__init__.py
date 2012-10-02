@@ -268,6 +268,11 @@ class MongoRestTestCase(unittest.TestCase):
         data_list = json.loads(resp.data)['data']
         self.assertEqual(data_list, [])
 
+        resp = self.app.get('/user/?first_name__in=%s,%s' % (self.user_1_obj['first_name'], self.user_2_obj['first_name']))
+        response_success(resp)
+        users = json.loads(resp.data)
+        self.assertEqual(len(users['data']), 2)
+
         resp = self.app.get('/posts/?author_id=%s' % self.user_2_obj['id'])
         response_success(resp)
         data_list = json.loads(resp.data)['data']
@@ -291,7 +296,6 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.get('/posts/?title=first post!')
         data_list_2 = json.loads(resp.data)['data']
         self.assertEqual(data_list_1, data_list_2)
-
 
         # test bulk update
         resp = self.app.put('/posts/?title__startswith=first', data=json.dumps({
