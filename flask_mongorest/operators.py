@@ -29,6 +29,17 @@ class Gte(Operator):
 class Exact(Operator):
     op = 'exact'
 
+class In(Operator):
+    op = 'in'
+
+    def prepare_queryset_kwargs(self, field, value, negate):
+        # only use 'in' if multiple values are specified
+        if ',' in value:
+            value = value.split(',')
+        else:
+            self.op = 'exact'
+        return super(In, self).prepare_queryset_kwargs(field, value, negate)
+
 class Contains(Operator):
     op = 'contains'
 
