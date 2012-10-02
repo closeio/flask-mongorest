@@ -39,6 +39,8 @@ class User(db.Document):
 class UserResource(Resource):
     document = User
 
+
+
 @api.register()
 class UserView(ResourceView):
     resource = UserResource
@@ -69,7 +71,7 @@ class PostResource(Resource):
         'sections': ContentResource, #nested complex objects
     }
     filters = {
-        'title': [ops.Exact, ops.Startswith],
+        'title': [ops.Exact, ops.Startswith, ops.In],
         'author_id': [ops.Exact],
         'is_published': [ops.Boolean],
     }

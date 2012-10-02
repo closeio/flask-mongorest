@@ -268,10 +268,24 @@ class MongoRestTestCase(unittest.TestCase):
         data_list = json.loads(resp.data)['data']
         self.assertEqual(data_list, [])
 
-        resp = self.app.get('/user/?first_name__in=%s,%s' % (self.user_1_obj['first_name'], self.user_2_obj['first_name']))
+        resp = self.app.get('/posts/?title__in=%s,%s' % (self.post_1_obj['title'], self.post_2_obj['title']))
         response_success(resp)
-        users = json.loads(resp.data)
-        self.assertEqual(len(users['data']), 2)
+        posts = json.loads(resp.data)
+        self.assertEqual(len(posts['data']), 2)
+
+        # test negation
+
+        # exclude many
+        resp = self.app.get('/posts/?title__not__in=%s,%s' % (self.post_1_obj['title'], self.post_2_obj['title']))
+        response_success(resp)
+        posts = json.loads(resp.data)
+        self.assertEqual(len(posts['data']), 0)
+
+        # exclude one
+        resp = self.app.get('/posts/?title__not__in=%s' % (self.post_1_obj['title']))
+        response_success(resp)
+        posts = json.loads(resp.data)
+        self.assertEqual(len(posts['data']), 1)
 
         resp = self.app.get('/posts/?author_id=%s' % self.user_2_obj['id'])
         response_success(resp)
