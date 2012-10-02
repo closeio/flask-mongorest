@@ -33,12 +33,18 @@ class In(Operator):
     op = 'in'
 
     def prepare_queryset_kwargs(self, field, value, negate):
-        # only use 'in' if multiple values are specified
+        # only use 'in' or 'nin' if multiple values are specified
         if ',' in value:
             value = value.split(',')
+            self.op = (not negate and self.op) or 'nin'
         else:
-            self.op = 'exact'
+            self.op = (not negate and 'exact') or 'ne'
         return super(In, self).prepare_queryset_kwargs(field, value, negate)
+
+    def apply(self, queryset, field, value, negate=False):
+        kwargs = self.prepare_queryset_kwargs(field, value, negate)
+        return queryset.filter(**kwargs)
+
 
 class Contains(Operator):
     op = 'contains'
@@ -58,3 +64,4 @@ class Boolean(Operator):
         else:
             bool_value = True
         return {field:bool_value}
+
