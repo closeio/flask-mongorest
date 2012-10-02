@@ -1,3 +1,4 @@
+from flask import Blueprint
 from functools import wraps
 from flask_mongorest.methods import Create, Update, BulkUpdate, Fetch, List, Delete
 
@@ -6,6 +7,7 @@ class MongoRest(object):
     def __init__(self, app, **kwargs):
         self.app = app
         self.url_prefix = kwargs.pop('url_prefix', '')
+        app.register_blueprint(Blueprint(self.url_prefix, __name__, template_folder='templates'))
 
     def register(self, **kwargs):
         def decorator(klass):

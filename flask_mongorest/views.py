@@ -1,9 +1,9 @@
 import json
 import mimerender
 import mongoengine
-from flask import request
 from flask.ext.views.base import View
 from werkzeug.routing import NotFound
+from flask import request, render_template
 from werkzeug.exceptions import Unauthorized
 from flask.ext.mongorest.utils import MongoEncoder
 from flask.ext.mongorest.exceptions import ValidationError
@@ -11,6 +11,7 @@ from flask.ext.mongorest.exceptions import ValidationError
 
 mimerender = mimerender.FlaskMimeRender()
 render_json = lambda **payload: json.dumps(payload, cls=MongoEncoder)
+render_html = lambda **payload: render_template('mongorest/debug.html', data=json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4))
 
 class ResourceView(View):
     resource = None
@@ -20,7 +21,7 @@ class ResourceView(View):
     def __init__(self):
         assert(self.resource and self.methods)
 
-    @mimerender(default='json', json = render_json)
+    @mimerender(default='json', json = render_json, html = render_html)
     def dispatch_request(self, *args, **kwargs):
         authorized = True if len(self.authentication_methods) == 0 else False
         for authentication_method in self.authentication_methods:
@@ -46,11 +47,10 @@ class ResourceView(View):
             }
             if has_more != None:
                 ret['has_more'] = has_more
-            return ret
         else:
             obj = self._resource.get_object(pk)
             ret = self._resource.serialize(obj, request.args)
-            return ret
+        return ret
 
     def post(self, **kwargs):
         if 'pk' in kwargs:
