@@ -268,6 +268,25 @@ class MongoRestTestCase(unittest.TestCase):
         data_list = json.loads(resp.data)['data']
         self.assertEqual(data_list, [])
 
+        resp = self.app.get('/posts/?title__in=%s,%s' % (self.post_1_obj['title'], self.post_2_obj['title']))
+        response_success(resp)
+        posts = json.loads(resp.data)
+        self.assertEqual(len(posts['data']), 2)
+
+        # test negation
+
+        # exclude many
+        resp = self.app.get('/posts/?title__not__in=%s,%s' % (self.post_1_obj['title'], self.post_2_obj['title']))
+        response_success(resp)
+        posts = json.loads(resp.data)
+        self.assertEqual(len(posts['data']), 0)
+
+        # exclude one
+        resp = self.app.get('/posts/?title__not__in=%s' % (self.post_1_obj['title']))
+        response_success(resp)
+        posts = json.loads(resp.data)
+        self.assertEqual(len(posts['data']), 1)
+
         resp = self.app.get('/posts/?author_id=%s' % self.user_2_obj['id'])
         response_success(resp)
         data_list = json.loads(resp.data)['data']
@@ -291,7 +310,6 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.get('/posts/?title=first post!')
         data_list_2 = json.loads(resp.data)['data']
         self.assertEqual(data_list_1, data_list_2)
-
 
         # test bulk update
         resp = self.app.put('/posts/?title__startswith=first', data=json.dumps({
