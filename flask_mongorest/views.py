@@ -3,6 +3,7 @@ import mimerender
 import mongoengine
 from flask.ext.views.base import View
 from werkzeug.routing import NotFound
+from werkzeug.exceptions import BadRequest
 from flask import request, render_template
 from werkzeug.exceptions import Unauthorized
 from flask.ext.mongorest.utils import MongoEncoder
@@ -37,6 +38,8 @@ class ResourceView(View):
             raise NotFound()
         except ValidationError, e:
             return e.message, '400 Bad Request' 
+        except mongoengine.ValidationError, e:
+            raise BadRequest(description=e)
 
     def get(self, **kwargs):
         pk = kwargs.pop('pk', None)
