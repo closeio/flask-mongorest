@@ -17,6 +17,8 @@ class MongoEncoder(json.JSONEncoder):
             return value()
         if isinstance(value, datetime.datetime):
             return value.isoformat()
+        if isinstance(value, datetime.date):
+            return value.strftime("%Y-%m-%d")
         if isinstance(value, decimal.Decimal):
             return str(value)
         return json.JSONEncoder.default(value, **kwargs)
