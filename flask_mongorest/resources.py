@@ -316,11 +316,11 @@ class Resource(object):
 
     def save_object(self, obj):
         obj.save()
+        obj.reload()
 
     def _save(self, obj):
         try:
             self.save_object(obj)
-            obj.reload()
         except mongoengine.ValidationError, e:
             def serialize_errors(errors):
                 if hasattr(errors, 'iteritems'):
