@@ -38,6 +38,9 @@ class User(db.Document):
 
 class UserResource(Resource):
     document = User
+    filters = {
+        'datetime': [ops.Exact]
+    }
 
 
 
