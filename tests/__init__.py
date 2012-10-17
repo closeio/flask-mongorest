@@ -28,11 +28,13 @@ class MongoRestTestCase(unittest.TestCase):
         'email': '1@b.com',
         'first_name': 'alan',
         'last_name': 'baker',
+        'datetime': '2012-10-09T10:00:00+00:00',
     }
     user_2 = {
         'email': '2@b.com',
         'first_name': 'olivia',
         'last_name': 'baker',
+        'datetime': '2012-11-09T11:00:00+00:00',
     }
 
     post_1 = {
@@ -272,6 +274,21 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
         posts = json.loads(resp.data)
         self.assertEqual(len(posts['data']), 2)
+
+        resp = self.app.get('/user/?datetime=%s' % '2012-10-09 10:00:00')
+        response_success(resp)
+        users = json.loads(resp.data)
+        self.assertEqual(len(users['data']), 1)
+
+        resp = self.app.get('/user/?datetime__gt=%s' % '2012-10-08 10:00:00')
+        response_success(resp)
+        users = json.loads(resp.data)
+        self.assertEqual(len(users['data']), 2)
+
+        resp = self.app.get('/user/?datetime__gte=%s' % '2012-10-09 10:00:00')
+        response_success(resp)
+        users = json.loads(resp.data)
+        self.assertEqual(len(users['data']), 2)
 
         # test negation
 
