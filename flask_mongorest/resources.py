@@ -4,8 +4,11 @@ import datetime
 import mongoengine
 from flask import request
 from bson.dbref import DBRef
+from bson.objectid import ObjectId
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, DateTimeField, DecimalField
+from mongoengine import EmbeddedDocument
 from flask.ext.mongorest.exceptions import ValidationError
+from flask.ext.mongorest.utils import isbound, eval_query
 import dateutil.parser
 
 class ResourceMeta(type):
@@ -23,6 +26,7 @@ class Resource(object):
     form = None
     schema = None
     related_resources = {}
+    related_resources_hints = {} #@todo this should be integrated into the related_resources dict, possibly as a tuple
     rename_fields = {}
     child_document_resources = {}
     paginate = True
@@ -78,6 +82,7 @@ class Resource(object):
             filters[field] = field_filters
         return filters
 
+
     def serialize(self, obj, params=None):
         if not obj:
             return {}
@@ -90,6 +95,11 @@ class Resource(object):
             """
             @TODO needs significant cleanup
             """
+            if not field_instance:
+                if field_name not in self._related_resources.keys():
+                    if not isinstance(obj, EmbeddedDocument):
+                        return obj.to_dbref()
+    
             field_value = obj if field_instance else getattr(obj, field_name)
             field_instance = field_instance or getattr(self.document, field_name)
             if isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)):
@@ -102,10 +112,16 @@ class Resource(object):
             elif isinstance(field_instance, ListField):
                 return [get(elem, field_name, field_instance=field_instance.field) for elem in field_value]
             elif callable(field_instance):
-                value = field_value()
+                if isinstance(field_value, list):
+                    value = field_value
+                else:
+                    if isbound(field_instance):
+                        value = field_instance()
+                    else:
+                        value = field_instance(obj)
+                     
                 if field_name in self._related_resources:
-                    if isinstance(value, mongoengine.queryset.QuerySet):
-                        return [self._related_resources[field_name]().serialize(o) for o in value]
+                    return [self._related_resources[field_name]().serialize(o) for o in value]
                 return value
             return field_value
 
@@ -180,8 +196,6 @@ class Resource(object):
             # We need to convert JSON data into form data.
             # e.g. { "people": [ { "name": "A" } ] } into { "people-0-name": "A" }
             def json_to_form_data(prefix, json_data):
-                import datetime
-                from bson.dbref import DBRef
                 form_data = {}
                 for k, v in json_data.iteritems():
                     if isinstance(v, list): # FieldList
@@ -254,13 +268,58 @@ class Resource(object):
 
         if limit:
             # It is OK to evaluate the queryset as we will do so anyway.
-            qs = list(qs)
-            has_more = len(qs) == limit
+            qs, count = eval_query(qs)
+            has_more = count == limit
             if has_more:
                 qs = qs[:-1]
         else:
             has_more = None
 
+        # bulk-fetch related resources for moar speed
+
+        if self.related_resources_hints:
+            document_queryset = {}
+            for obj in qs:
+                for field_name in self.related_resources_hints.keys():
+                    resource = self.related_resources[field_name]
+                    method = getattr(obj, field_name)
+                    if callable(method):
+                        q = method()
+                        if field_name in document_queryset.keys():
+                            document_queryset[field_name] = (document_queryset[field_name] | q._query_obj)          
+                        else:
+                            document_queryset[field_name] = q._query_obj
+            
+            hints = {}
+            for k,v in document_queryset.iteritems():
+                doc = self.related_resources[k].document
+                document_queryset[k], count = eval_query(doc.objects.filter(v))
+                 
+
+                hint_index = {}
+                if k in self.related_resources_hints.keys():
+                    hint_field = self.related_resources_hints[k]
+                    for obj in document_queryset[k]:
+                        hinted = str(obj._data[hint_field].id)
+                        hint_index[hinted] = obj
+
+                    hints[k] = hint_index
+        
+            for obj in qs:
+                for field, hint_index in hints.iteritems():
+                    obj_id = obj.id
+                    if isinstance(obj_id, DBRef):
+                        obj_id = obj_id.id
+                    elif isinstance(obj_id, ObjectId):
+                        obj_id = str(obj_id)
+                    if obj_id not in hint_index.keys():
+                        setattr(obj, field, [])
+                        continue
+                    if isinstance(getattr(obj, field), list):
+                        getattr(obj, field).append(hint_index[obj_id]) 
+                    else:
+                        setattr(obj, field, [hint_index[obj_id]])
+                    
         return qs, has_more
 
     def _get(self, method, data, field_name, field_instance=None, parent_resources=None):

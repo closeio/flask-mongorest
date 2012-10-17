@@ -5,7 +5,15 @@ from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from mongoengine.base import BaseDocument
 
-callable = lambda o: hasattr(o, '__call__')
+isbound = lambda m: getattr(m, 'im_self', None) is not None
+
+def eval_query(qs):
+    count = 0
+    objs = []
+    for obj in qs:
+        count += 1 
+        objs.append(obj)
+    return objs, count
 
 class MongoEncoder(json.JSONEncoder):
     def default(self, value, **kwargs):
