@@ -46,13 +46,13 @@ class ResourceView(View):
         if pk is None:
             objs, has_more = self._resource.get_objects()
             ret = {
-                'data': [self._resource.serialize(obj, request.args) for obj in objs]
+                'data': [self._resource.serialize(obj, params=request.args) for obj in objs]
             }
             if has_more != None:
                 ret['has_more'] = has_more
         else:
             obj = self._resource.get_object(pk)
-            ret = self._resource.serialize(obj, request.args)
+            ret = self._resource.serialize(obj, params=request.args)
         return ret
 
     def post(self, **kwargs):
@@ -60,7 +60,7 @@ class ResourceView(View):
             raise NotFound("Did you mean to use PUT?")
         self._resource.validate_request()
         obj = self._resource.create_object()
-        ret = self._resource.serialize(obj, request.args)
+        ret = self._resource.serialize(obj, params=request.args)
         return ret
 
     def put(self, **kwargs):
@@ -95,7 +95,7 @@ class ResourceView(View):
             obj = self._resource.get_object(pk)
             self._resource.validate_request(obj)
             obj = self._resource.update_object(obj)
-            ret = self._resource.serialize(obj, request.args)
+            ret = self._resource.serialize(obj, params=request.args)
             return ret
 
     def delete(self, **kwargs):

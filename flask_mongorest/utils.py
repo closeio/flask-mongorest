@@ -21,8 +21,6 @@ class MongoEncoder(json.JSONEncoder):
             return unicode(value)
         elif isinstance(value, DBRef):
             return value.id
-        elif callable(value):
-            return value()
         if isinstance(value, datetime.datetime):
             return value.isoformat()
         if isinstance(value, datetime.date):

@@ -83,28 +83,29 @@ class Resource(object):
         return filters
 
 
-    def serialize(self, obj, params=None):
+    def serialize(self, obj, **kwargs):
         if not obj:
             return {}
 
+        related = kwargs.pop('related', False)
+
         if obj.__class__ in self._child_document_resources \
         and self._child_document_resources[obj.__class__] != self.__class__:
-            return obj and self._child_document_resources[obj.__class__]().serialize(obj)
+            kwargs['related'] = True
+            return obj and self._child_document_resources[obj.__class__]().serialize(obj, **kwargs)
 
         def get(obj, field_name, field_instance=None):
             """
             @TODO needs significant cleanup
             """
-            if not field_instance:
-                if field_name not in self._related_resources.keys():
-                    if not isinstance(obj, EmbeddedDocument):
-                        return obj.to_dbref()
-    
+            if related == True and isinstance(field_instance or getattr(self.document, field_name), ReferenceField):
+                return obj._data[field_name]
             field_value = obj if field_instance else getattr(obj, field_name)
             field_instance = field_instance or getattr(self.document, field_name)
             if isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)):
                 if field_name in self._related_resources:
-                    return field_value and self._related_resources[field_name]().serialize(field_value)
+                    kwargs['related'] = True
+                    return field_value and self._related_resources[field_name]().serialize(field_value, **kwargs)
                 else:
                     if isinstance(field_value, DBRef):
                         return field_value
@@ -117,15 +118,26 @@ class Resource(object):
                 else:
                     if isbound(field_instance):
                         value = field_instance()
+                    elif isbound(field_value):
+                        value = field_value()
                     else:
-                        value = field_instance(obj)
+                        try:
+                            value = field_instance(obj)
+                        except:
+                            print "field_value", field_value
+                            print "field_name", field_name
+                            print "field_instance", field_instance
+                            print "obj", obj
                      
                 if field_name in self._related_resources:
-                    return [self._related_resources[field_name]().serialize(o) for o in value]
+                    kwargs['related'] = True
+                    return [self._related_resources[field_name]().serialize(o, **kwargs) for o in value]
                 return value
             return field_value
 
         fields = self.get_fields()
+
+        params = kwargs.pop('params', None)
 
         if params and '_fields' in params:
             only_fields = set(params['_fields'].split(','))
