@@ -98,7 +98,10 @@ class Resource(object):
             @TODO needs significant cleanup
             """
             if related == True and isinstance(field_instance or getattr(self.document, field_name), ReferenceField):
-                return obj._data[field_name]
+                value = obj._data[field_name]
+                if value and not isinstance(value, DBRef):
+                    value = value.to_dbref()
+                return value
             field_value = obj if field_instance else getattr(obj, field_name)
             field_instance = field_instance or getattr(self.document, field_name)
             if isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)):
