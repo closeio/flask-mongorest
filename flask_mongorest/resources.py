@@ -287,9 +287,16 @@ class Resource(object):
         # bulk-fetch related resources for moar speed
 
         if self.related_resources_hints:
+            if params and '_fields' in params:
+                only_fields = set(params['_fields'].split(','))
+            else:
+                only_fields = None
+
             document_queryset = {}
             for obj in qs:
                 for field_name in self.related_resources_hints.keys():
+                    if only_fields and field_name not in only_fields:
+                        continue
                     resource = self.related_resources[field_name]
                     method = getattr(obj, field_name)
                     if callable(method):
