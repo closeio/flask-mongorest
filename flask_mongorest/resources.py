@@ -6,7 +6,6 @@ from flask import request
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, DateTimeField, DecimalField
-from mongoengine import EmbeddedDocument
 from flask.ext.mongorest.exceptions import ValidationError
 from flask.ext.mongorest.utils import isbound, eval_query
 import dateutil.parser
@@ -121,13 +120,7 @@ class Resource(object):
                     elif isbound(field_value):
                         value = field_value()
                     else:
-                        try:
-                            value = field_instance(obj)
-                        except:
-                            print "field_value", field_value
-                            print "field_name", field_name
-                            print "field_instance", field_instance
-                            print "obj", obj
+                        value = field_instance(obj)
                      
                 if field_name in self._related_resources:
                     kwargs['related'] = True
