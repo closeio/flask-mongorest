@@ -241,7 +241,7 @@ class Resource(object):
 
     def get_objects(self, all=False, qs=None):
         params = request.args
-        if not qs:
+        if qs == None:
             qs = self.get_queryset()
         for key in params:
             value = params[key]
