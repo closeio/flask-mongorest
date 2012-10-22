@@ -310,14 +310,16 @@ class Resource(object):
             for k,v in document_queryset.iteritems():
                 doc = self.related_resources[k].document
                 document_queryset[k], count = eval_query(doc.objects.filter(v))
-                 
 
                 hint_index = {}
                 if k in self.related_resources_hints.keys():
                     hint_field = self.related_resources_hints[k]
                     for obj in document_queryset[k]:
                         hinted = str(obj._data[hint_field].id)
-                        hint_index[hinted] = obj
+                        if hinted not in hint_index:
+                            hint_index[hinted] = [obj]
+                        else:
+                            hint_index[hinted].append(obj)
 
                     hints[k] = hint_index
         
@@ -331,10 +333,7 @@ class Resource(object):
                     if obj_id not in hint_index.keys():
                         setattr(obj, field, [])
                         continue
-                    if isinstance(getattr(obj, field), list):
-                        getattr(obj, field).append(hint_index[obj_id]) 
-                    else:
-                        setattr(obj, field, [hint_index[obj_id]])
+                    setattr(obj, field, hint_index[obj_id])
                     
         return qs, has_more
 
