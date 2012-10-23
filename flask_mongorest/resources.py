@@ -241,7 +241,9 @@ class Resource(object):
 
     def get_objects(self, all=False, qs=None):
         params = request.args
+        custom_qs = True
         if qs == None:
+            custom_qs = False
             qs = self.get_queryset()
         for key in params:
             value = params[key]
@@ -262,7 +264,7 @@ class Resource(object):
             field = self._reverse_rename_fields.get(field, field)
             qs = operator().apply(qs, field, value, negate)
         limit = None
-        if not all:
+        if not custom_qs and not all:
             if self.paginate:
                 limit = min(int(params.get('_limit', 100)), self.max_limit)+1
                 # Fetch one more so we know if there are more results.
