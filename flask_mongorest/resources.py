@@ -4,8 +4,11 @@ import datetime
 import mongoengine
 from flask import request
 from bson.dbref import DBRef
+from bson.objectid import ObjectId
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, DateTimeField, DecimalField
 from flask.ext.mongorest.exceptions import ValidationError
+from flask.ext.mongorest.utils import isbound, eval_query
+from flask.ext.mongorest.utils import MongoEncoder
 import dateutil.parser
 
 class ResourceMeta(type):
@@ -23,6 +26,7 @@ class Resource(object):
     form = None
     schema = None
     related_resources = {}
+    related_resources_hints = {} #@todo this should be integrated into the related_resources dict, possibly as a tuple
     rename_fields = {}
     child_document_resources = {}
     paginate = True
@@ -78,23 +82,33 @@ class Resource(object):
             filters[field] = field_filters
         return filters
 
-    def serialize(self, obj, params=None):
+
+    def serialize(self, obj, **kwargs):
         if not obj:
             return {}
 
+        related = kwargs.pop('related', False)
+
         if obj.__class__ in self._child_document_resources \
         and self._child_document_resources[obj.__class__] != self.__class__:
-            return obj and self._child_document_resources[obj.__class__]().serialize(obj)
+            kwargs['related'] = True
+            return obj and self._child_document_resources[obj.__class__]().serialize(obj, **kwargs)
 
         def get(obj, field_name, field_instance=None):
             """
             @TODO needs significant cleanup
             """
+            if related == True and isinstance(field_instance or getattr(self.document, field_name), ReferenceField):
+                value = obj._data[field_name]
+                if value and not isinstance(value, DBRef):
+                    value = value.to_dbref()
+                return value
             field_value = obj if field_instance else getattr(obj, field_name)
             field_instance = field_instance or getattr(self.document, field_name)
             if isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)):
                 if field_name in self._related_resources:
-                    return field_value and self._related_resources[field_name]().serialize(field_value)
+                    kwargs['related'] = True
+                    return field_value and self._related_resources[field_name]().serialize(field_value, **kwargs)
                 else:
                     if isinstance(field_value, DBRef):
                         return field_value
@@ -102,14 +116,25 @@ class Resource(object):
             elif isinstance(field_instance, ListField):
                 return [get(elem, field_name, field_instance=field_instance.field) for elem in field_value]
             elif callable(field_instance):
-                value = field_value()
+                if isinstance(field_value, list):
+                    value = field_value
+                else:
+                    if isbound(field_instance):
+                        value = field_instance()
+                    elif isbound(field_value):
+                        value = field_value()
+                    else:
+                        value = field_instance(obj)
+                     
                 if field_name in self._related_resources:
-                    if isinstance(value, mongoengine.queryset.QuerySet):
-                        return [self._related_resources[field_name]().serialize(o) for o in value]
+                    kwargs['related'] = True
+                    return [self._related_resources[field_name]().serialize(o, **kwargs) for o in value]
                 return value
             return field_value
 
         fields = self.get_fields()
+
+        params = kwargs.pop('params', None)
 
         if params and '_fields' in params:
             only_fields = set(params['_fields'].split(','))
@@ -180,8 +205,6 @@ class Resource(object):
             # We need to convert JSON data into form data.
             # e.g. { "people": [ { "name": "A" } ] } into { "people-0-name": "A" }
             def json_to_form_data(prefix, json_data):
-                import datetime
-                from bson.dbref import DBRef
                 form_data = {}
                 for k, v in json_data.iteritems():
                     if isinstance(v, list): # FieldList
@@ -190,7 +213,7 @@ class Resource(object):
                                 form_data.update(json_to_form_data('%s%s-%d-' % (prefix, k, n), el))
                     else:
                         if isinstance(v, dict): # DictField
-                            v = json.dumps(v)
+                            v = json.dumps(v, cls=MongoEncoder)
                         if isinstance(v, bool) and v == False: # BooleanField
                             v = []
                         if isinstance(v, datetime.datetime): # DateTimeField
@@ -217,9 +240,12 @@ class Resource(object):
     def get_object(self, pk):
         return self.get_queryset().get(pk=pk)
 
-    def get_objects(self, all=False):
+    def get_objects(self, all=False, qs=None):
         params = request.args
-        qs = self.get_queryset()
+        custom_qs = True
+        if qs == None:
+            custom_qs = False
+            qs = self.get_queryset()
         for key in params:
             value = params[key]
             operator = None
@@ -239,7 +265,7 @@ class Resource(object):
             field = self._reverse_rename_fields.get(field, field)
             qs = operator().apply(qs, field, value, negate)
         limit = None
-        if not all:
+        if not custom_qs and not all:
             if self.paginate:
                 limit = min(int(params.get('_limit', 100)), self.max_limit)+1
                 # Fetch one more so we know if there are more results.
@@ -254,13 +280,64 @@ class Resource(object):
 
         if limit:
             # It is OK to evaluate the queryset as we will do so anyway.
-            qs = list(qs)
-            has_more = len(qs) == limit
+            qs, count = eval_query(qs)
+            has_more = count == limit
             if has_more:
                 qs = qs[:-1]
         else:
             has_more = None
 
+        # bulk-fetch related resources for moar speed
+
+        if self.related_resources_hints:
+            if params and '_fields' in params:
+                only_fields = set(params['_fields'].split(','))
+            else:
+                only_fields = None
+
+            document_queryset = {}
+            for obj in qs:
+                for field_name in self.related_resources_hints.keys():
+                    if only_fields and field_name not in only_fields:
+                        continue
+                    resource = self.related_resources[field_name]
+                    method = getattr(obj, field_name)
+                    if callable(method):
+                        q = method()
+                        if field_name in document_queryset.keys():
+                            document_queryset[field_name] = (document_queryset[field_name] | q._query_obj)          
+                        else:
+                            document_queryset[field_name] = q._query_obj
+            
+            hints = {}
+            for k,v in document_queryset.iteritems():
+                doc = self.related_resources[k].document
+                document_queryset[k], count = eval_query(doc.objects.filter(v))
+
+                hint_index = {}
+                if k in self.related_resources_hints.keys():
+                    hint_field = self.related_resources_hints[k]
+                    for obj in document_queryset[k]:
+                        hinted = str(obj._data[hint_field].id)
+                        if hinted not in hint_index:
+                            hint_index[hinted] = [obj]
+                        else:
+                            hint_index[hinted].append(obj)
+
+                    hints[k] = hint_index
+        
+            for obj in qs:
+                for field, hint_index in hints.iteritems():
+                    obj_id = obj.id
+                    if isinstance(obj_id, DBRef):
+                        obj_id = obj_id.id
+                    elif isinstance(obj_id, ObjectId):
+                        obj_id = str(obj_id)
+                    if obj_id not in hint_index.keys():
+                        setattr(obj, field, [])
+                        continue
+                    setattr(obj, field, hint_index[obj_id])
+                    
         return qs, has_more
 
     def _get(self, method, data, field_name, field_instance=None, parent_resources=None):
@@ -316,11 +393,11 @@ class Resource(object):
 
     def save_object(self, obj):
         obj.save()
+        obj.reload()
 
     def _save(self, obj):
         try:
             self.save_object(obj)
-            obj.reload()
         except mongoengine.ValidationError, e:
             def serialize_errors(errors):
                 if hasattr(errors, 'iteritems'):
