@@ -8,6 +8,7 @@ from bson.objectid import ObjectId
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, DateTimeField, DecimalField
 from flask.ext.mongorest.exceptions import ValidationError
 from flask.ext.mongorest.utils import isbound, eval_query
+from flask.ext.mongorest.utils import MongoEncoder
 import dateutil.parser
 
 class ResourceMeta(type):
@@ -212,7 +213,7 @@ class Resource(object):
                                 form_data.update(json_to_form_data('%s%s-%d-' % (prefix, k, n), el))
                     else:
                         if isinstance(v, dict): # DictField
-                            v = json.dumps(v)
+                            v = json.dumps(v, cls=MongoEncoder)
                         if isinstance(v, bool) and v == False: # BooleanField
                             v = []
                         if isinstance(v, datetime.datetime): # DateTimeField
