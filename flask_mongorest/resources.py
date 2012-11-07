@@ -300,7 +300,7 @@ class Resource(object):
                 for field_name in self.related_resources_hints.keys():
                     if only_fields and field_name not in only_fields:
                         continue
-                    resource = self.related_resources[field_name]
+                    resource = self.get_related_resources()[field_name]
                     method = getattr(obj, field_name)
                     if callable(method):
                         q = method()
@@ -311,7 +311,7 @@ class Resource(object):
             
             hints = {}
             for k,v in document_queryset.iteritems():
-                doc = self.related_resources[k].document
+                doc = self.get_related_resources()[k].document
                 document_queryset[k], count = eval_query(doc.objects.filter(v))
 
                 hint_index = {}
@@ -352,7 +352,7 @@ class Resource(object):
 
         if isinstance(field_instance, ReferenceField):
             if field_name in self._related_resources:
-                return self.related_resources[field_name]().create_object(data=field_data_value, save=True, parent_resources=parent_resources+[self])
+                return self.get_related_resources()[field_name]().create_object(data=field_data_value, save=True, parent_resources=parent_resources+[self])
             else:
                 if isinstance(field_data_value, mongoengine.Document):
                     return field_data_value
@@ -374,7 +374,9 @@ class Resource(object):
             if field_data_value == None:
                 return # no embedded document
             if field_name in self._related_resources:
-                return self.related_resources[field_name]().create_object(data=field_data_value, save=False, parent_resources=parent_resources+[self])
+                if isinstance(field_data_value, self.get_related_resources()[field_name].document):
+                    return field_data_value
+                return self.get_related_resources()[field_name]().create_object(data=field_data_value, save=False, parent_resources=parent_resources+[self])
             else:
                 return {} # dummy embedded document
 
@@ -383,7 +385,9 @@ class Resource(object):
                 if isinstance(inner_field, ListField):
                     return [expand_list(inner_field.field, elem) for elem in inner_data]
                 elif isinstance(inner_field, EmbeddedDocumentField):
-                    return self.related_resources[field_name]().create_object(data=inner_data, save=False, parent_resources=parent_resources+[self])
+                    if isinstance(inner_data, self.get_related_resources()[field_name].document):
+                        return inner_data
+                    return self.get_related_resources()[field_name]().create_object(data=inner_data, save=False, parent_resources=parent_resources+[self])
                 else:
                     return self._get(method, inner_data, field_name, field_instance=inner_field, parent_resources=parent_resources)
             return [expand_list(field_instance.field, elem) for elem in field_data_value]
@@ -411,10 +415,7 @@ class Resource(object):
         data = data or self.data
         for field in self.get_fields():
             if field in self.document._fields.keys() and field not in self.readonly_fields and (type(data) is list or (type(data) is dict and data.has_key(field))):
-                if self.schema:
-                    kwargs[field] = data[field]
-                else:
-                    kwargs[field] = self._get('create_object', data, field, parent_resources=parent_resources)
+                kwargs[field] = self._get('create_object', data, field, parent_resources=parent_resources)
         obj = self.document(**kwargs)
         if save:
             self._save(obj)
