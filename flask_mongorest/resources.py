@@ -213,7 +213,7 @@ class Resource(object):
                                 form_data.update(json_to_form_data('%s%s-%d-' % (prefix, k, n), el))
                     else:
                         if isinstance(v, dict): # DictField
-                            v = json.dumps(v, cls=MongoEncoder)
+                            v = json.dumps(v, cls=MongoEncoder, ensure_ascii=False, encoding='utf-8')
                         if isinstance(v, bool) and v == False: # BooleanField
                             v = []
                         if isinstance(v, datetime.datetime): # DateTimeField
