@@ -144,7 +144,7 @@ class TestView(ResourceView):
 @api.register(name='testform', url='/testform/')
 class TestFormView(ResourceView):
     resource = TestFormResource
-    methods = [Create, Update, Fetch, List]
+    methods = [Create, Update, Fetch, List, BulkUpdate]
 
 
 @api.register(name='testfields', url='/testfields/')

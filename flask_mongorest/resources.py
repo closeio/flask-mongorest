@@ -48,10 +48,11 @@ class Resource(object):
             'Cannot rename multiple fields to the same name'
         self._filters = self.get_filters()
         self._child_document_resources = self.get_child_document_resources()
-        self.data = {}
+        self.data = None
+        self.raw_data = {}
         if request.method in ('PUT', 'POST'):
             try:
-                self.data = json.loads(request.data)
+                self.raw_data = json.loads(request.data)
             except ValueError, e:
                 raise ValidationError({'error': 'invalid json.'})
 
@@ -158,6 +159,9 @@ class Resource(object):
         return data
 
     def validate_request(self, obj=None):
+        # Don't work on original raw data, we may reuse the resource for bulk updates.
+        self.data = self.raw_data.copy()
+
         if not self.schema and self.form:
             from werkzeug.datastructures import MultiDict
 
