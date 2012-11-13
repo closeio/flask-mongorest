@@ -27,6 +27,7 @@ class Resource(object):
     schema = None
     related_resources = {}
     related_resources_hints = {} #@todo this should be integrated into the related_resources dict, possibly as a tuple
+    save_related_fields = []
     rename_fields = {}
     child_document_resources = {}
     paginate = True
@@ -51,6 +52,7 @@ class Resource(object):
         self._child_document_resources = self.get_child_document_resources()
         self.data = None
         self.raw_data = {}
+        self._dirty_fields = None
         if request.method in ('PUT', 'POST'):
             try:
                 self.raw_data = json.loads(request.data)
@@ -62,6 +64,9 @@ class Resource(object):
 
     def get_related_resources(self):
         return self.related_resources
+
+    def get_save_related_fields(self):
+        return self.save_related_fields
 
     def get_rename_fields(self):
         """
@@ -399,9 +404,47 @@ class Resource(object):
         else:
             return field_data_value
 
-    def save_object(self, obj):
+    def save_related_objects(self, obj, parent_resources=None):
+        if not parent_resources:
+            parent_resources = [self]
+        else:
+            parent_resources += [self]
+
+        if self._dirty_fields:
+            for field_name in set(self._dirty_fields) & set(self.get_save_related_fields()):
+                try:
+                    related_resource = self.get_related_resources()[field_name]
+                except KeyError:
+                    related_resource = None
+
+                field_instance = getattr(self.document, field_name)
+
+                # If it's a ReferenceField, just save it.
+                if isinstance(field_instance, ReferenceField):
+                    instance = getattr(obj, field_name)
+                    if instance:
+                        instance_data = instance._data
+                        if related_resource:
+                            related_resource().save_object(instance, parent_resources=parent_resources)
+                        else:
+                            instance.save()
+
+                # If it's a ListField(ReferenceField), save all instances.
+                if isinstance(field_instance, ListField) and isinstance(field_instance.field, ReferenceField):
+                    instance_list = getattr(obj, field_name)
+                    for instance in instance_list:
+                        instance_data = instance._data
+                        if related_resource:
+                            related_resource().save_object(instance, parent_resources=parent_resources)
+                        else:
+                            instance.save()
+
+    def save_object(self, obj, **kwargs):
+        self.save_related_objects(obj, **kwargs)
         obj.save()
         obj.reload()
+
+        self._dirty_fields = None # No longer dirty.
 
     def _save(self, obj):
         try:
@@ -417,25 +460,35 @@ class Resource(object):
     def create_object(self, data=None, save=True, parent_resources=None):
         kwargs = {}
         data = data or self.data
+        self._dirty_fields = []
         for field in self.get_fields():
             if field in self.document._fields.keys() and field not in self.readonly_fields and (type(data) is list or (type(data) is dict and data.has_key(field))):
-                kwargs[field] = self._get('create_object', data, field, parent_resources=parent_resources)
+                if self.schema:
+                    kwargs[field] = data[field]
+                    self._dirty_fields.append(field)
+                else:
+                    # TODO: remove old code
+                    kwargs[field] = self._get('create_object', data, field, parent_resources=parent_resources)
         obj = self.document(**kwargs)
         if save:
             self._save(obj)
         return obj
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
+        self._dirty_fields = []
         data = data or self.data
         for field in self.get_fields():
-            if field in self.document._fields.keys() and field not in self.readonly_fields and field in data:
-                if field in self._related_resources:
-                    field_instance = getattr(self.document, field)
-                    if isinstance(field_instance, ReferenceField) or (isinstance(field_instance, ListField) and isinstance(field_instance.field, ReferenceField)):
-                        continue # Not implemented.
-                if self.schema:
+            if self.schema:
+                if field in self.document._fields.keys() and field not in self.readonly_fields and (type(data) is list or (type(data) is dict and data.has_key(field))):
                     setattr(obj, field, data[field])
-                else:
+                    self._dirty_fields.append(field)
+            else:
+                # TODO: remove old code
+                if field in self.document._fields.keys() and field not in self.readonly_fields and field in data:
+                    if field in self._related_resources:
+                        field_instance = getattr(self.document, field)
+                        if isinstance(field_instance, ReferenceField) or (isinstance(field_instance, ListField) and isinstance(field_instance.field, ReferenceField)):
+                            continue # Not implemented.
                     setattr(obj, field, self._get('update_object', data, field, parent_resources=parent_resources))
         if save:
             self._save(obj)

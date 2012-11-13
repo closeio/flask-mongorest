@@ -29,7 +29,8 @@ setup(
         'mimerender',
         'nose', 
         'coverage',
-        'python-dateutil'
+        'python-dateutil',
+        'cleancat'
     ],
     classifiers=[
         'Development Status :: 4 - Beta',

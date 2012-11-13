@@ -10,6 +10,8 @@ from flask.ext.mongorest import operators as ops
 from flask.ext.mongorest.methods import *
 from flask.ext.mongorest.authentication import AuthenticationBase
 
+from example import schemas, documents
+
 
 app = Flask(__name__)
 
@@ -150,6 +152,22 @@ class TestFormView(ResourceView):
 @api.register(name='testfields', url='/testfields/')
 class TestFieldsResource(ResourceView):
     resource = TestFieldsResource
+    methods = [Create, Update, Fetch, List]
+
+class LanguageResource(Resource):
+    document = documents.Language
+
+class PersonResource(Resource):
+    document = documents.Person
+    schema = schemas.Person
+    related_resources = {
+        'languages': LanguageResource,
+    }
+    save_related_fields = ['languages']
+
+@api.register(name='person', url='/person/')
+class PersonView(ResourceView):
+    resource = PersonResource
     methods = [Create, Update, Fetch, List]
 
 
