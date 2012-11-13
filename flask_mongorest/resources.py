@@ -275,7 +275,7 @@ class Resource(object):
                 # Fetch one more so we know if there are more results.
                 qs = qs.skip(int(params.get('_skip', 0))).limit(limit)
             else:
-                qs = qs.limit(self.max_limit)+1
+                qs = qs.limit(self.max_limit+1)
         if self.allowed_ordering and params.get('_order_by', None) in self.allowed_ordering:
             qs = qs.order_by(*params['_order_by'].split(','))
         # Needs to be at the end as it returns a list.
