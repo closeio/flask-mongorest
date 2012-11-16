@@ -229,6 +229,36 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(obj['name'], 'namevalue2')
         self.assertEqual(obj['upper_name'], 'NAMEVALUE2')
 
+    def test_form(self):
+        resp = self.app.post('/testform/', data=json.dumps({
+            'name': 'name1',
+            'other': 'other1',
+        }))
+        response_success(resp)
+        test_1 = json.loads(resp.data)
+
+        resp = self.app.post('/testform/', data=json.dumps({
+            'name': 'name2',
+            'other': 'other2',
+        }))
+        response_success(resp)
+        test_2 = json.loads(resp.data)
+
+        resp = self.app.put('/testform/', data=json.dumps({
+            'other': 'new',
+        }))
+        response_success(resp)
+
+        resp = self.app.get('/testform/%s/' % test_1['id'])
+        test_1 = json.loads(resp.data)
+        self.assertEqual(test_1['name'], 'name1')
+        self.assertEqual(test_1['other'], 'new')
+
+        resp = self.app.get('/testform/%s/' % test_2['id'])
+        test_2 = json.loads(resp.data)
+        self.assertEqual(test_2['name'], 'name2')
+        self.assertEqual(test_2['other'], 'new')
+
     def test_get(self):
         resp = self.app.get('/user/')
         objs = json.loads(resp.data)['data']
@@ -416,6 +446,157 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp, code=400)
         resp = json.loads(resp.data)
         self.assertEqual(resp['error'], 'invalid json.')
+
+
+class MongoRestSchemaTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.app = example.app.test_client()
+        example.documents.Language.drop_collection()
+        example.documents.Person.drop_collection()
+
+    def tearDown(self):
+        pass
+
+    def test_person(self):
+        resp = self.app.post('/person/', data=json.dumps({
+            'name': 'John',
+            'languages': [
+                { 'name': 'English' },
+                { 'name': 'German' },
+            ]
+        }))
+        response_success(resp)
+        person = json.loads(resp.data)
+
+        person_id = person['id']
+
+        self.assertEqual(len(person['languages']), 2)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['name'], 'English')
+        self.assertEqual(person['languages'][1]['name'], 'German')
+
+        english_id = person['languages'][0]['id']
+        german_id = person['languages'][1]['id']
+
+        # No change (same data)
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
+            'name': 'John',
+            'languages': [
+                { 'id': english_id, 'name': 'English' },
+                { 'id': german_id, 'name': 'German' },
+            ]
+        }))
+        response_success(resp)
+        person = json.loads(resp.data)
+        self.assertEqual(len(person['languages']), 2)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['id'], english_id)
+        self.assertEqual(person['languages'][1]['id'], german_id)
+        self.assertEqual(person['languages'][0]['name'], 'English')
+        self.assertEqual(person['languages'][1]['name'], 'German')
+
+        # No change (omitted fields of related document)
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
+            'name': 'John',
+            'languages': [
+                { 'id': english_id },
+                { 'id': german_id },
+            ]
+        }))
+        response_success(resp)
+        person = json.loads(resp.data)
+        self.assertEqual(len(person['languages']), 2)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['id'], english_id)
+        self.assertEqual(person['languages'][1]['id'], german_id)
+        self.assertEqual(person['languages'][0]['name'], 'English')
+        self.assertEqual(person['languages'][1]['name'], 'German')
+
+        # Also no change (empty data)
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({ }))
+        response_success(resp)
+        person = json.loads(resp.data)
+        self.assertEqual(len(person['languages']), 2)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['id'], english_id)
+        self.assertEqual(person['languages'][1]['id'], german_id)
+        self.assertEqual(person['languages'][0]['name'], 'English')
+        self.assertEqual(person['languages'][1]['name'], 'German')
+
+        # Change value
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
+            'languages': [
+                { 'id': english_id, 'name': 'English' },
+                { 'id': german_id, 'name': 'French' },
+            ]
+        }))
+        response_success(resp)
+        person = json.loads(resp.data)
+        self.assertEqual(len(person['languages']), 2)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['id'], english_id)
+        self.assertEqual(person['languages'][1]['id'], german_id)
+        self.assertEqual(person['languages'][0]['name'], 'English')
+        self.assertEqual(person['languages'][1]['name'], 'French')
+
+        # Insert item / rename back
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
+            'languages': [
+                { 'id': english_id },
+                { 'name': 'Spanish' },
+                { 'id': german_id, 'name': 'German' },
+            ]
+        }))
+        response_success(resp)
+        person = json.loads(resp.data)
+        self.assertEqual(len(person['languages']), 3)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['id'], english_id)
+        self.assertEqual(person['languages'][2]['id'], german_id)
+        self.assertEqual(person['languages'][0]['name'], 'English')
+        self.assertEqual(person['languages'][1]['name'], 'Spanish')
+        self.assertEqual(person['languages'][2]['name'], 'German')
+
+        spanish_id = person['languages'][1]['id']
+
+        # Remove item
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
+            'languages': [
+                { 'id': german_id },
+            ]
+        }))
+        response_success(resp)
+        person = json.loads(resp.data)
+        self.assertEqual(len(person['languages']), 1)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['id'], german_id)
+        self.assertEqual(person['languages'][0]['name'], 'German')
+
+        # Assign back (item is still in the database)
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
+            'languages': [
+                { 'id': german_id },
+                { 'id': english_id },
+            ]
+        }))
+        response_success(resp)
+        person = json.loads(resp.data)
+        self.assertEqual(len(person['languages']), 2)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['id'], german_id)
+        self.assertEqual(person['languages'][0]['name'], 'German')
+        self.assertEqual(person['languages'][1]['id'], english_id)
+        self.assertEqual(person['languages'][1]['name'], 'English')
+
+        # Test invalid ID
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
+            'languages': [
+                { 'id': 'INVALID' },
+            ]
+        }))
+        response_error(resp)
+
 
 if __name__ == '__main__':
     unittest.main()

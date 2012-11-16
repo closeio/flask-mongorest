@@ -3,3 +3,4 @@ flask-mongoengine
 mimerender
 python-dateutil
 sphinx
+cleancat
