@@ -121,7 +121,10 @@ class Resource(object):
                 else:
                     if isinstance(field_value, DBRef):
                         return field_value
-                    return field_value and field_value.to_dbref()
+                    try:
+                        return field_value and field_value.to_dbref()
+                    except:
+                        return field_value
             elif isinstance(field_instance, ListField):
                 return [get(elem, field_name, field_instance=field_instance.field) for elem in field_value]
             elif callable(field_instance):
