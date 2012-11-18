@@ -114,13 +114,13 @@ class Resource(object):
             if isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)):
                 if field_name in self._related_resources:
                     kwargs['related'] = True
-                    return field_value and self._related_resources[field_name]().serialize(field_value, **kwargs)
+                    return field_value and not isinstance(field_value, DBRef) and self._related_resources[field_name]().serialize(field_value, **kwargs)
                 else:
                     if isinstance(field_value, DBRef):
                         return field_value
                     return field_value and field_value.to_dbref()
             elif isinstance(field_instance, ListField):
-                return [get(elem, field_name, field_instance=field_instance.field) for elem in field_value]
+                return [val for val in [get(elem, field_name, field_instance=field_instance.field) for elem in field_value] if val]
             elif callable(field_instance):
                 if isinstance(field_value, list):
                     value = field_value
