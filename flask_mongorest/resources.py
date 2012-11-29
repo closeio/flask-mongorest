@@ -454,7 +454,7 @@ class Resource(object):
                 if hasattr(errors, 'iteritems'):
                     return dict((k, serialize_errors(v)) for (k, v) in errors.iteritems())
                 else:
-                    return str(errors)
+                    return unicode(errors)
             raise ValidationError({'field-errors': serialize_errors(e.errors)})
 
     def create_object(self, data=None, save=True, parent_resources=None):
