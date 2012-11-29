@@ -112,7 +112,10 @@ class Resource(object):
             try:
                 field_value = obj if field_instance else getattr(obj, field_name)
             except:
-                field_value = obj[field_name]
+                if isinstance(obj, dict) and field_name in obj.keys():
+                    field_value = obj[field_name]
+                else:
+                    field_value = None # :(
             field_instance = field_instance or getattr(self.document, field_name)
             if isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)):
                 if field_name in self._related_resources:

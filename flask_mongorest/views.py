@@ -14,7 +14,7 @@ mimerender = mimerender.FlaskMimeRender()
 render_json = lambda **payload: json.dumps(payload, cls=MongoEncoder, ensure_ascii=False, encoding='utf-8')
 render_html = lambda **payload: render_template('mongorest/debug.html', 
                                            data=json.dumps(payload, cls=MongoEncoder, ensure_ascii=False,
-                                                           encoding='utf-8',sort_keys=True, indent=4))
+                                                           encoding='utf-8', sort_keys=True, indent=4))
 
 class ResourceView(View):
     resource = None
