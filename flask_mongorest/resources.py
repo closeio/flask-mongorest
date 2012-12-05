@@ -109,7 +109,13 @@ class Resource(object):
                 if value and not isinstance(value, DBRef):
                     value = value.to_dbref()
                 return value
-            field_value = obj if field_instance else getattr(obj, field_name)
+            try:
+                field_value = obj if field_instance else getattr(obj, field_name)
+            except:
+                if isinstance(obj, dict) and field_name in obj.keys():
+                    field_value = obj[field_name]
+                else:
+                    field_value = None # :(
             field_instance = field_instance or getattr(self.document, field_name)
             if isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)):
                 if field_name in self._related_resources:
@@ -118,7 +124,10 @@ class Resource(object):
                 else:
                     if isinstance(field_value, DBRef):
                         return field_value
-                    return field_value and field_value.to_dbref()
+                    try:
+                        return field_value and field_value.to_dbref()
+                    except:
+                        return field_value
             elif isinstance(field_instance, ListField):
                 return [val for val in [get(elem, field_name, field_instance=field_instance.field) for elem in field_value] if val]
             elif callable(field_instance):
@@ -222,7 +231,7 @@ class Resource(object):
                                 form_data.update(json_to_form_data('%s%s-%d-' % (prefix, k, n), el))
                     else:
                         if isinstance(v, dict): # DictField
-                            v = json.dumps(v, cls=MongoEncoder)
+                            v = json.dumps(v, cls=MongoEncoder, ensure_ascii=False, encoding='utf-8')
                         if isinstance(v, bool) and v == False: # BooleanField
                             v = []
                         if isinstance(v, datetime.datetime): # DateTimeField
