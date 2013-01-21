@@ -298,6 +298,19 @@ class Resource(object):
 
         # bulk-fetch related resources for moar speed
 
+        def cmp_fields(ordering):
+            # Takes a list of fields and directions and returns a
+            # comparison function for sorted() to perform client-side
+            # sorting.
+            # Example: sorted(objs, cmp_fields([('date_created', -1)]))
+            def _cmp(x, y):
+                for field, direction in ordering:
+                    result = cmp(x, y) * direction
+                    if result:
+                        return result
+                return 0
+            return _cmp
+
         if self.related_resources_hints:
             if params and '_fields' in params:
                 only_fields = set(params['_fields'].split(','))
@@ -317,11 +330,25 @@ class Resource(object):
                             document_queryset[field_name] = (document_queryset[field_name] | q._query_obj)          
                         else:
                             document_queryset[field_name] = q._query_obj
-            
+
             hints = {}
             for k,v in document_queryset.iteritems():
                 doc = self.get_related_resources()[k].document
-                document_queryset[k], count = eval_query(doc.objects.filter(v))
+
+                query = doc.objects.filter(v)
+
+                # Don't let MongoDB do the sorting as it won't use the index.
+                # Store the ordering so we can do client sorting afterwards.
+                ordering = query._ordering
+                query._ordering = []
+
+                # NO I REALLY DONT WANT YOUR ORDERING
+                document_ordering = query._document._meta['ordering']
+                query._document._meta['ordering'] = []
+                results, count = eval_query(query)
+                query._document._meta['ordering'] = document_ordering
+
+                document_queryset[k] = sorted(results, cmp_fields(ordering))
 
                 hint_index = {}
                 if k in self.related_resources_hints.keys():
