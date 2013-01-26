@@ -7,7 +7,7 @@ from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, DateTimeField, DecimalField
 from flask.ext.mongorest.exceptions import ValidationError
-from flask.ext.mongorest.utils import isbound, eval_query
+from flask.ext.mongorest.utils import isbound
 from flask.ext.mongorest.utils import MongoEncoder
 import dateutil.parser
 
@@ -93,27 +93,28 @@ class Resource(object):
         if not obj:
             return {}
 
-        related = kwargs.pop('related', False)
-
         if obj.__class__ in self._child_document_resources \
         and self._child_document_resources[obj.__class__] != self.__class__:
-            kwargs['related'] = True
             return obj and self._child_document_resources[obj.__class__]().serialize(obj, **kwargs)
 
         def get(obj, field_name, field_instance=None):
             """
             @TODO needs significant cleanup
             """
-            if related == True and isinstance(field_instance or getattr(self.document, field_name), ReferenceField):
-                value = obj._data[field_name]
-                if value and not isinstance(value, DBRef):
-                    value = value.to_dbref()
-                return value
-            field_value = obj if field_instance else getattr(obj, field_name)
+
+            has_field_instance = bool(field_instance)
             field_instance = field_instance or getattr(self.document, field_name)
+
+            if has_field_instance:
+                field_value = obj
+            elif isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)) and field_name not in self._related_resources:
+                # Don't dereference references if no related resource is specified.
+                field_value = obj._data[field_name]
+            else:
+                field_value = getattr(obj, field_name)
+
             if isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)):
                 if field_name in self._related_resources:
-                    kwargs['related'] = True
                     return field_value and not isinstance(field_value, DBRef) and self._related_resources[field_name]().serialize(field_value, **kwargs)
                 else:
                     if isinstance(field_value, DBRef):
@@ -133,7 +134,6 @@ class Resource(object):
                         value = field_instance(obj)
                      
                 if field_name in self._related_resources:
-                    kwargs['related'] = True
                     return [self._related_resources[field_name]().serialize(o, **kwargs) for o in value]
                 return value
             return field_value
@@ -154,10 +154,11 @@ class Resource(object):
                 continue
             if hasattr(self, field):
                 value = getattr(self, field)(obj)
-                if isinstance(value, mongoengine.queryset.QuerySet):
-                    value = [self._related_resources[field]().serialize(o) for o in value]
-                if isinstance(value, mongoengine.document.Document):
-                    value = self._related_resources[field]().serialize(value)
+                if field in self._related_resources and value != None:
+                    if isinstance(value, mongoengine.document.Document):
+                        value = self._related_resources[field]().serialize(value)
+                    else: # assume queryset or list
+                        value = [self._related_resources[field]().serialize(o) for o in value]
                 data[renamed_field] = value
             else:
                 data[renamed_field] = get(obj, field)
@@ -289,8 +290,8 @@ class Resource(object):
 
         if limit:
             # It is OK to evaluate the queryset as we will do so anyway.
-            qs, count = eval_query(qs)
-            has_more = count == limit
+            qs = [o for o in qs] # don't use list() because mongoengine will do a count query
+            has_more = len(qs) == limit
             if has_more:
                 qs = qs[:-1]
         else:
@@ -345,7 +346,7 @@ class Resource(object):
                 # NO I REALLY DONT WANT YOUR ORDERING
                 document_ordering = query._document._meta['ordering']
                 query._document._meta['ordering'] = []
-                results, count = eval_query(query)
+                results = [o for o in query] # don't use list() because mongoengine will do a count query
                 query._document._meta['ordering'] = document_ordering
 
                 document_queryset[k] = sorted(results, cmp_fields(ordering))

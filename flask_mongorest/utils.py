@@ -7,14 +7,6 @@ from mongoengine.base import BaseDocument
 
 isbound = lambda m: getattr(m, 'im_self', None) is not None
 
-def eval_query(qs):
-    count = 0
-    objs = []
-    for obj in qs:
-        count += 1 
-        objs.append(obj)
-    return objs, count
-
 class MongoEncoder(json.JSONEncoder):
     def default(self, value, **kwargs):
         if isinstance(value, ObjectId):
