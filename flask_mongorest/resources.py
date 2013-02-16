@@ -152,7 +152,7 @@ class Resource(object):
             renamed_field = self._rename_fields.get(field, field)
             if only_fields != None and renamed_field not in only_fields:
                 continue
-            if hasattr(self, field):
+            if hasattr(self, field) and callable(getattr(self, field)):
                 value = getattr(self, field)(obj)
                 if field in self._related_resources and value != None:
                     if isinstance(value, mongoengine.document.Document):
