@@ -61,7 +61,10 @@ class ResourceView(View):
         self._resource.validate_request()
         obj = self._resource.create_object()
         ret = self._resource.serialize(obj, params=request.args)
-        return ret
+        if isinstance(obj, mongoengine.Document):
+            return ret, "201 Created", {"Location": str(obj.id)}
+        else:
+            return ret
 
     def put(self, **kwargs):
         pk = kwargs.pop('pk', None)

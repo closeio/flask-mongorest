@@ -1,6 +1,7 @@
 import json
 import decimal
 import datetime
+from urlparse import urlparse
 import mongoengine
 from flask import request
 from bson.dbref import DBRef
@@ -33,6 +34,7 @@ class Resource(object):
     paginate = True
     select_related = False
     allowed_ordering = []
+    uri_prefix = None # Must start and end with a "/"
     max_limit = 1000 # cap the number of records in the _limit param to avoid DDoS'ing the API.
 
     __metaclass__ = ResourceMeta
@@ -389,7 +391,13 @@ class Resource(object):
 
         if isinstance(field_instance, ReferenceField):
             if field_name in self._related_resources:
-                return self.get_related_resources()[field_name]().create_object(data=field_data_value, save=True, parent_resources=parent_resources+[self])
+                restype = self.get_related_resources()[field_name]
+                if restype.uri_prefix:
+                    url = urlparse(field_data_value)
+                    uri = url.path
+                    objid = uri.lstrip(restype.uri_prefix)
+                    return field_instance.document_type.objects.get(pk=objid).to_dbref()
+                return restype().create_object(data=field_data_value, save=True, parent_resources=parent_resources+[self])
             else:
                 if isinstance(field_data_value, mongoengine.Document):
                     return field_data_value
