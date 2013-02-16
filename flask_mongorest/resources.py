@@ -91,13 +91,19 @@ class Resource(object):
         return filters
 
 
+    def serialize_field(self, obj, **kwargs):
+        if self.uri_prefix and hasattr(obj, "id"):
+            return self.uri_prefix+str(obj.id)
+        else:
+            return self.serialize(obj, **kwargs)
+            
     def serialize(self, obj, **kwargs):
         if not obj:
             return {}
 
         if obj.__class__ in self._child_document_resources \
         and self._child_document_resources[obj.__class__] != self.__class__:
-            return obj and self._child_document_resources[obj.__class__]().serialize(obj, **kwargs)
+            return obj and self._child_document_resources[obj.__class__]().serialize_field(obj, **kwargs)
 
         def get(obj, field_name, field_instance=None):
             """
@@ -117,7 +123,7 @@ class Resource(object):
 
             if isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)):
                 if field_name in self._related_resources:
-                    return field_value and not isinstance(field_value, DBRef) and self._related_resources[field_name]().serialize(field_value, **kwargs)
+                    return field_value and not isinstance(field_value, DBRef) and self._related_resources[field_name]().serialize_field(field_value, **kwargs)
                 else:
                     if isinstance(field_value, DBRef):
                         return field_value
@@ -136,7 +142,7 @@ class Resource(object):
                         value = field_instance(obj)
                      
                 if field_name in self._related_resources:
-                    return [self._related_resources[field_name]().serialize(o, **kwargs) for o in value]
+                    return [self._related_resources[field_name]().serialize_field(o, **kwargs) for o in value]
                 return value
             return field_value
 
@@ -158,9 +164,9 @@ class Resource(object):
                 value = getattr(self, field)(obj)
                 if field in self._related_resources and value != None:
                     if isinstance(value, mongoengine.document.Document):
-                        value = self._related_resources[field]().serialize(value)
+                        value = self._related_resources[field]().serialize_field(value)
                     else: # assume queryset or list
-                        value = [self._related_resources[field]().serialize(o) for o in value]
+                        value = [self._related_resources[field]().serialize_field(o) for o in value]
                 data[renamed_field] = value
             else:
                 data[renamed_field] = get(obj, field)
