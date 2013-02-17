@@ -154,6 +154,9 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.post('/testform/', data=json.dumps({
             'name': 'okay',
         }))
+        self.assertIn("Location",resp.headers)
+        loc = resp.headers["Location"]
+        self.assertIn("/testform/",loc)
         response_success(resp)
         data = json.loads(resp.data)
         self.assertEqual(data['name'], 'okay')

@@ -130,6 +130,7 @@ class TestResource(Resource):
 class TestFormResource(Resource):
     form = TestForm
     document = TestDocument
+    uri_prefix = "/testform/"
 
 class TestFieldsResource(Resource):
     document = TestDocument
