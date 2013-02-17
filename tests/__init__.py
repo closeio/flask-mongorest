@@ -276,9 +276,6 @@ class MongoRestTestCase(unittest.TestCase):
         self.post_1['user_lists'] = [[example.UserResource.uri(self.user_1_obj['id'])],
                                      [example.UserResource.uri(self.user_1_obj['id']),
                                       example.UserResource.uri(self.user_2_obj['id'])]]
-        print "author_id = "+str(self.post_1["author_id"])
-        print "editor = "+str(self.post_1["editor"])
-        print "user_lists = "+str(self.post_1["user_lists"])
         resp = self.app.post('/posts/', data=json.dumps(self.post_1))
         response_success(resp)
         compare_req_resp(self.post_1, json.loads(resp.data))
