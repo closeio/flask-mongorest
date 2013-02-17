@@ -61,6 +61,14 @@ class Resource(object):
             except ValueError, e:
                 raise ValidationError({'error': 'invalid json.'})
 
+    @classmethod
+    def uri(self, path):
+        if self.uri_prefix:
+            ret = self.uri_prefix+path
+            return ret
+        else:
+            raise ValueError("Cannot generate URI for resources that do not specify a uri_prefix")
+
     def get_fields(self):
         return self.fields
 

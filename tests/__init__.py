@@ -266,16 +266,16 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(test_2['other'], 'new')
 
     def test_get(self):
-        resp = self.app.get('/user/')
+        resp = self.app.get(example.UserResource.uri_prefix) # /users/
         objs = json.loads(resp.data)['data']
         self.assertEqual(len(objs), 2)
 
     def test_post(self):
-        self.post_1['author_id'] = example.UserResource.uri_prefix+self.user_1_obj['id']
-        self.post_1['editor'] = example.UserResource.uri_prefix+self.user_2_obj['id']
-        self.post_1['user_lists'] = [[example.UserResource.uri_prefix+self.user_1_obj['id']],
-                                     [example.UserResource.uri_prefix+self.user_1_obj['id'],
-                                      example.UserResource.uri_prefix+self.user_2_obj['id']]]
+        self.post_1['author_id'] = example.UserResource.uri(self.user_1_obj['id'])
+        self.post_1['editor'] = example.UserResource.uri(self.user_2_obj['id'])
+        self.post_1['user_lists'] = [[example.UserResource.uri(self.user_1_obj['id'])],
+                                     [example.UserResource.uri(self.user_1_obj['id']),
+                                      example.UserResource.uri(self.user_2_obj['id'])]]
         print "author_id = "+str(self.post_1["author_id"])
         print "editor = "+str(self.post_1["editor"])
         print "user_lists = "+str(self.post_1["user_lists"])
@@ -287,7 +287,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
         compare_req_resp(self.post_1_obj, json.loads(resp.data))
 
-        self.post_1_obj['author_id'] = example.UserResource.uri_prefix+self.user_2_obj['id']
+        self.post_1_obj['author_id'] = example.UserResource.uri(self.user_2_obj['id'])
         resp = self.app.put('/posts/%s/' % self.post_1_obj['id'], data=json.dumps(self.post_1_obj))
         jd = json.loads(resp.data)
         self.assertEqual(self.post_1_obj['author_id'], jd["author_id"])
@@ -450,7 +450,7 @@ class MongoRestTestCase(unittest.TestCase):
         user = json.loads(resp.data)
         self.assertEqual(user.keys(), ['id'])
 
-        resp = self.app.get('/user/%s/' % user['id'])
+        resp = self.app.get(example.UserResource.uri(user['id'])) # /user/:id
         response_success(resp)
         user = json.loads(resp.data)
         compare_req_resp(test_user_data, user)

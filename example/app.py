@@ -15,6 +15,8 @@ from example import schemas, documents
 
 app = Flask(__name__)
 
+app.url_map.strict_slashes = False
+
 app.config.update(
     DEBUG = True,
     TESTING = True,
