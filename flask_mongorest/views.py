@@ -61,7 +61,7 @@ class ResourceView(View):
         self._resource.validate_request()
         obj = self._resource.create_object()
         ret = self._resource.serialize(obj, params=request.args)
-        if isinstance(obj, mongoengine.Document) and restype.uri_prefix:
+        if isinstance(obj, mongoengine.Document) and self._resource.uri_prefix:
             return ret, "201 Created", {"Location": restype.uri_prefix+str(obj.id)}
         else:
             return ret
