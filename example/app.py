@@ -45,8 +45,6 @@ class UserResource(Resource):
     }
     uri_prefix = "/user/"
 
-
-
 @api.register()
 class UserView(ResourceView):
     resource = UserResource
@@ -76,7 +74,8 @@ class PostResource(Resource):
         'content': ContentResource,
         'sections': ContentResource, #nested complex objects
         'author': UserResource,
-        'editor': UserResource
+        'editor': UserResource,
+        'user_lists': UserResource,
     }
     filters = {
         'title': [ops.Exact, ops.Startswith, ops.In],

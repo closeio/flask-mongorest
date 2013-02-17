@@ -271,9 +271,14 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(len(objs), 2)
 
     def test_post(self):
-        self.post_1['author_id'] = "/user/"+self.user_1_obj['id']
-        self.post_1['editor'] = "/user/"+self.user_2_obj['id']
-        self.post_1['user_lists'] = [[self.user_1_obj['id']],[self.user_1_obj['id'], self.user_2_obj['id']]]
+        self.post_1['author_id'] = example.UserResource.uri_prefix+self.user_1_obj['id']
+        self.post_1['editor'] = example.UserResource.uri_prefix+self.user_2_obj['id']
+        self.post_1['user_lists'] = [[example.UserResource.uri_prefix+self.user_1_obj['id']],
+                                     [example.UserResource.uri_prefix+self.user_1_obj['id'],
+                                      example.UserResource.uri_prefix+self.user_2_obj['id']]]
+        print "author_id = "+str(self.post_1["author_id"])
+        print "editor = "+str(self.post_1["editor"])
+        print "user_lists = "+str(self.post_1["user_lists"])
         resp = self.app.post('/posts/', data=json.dumps(self.post_1))
         response_success(resp)
         compare_req_resp(self.post_1, json.loads(resp.data))
@@ -282,8 +287,11 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
         compare_req_resp(self.post_1_obj, json.loads(resp.data))
 
-        self.post_1_obj['author_id'] = "/user/"+self.user_2_obj['id']
+        self.post_1_obj['author_id'] = example.UserResource.uri_prefix+self.user_2_obj['id']
         resp = self.app.put('/posts/%s/' % self.post_1_obj['id'], data=json.dumps(self.post_1_obj))
+        jd = json.loads(resp.data)
+        self.assertEqual(self.post_1_obj['author_id'], jd["author_id"])
+        
         response_success(resp)
         compare_req_resp(self.post_1_obj, json.loads(resp.data))
         self.post_1_obj = json.loads(resp.data)

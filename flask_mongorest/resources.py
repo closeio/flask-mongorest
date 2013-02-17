@@ -266,6 +266,13 @@ class Resource(object):
             qs = self.get_queryset()
         for key in params:
             value = params[key]
+            # If this is a resource identified by a URI, we need
+            # to extract the object id at this point since 
+            # MongoEngine only understands the object id
+            if self.uri_prefix:
+                url = urlparse(value)
+                uri = url.path
+                value = uri.lstrip(self.uri_prefix)
             operator = None
             negate = False
             op_name = ''
@@ -402,7 +409,9 @@ class Resource(object):
                     url = urlparse(field_data_value)
                     uri = url.path
                     objid = uri.lstrip(restype.uri_prefix)
-                    return field_instance.document_type.objects.get(pk=objid).to_dbref()
+                    qobj = field_instance.document_type.objects.get(pk=objid)
+                    retobj = qobj.to_dbref()
+                    return retobj
                 return restype().create_object(data=field_data_value, save=True, parent_resources=parent_resources+[self])
             else:
                 if isinstance(field_data_value, mongoengine.Document):
@@ -527,7 +536,7 @@ class Resource(object):
             else:
                 # TODO: remove old code
                 if field in self.document._fields.keys() and field not in self.readonly_fields and field in data:
-                    if field in self._related_resources:
+                    if field in self._related_resources and not hasattr(self._related_resources[field], 'uri_prefix'):
                         field_instance = getattr(self.document, field)
                         if isinstance(field_instance, ReferenceField) or (isinstance(field_instance, ListField) and isinstance(field_instance.field, ReferenceField)):
                             continue # Not implemented.
