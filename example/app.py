@@ -43,6 +43,7 @@ class UserResource(Resource):
     filters = {
         'datetime': [ops.Exact]
     }
+    uri_prefix = "/user/"
 
 
 
@@ -74,6 +75,8 @@ class PostResource(Resource):
     related_resources = {
         'content': ContentResource,
         'sections': ContentResource, #nested complex objects
+        'author': UserResource,
+        'editor': UserResource
     }
     filters = {
         'title': [ops.Exact, ops.Startswith, ops.In],
