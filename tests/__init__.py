@@ -71,9 +71,9 @@ class MongoRestTestCase(unittest.TestCase):
 
         # create user 1
         resp = self.app.post('/user/', data=json.dumps(self.user_1))
-        self.assertIn("Location", resp.headers)
+        assert "Location" in resp.headers
         loc1 = resp.headers["Location"]
-        self.assertIn("/user/", loc1)
+        assert "/user/" in loc1
         assert loc1.startswith("http")
         response_success(resp)
         self.user_1_obj = json.loads(resp.data)
@@ -82,7 +82,7 @@ class MongoRestTestCase(unittest.TestCase):
         # create user 2
         resp = self.app.post('/user/', data=json.dumps(self.user_2))
         loc2 = resp.headers["Location"]
-        self.assertIn("/user/", loc2)
+        assert "/user/" in loc2
         assert loc2.startswith("http")
         response_success(resp)
         self.user_2_obj = json.loads(resp.data)
@@ -163,9 +163,9 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.post('/testform/', data=json.dumps({
             'name': 'okay',
         }))
-        self.assertIn("Location",resp.headers)
+        assert "Location" in resp.headers
         loc = resp.headers["Location"]
-        self.assertIn("/testform/",loc)
+        assert "/testform/" in loc
         response_success(resp)
         data = json.loads(resp.data)
         self.assertEqual(data['name'], 'okay')
