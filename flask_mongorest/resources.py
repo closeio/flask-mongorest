@@ -198,9 +198,6 @@ class Resource(object):
         for k, v in fields_to_update.iteritems():
             self.data[k] = v
 
-        # This allows the Resource to validate the request data
-        self.custom_data_validation(self.data)
-
         if self.schema:
             from cleancat import ValidationError as SchemaValidationError
             if request.method == 'PUT' and obj != None:
@@ -504,7 +501,7 @@ class Resource(object):
 
         # This allows some validation of the created object
         # prior to saving
-        self.custom_obj_validation(obj)
+        self.validate_object(obj)
 
         if save:
             self._save(obj)
@@ -528,7 +525,7 @@ class Resource(object):
                     setattr(obj, field, self._get('update_object', data, field, parent_resources=parent_resources))
         # This allows some validation of the updated object
         # prior to saving
-        self.custom_obj_validation(obj)
+        self.validate_object(obj)
 
         if save:
             self._save(obj)
@@ -538,8 +535,5 @@ class Resource(object):
     def delete_object(self, obj, parent_resources=None):
         obj.delete()
 
-    def custom_data_validation(self, data):
-        pass
-
-    def custom_obj_validation(self, obj):
+    def validate_object(self, obj):
         pass

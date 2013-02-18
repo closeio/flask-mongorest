@@ -45,11 +45,15 @@ class UserResource(Resource):
         'datetime': [ops.Exact]
     }
 
-    def custom_data_validation(self, data):
-        if "first_name" in data and data["first_name"]=="bill":
+    def validate_request(self, obj=None):
+        # Do the normal validation
+        super(UserResource,self).validate_request(obj)
+
+        # Now do some additional validation
+        if "first_name" in self.data and self.data["first_name"]=="bill":
             raise ValidationError({'error': "The first name Bill is blacklisted"})
 
-    def custom_obj_validation(self, obj):
+    def validate_object(self, obj):
         if hasattr(obj,"last_name") and obj.last_name=="williams":
             raise ValidationError({'error': "The last name Williams is blacklisted"})
 
