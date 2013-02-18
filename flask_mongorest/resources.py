@@ -198,7 +198,8 @@ class Resource(object):
         for k, v in fields_to_update.iteritems():
             self.data[k] = v
 
-        self.custom_validation(self.data)
+        # This allows the Resource to validate the request data
+        self.custom_data_validation(self.data)
 
         if self.schema:
             from cleancat import ValidationError as SchemaValidationError
@@ -500,6 +501,11 @@ class Resource(object):
                     # TODO: remove old code
                     kwargs[field] = self._get('create_object', data, field, parent_resources=parent_resources)
         obj = self.document(**kwargs)
+
+        # This allows some validation of the created object
+        # prior to saving
+        self.custom_obj_validation(obj)
+
         if save:
             self._save(obj)
         return obj
@@ -520,6 +526,10 @@ class Resource(object):
                         if isinstance(field_instance, ReferenceField) or (isinstance(field_instance, ListField) and isinstance(field_instance.field, ReferenceField)):
                             continue # Not implemented.
                     setattr(obj, field, self._get('update_object', data, field, parent_resources=parent_resources))
+        # This allows some validation of the updated object
+        # prior to saving
+        self.custom_obj_validation(obj)
+
         if save:
             self._save(obj)
 
@@ -528,5 +538,8 @@ class Resource(object):
     def delete_object(self, obj, parent_resources=None):
         obj.delete()
 
-    def custom_validation(self, data):
+    def custom_data_validation(self, data):
+        pass
+
+    def custom_obj_validation(self, obj):
         pass

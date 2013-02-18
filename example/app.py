@@ -45,9 +45,13 @@ class UserResource(Resource):
         'datetime': [ops.Exact]
     }
 
-    def custom_validation(self, data):
+    def custom_data_validation(self, data):
         if "first_name" in data and data["first_name"]=="bill":
             raise ValidationError({'error': "The first name Bill is blacklisted"})
+
+    def custom_obj_validation(self, obj):
+        if hasattr(obj,"last_name") and obj.last_name=="williams":
+            raise ValidationError({'error': "The last name Williams is blacklisted"})
 
 @api.register()
 class UserView(ResourceView):

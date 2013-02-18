@@ -92,7 +92,7 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.get('/user/%s/' % self.user_2_obj['id'])
         response_error(resp, code=404)
 
-    def test_invalid_post(self):
+    def test_invalid_post_data(self):
         altuser = self.user_1_obj.copy()
         altuser["first_name"] = "bill"
         altuser["email"] = "3@b.com"
@@ -100,9 +100,24 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.post('/user/', data=data)
         response_error(resp, code=400)
 
-    def test_invalid_put(self):
+    def test_invalid_put_data(self):
         altuser = self.user_1_obj.copy()
         altuser["first_name"] = "bill"
+        data=json.dumps(altuser)
+        resp = self.app.put('/user/%s/' % self.user_1_obj['id'], data=data)
+        response_error(resp, code=400)
+
+    def test_invalid_post_obj(self):
+        altuser = self.user_1_obj.copy()
+        altuser["last_name"] = "williams"
+        altuser["email"] = "4@b.com"
+        data=json.dumps(altuser)
+        resp = self.app.post('/user/', data=data)
+        response_error(resp, code=400)
+
+    def test_invalid_put_obj(self):
+        altuser = self.user_1_obj.copy()
+        altuser["last_name"] = "williams"
         data=json.dumps(altuser)
         resp = self.app.put('/user/%s/' % self.user_1_obj['id'], data=data)
         response_error(resp, code=400)
