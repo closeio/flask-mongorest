@@ -74,6 +74,7 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertIn("Location", resp.headers)
         loc = resp.headers["Location"]
         self.assertIn("/user/", loc)
+        assert loc.startswith("http")
         response_success(resp)
         self.user_1_obj = json.loads(resp.data)
         compare_req_resp(self.user_1, self.user_1_obj)

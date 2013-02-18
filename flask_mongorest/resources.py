@@ -3,7 +3,7 @@ import decimal
 import datetime
 from urlparse import urlparse
 import mongoengine
-from flask import request
+from flask import request, url_for
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, DateTimeField, DecimalField
@@ -63,11 +63,22 @@ class Resource(object):
 
     @classmethod
     def uri(self, path):
+        """This generates a URI reference for the given path"""
         if self.uri_prefix:
             ret = self.uri_prefix+path
             return ret
         else:
             raise ValueError("Cannot generate URI for resources that do not specify a uri_prefix")
+
+    @classmethod
+    def url(self, path):
+        """This generates a complete URL for the given path"""
+        if self.uri_prefix:
+            url = url_for(self.uri_prefix.lstrip("/").rstrip("/"),_external=True)
+            ret = url+path
+            return ret
+        else:
+            raise ValueError("Cannot generate URL for resources that do not specify a uri_prefix")
 
     def get_fields(self):
         return self.fields
