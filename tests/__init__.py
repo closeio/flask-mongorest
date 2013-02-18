@@ -72,16 +72,21 @@ class MongoRestTestCase(unittest.TestCase):
         # create user 1
         resp = self.app.post('/user/', data=json.dumps(self.user_1))
         self.assertIn("Location", resp.headers)
-        loc = resp.headers["Location"]
-        self.assertIn("/user/", loc)
-        assert loc.startswith("http")
+        loc1 = resp.headers["Location"]
+        self.assertIn("/user/", loc1)
+        assert loc1.startswith("http")
         response_success(resp)
         self.user_1_obj = json.loads(resp.data)
+        self.user_1_loc = loc1
         compare_req_resp(self.user_1, self.user_1_obj)
         # create user 2
         resp = self.app.post('/user/', data=json.dumps(self.user_2))
+        loc2 = resp.headers["Location"]
+        self.assertIn("/user/", loc2)
+        assert loc2.startswith("http")
         response_success(resp)
         self.user_2_obj = json.loads(resp.data)
+        self.user_2_loc = loc2
         compare_req_resp(self.user_2, self.user_2_obj)
 
     def tearDown(self):
@@ -272,11 +277,9 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(len(objs), 2)
 
     def test_post(self):
-        self.post_1['author_id'] = example.UserResource.uri(self.user_1_obj['id'])
-        self.post_1['editor'] = example.UserResource.uri(self.user_2_obj['id'])
-        self.post_1['user_lists'] = [[example.UserResource.uri(self.user_1_obj['id'])],
-                                     [example.UserResource.uri(self.user_1_obj['id']),
-                                      example.UserResource.uri(self.user_2_obj['id'])]]
+        self.post_1['author_id'] = self.user_1_loc
+        self.post_1['editor'] = self.user_2_loc
+        self.post_1['user_lists'] = [[self.user_1_loc], [self.user_1_loc, self.user_2_loc]]
         resp = self.app.post('/posts/', data=json.dumps(self.post_1))
         response_success(resp)
         compare_req_resp(self.post_1, json.loads(resp.data))
@@ -285,7 +288,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
         compare_req_resp(self.post_1_obj, json.loads(resp.data))
 
-        self.post_1_obj['author_id'] = example.UserResource.uri(self.user_2_obj['id'])
+        self.post_1_obj['author_id'] = self.user_2_loc
         resp = self.app.put('/posts/%s/' % self.post_1_obj['id'], data=json.dumps(self.post_1_obj))
         jd = json.loads(resp.data)
         self.assertEqual(self.post_1_obj['author_id'], jd["author_id"])

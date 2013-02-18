@@ -71,8 +71,8 @@ class Resource(object):
             raise ValueError("Cannot generate URI for resources that do not specify a uri_prefix")
 
     @classmethod
-    def url(self, path):
-        """This generates a complete URL for the given path"""
+    def _url(self, path):
+        """This generates a complete URL for the given path.  Requires application context."""
         if self.uri_prefix:
             url = url_for(self.uri_prefix.lstrip("/").rstrip("/"),_external=True)
             ret = url+path
@@ -112,7 +112,7 @@ class Resource(object):
 
     def serialize_field(self, obj, **kwargs):
         if self.uri_prefix and hasattr(obj, "id"):
-            return self.uri_prefix+str(obj.id)
+            return self._url(str(obj.id))
         else:
             return self.serialize(obj, **kwargs)
             
