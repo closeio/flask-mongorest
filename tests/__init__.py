@@ -92,6 +92,21 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.get('/user/%s/' % self.user_2_obj['id'])
         response_error(resp, code=404)
 
+    def test_invalid_post(self):
+        altuser = self.user_1_obj.copy()
+        altuser["first_name"] = "bill"
+        altuser["email"] = "3@b.com"
+        data=json.dumps(altuser)
+        resp = self.app.post('/user/', data=data)
+        response_error(resp, code=400)
+
+    def test_invalid_put(self):
+        altuser = self.user_1_obj.copy()
+        altuser["first_name"] = "bill"
+        data=json.dumps(altuser)
+        resp = self.app.put('/user/%s/' % self.user_1_obj['id'], data=data)
+        response_error(resp, code=400)
+
     def test_update_user(self):
         self.user_1_obj['first_name'] = 'anthony'
         self.user_1_obj['datetime'] = datetime.datetime.utcnow().isoformat()

@@ -198,6 +198,8 @@ class Resource(object):
         for k, v in fields_to_update.iteritems():
             self.data[k] = v
 
+        self.custom_validation(self.data)
+
         if self.schema:
             from cleancat import ValidationError as SchemaValidationError
             if request.method == 'PUT' and obj != None:
@@ -525,3 +527,6 @@ class Resource(object):
 
     def delete_object(self, obj, parent_resources=None):
         obj.delete()
+
+    def custom_validation(self, data):
+        pass

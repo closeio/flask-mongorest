@@ -9,6 +9,7 @@ from flask.ext.mongorest.resources import Resource
 from flask.ext.mongorest import operators as ops
 from flask.ext.mongorest.methods import *
 from flask.ext.mongorest.authentication import AuthenticationBase
+from flask.ext.mongorest.exceptions import ValidationError
 
 from example import schemas, documents
 
@@ -44,7 +45,9 @@ class UserResource(Resource):
         'datetime': [ops.Exact]
     }
 
-
+    def custom_validation(self, data):
+        if "first_name" in data and data["first_name"]=="bill":
+            raise ValidationError({'error': "The first name Bill is blacklisted"})
 
 @api.register()
 class UserView(ResourceView):
