@@ -498,6 +498,11 @@ class Resource(object):
                     # TODO: remove old code
                     kwargs[field] = self._get('create_object', data, field, parent_resources=parent_resources)
         obj = self.document(**kwargs)
+
+        # This allows some validation of the created object
+        # prior to saving
+        self.validate_object(obj)
+
         if save:
             self._save(obj)
         return obj
@@ -518,6 +523,10 @@ class Resource(object):
                         if isinstance(field_instance, ReferenceField) or (isinstance(field_instance, ListField) and isinstance(field_instance.field, ReferenceField)):
                             continue # Not implemented.
                     setattr(obj, field, self._get('update_object', data, field, parent_resources=parent_resources))
+        # This allows some validation of the updated object
+        # prior to saving
+        self.validate_object(obj)
+
         if save:
             self._save(obj)
 
@@ -525,3 +534,6 @@ class Resource(object):
 
     def delete_object(self, obj, parent_resources=None):
         obj.delete()
+
+    def validate_object(self, obj):
+        pass
