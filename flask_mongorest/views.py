@@ -32,7 +32,7 @@ class ResourceView(View):
             raise Unauthorized
 
         try:
-            self._resource = self.resource()
+            self._resource = self.requested_resource(request)
             return super(ResourceView, self).dispatch_request(*args, **kwargs)
         except mongoengine.queryset.DoesNotExist:
             raise NotFound()
@@ -40,6 +40,14 @@ class ResourceView(View):
             return e.message, '400 Bad Request' 
         except mongoengine.ValidationError, e:
             raise BadRequest(description=e)
+
+    def requested_resource(self, request):
+        """In the case where the Resource that this view is associated with points to a Document class
+           that allows inheritance, this method should indicate the specific Resource class to use
+           when processing POST and PUT requests through information available in the request
+           itself or through other means."""
+        # Default behavior is to use the (base) resource class
+        return self.resource()
 
     def get(self, **kwargs):
         pk = kwargs.pop('pk', None)
