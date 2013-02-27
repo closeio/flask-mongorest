@@ -6,7 +6,8 @@ import mongoengine
 from flask import request, url_for
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
-from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, DateTimeField, DecimalField
+from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField
+from mongoengine.fields import DateTimeField, DecimalField, DictField
 from flask.ext.mongorest.exceptions import ValidationError
 from flask.ext.mongorest.utils import isbound
 from flask.ext.mongorest.utils import MongoEncoder
@@ -151,6 +152,11 @@ class Resource(object):
                     return field_value and field_value.to_dbref()
             elif isinstance(field_instance, ListField):
                 return [val for val in [get(elem, field_name, field_instance=field_instance.field) for elem in field_value] if val]
+            elif isinstance(field_instance, DictField):
+                return dict(
+                    (key, get(elem, field_name,
+                              field_instance=field_instance.field))
+                    for (key, elem) in field_value.items())
             elif callable(field_instance):
                 if isinstance(field_value, list):
                     value = field_value
@@ -482,6 +488,19 @@ class Resource(object):
                     return self._get(method, inner_data, field_name, field_instance=inner_field, parent_resources=parent_resources)
             return [expand_list(field_instance.field, elem) for elem in field_data_value]
 
+        elif isinstance(field_instance, DictField):
+            def expand_map(inner_field, inner_data):
+                if isinstance(inner_field, DictField):
+                    return dict(
+                        (key, expand_map(inner_field.field, elem))
+                        for key, elem in inner_data.items())
+                elif isinstance(inner_field, EmbeddedDocumentField):
+                    return self.related_resources[field_name]().create_object(data=inner_data, save=False, parent_resources=parent_resources+[self])
+                else:
+                    return self._get(method, inner_data, field_name, field_instance=inner_field, parent_resources=parent_resources)
+            return dict(
+                (key, expand_map(field_instance.field, elem))
+                for key, elem in field_data_value.items())
         else:
             return field_data_value
 
