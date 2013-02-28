@@ -43,15 +43,17 @@ class ResourceView(View):
 
     def get(self, **kwargs):
         pk = kwargs.pop('pk', None)
+        qfilter = lambda qs: self.has_read_permission(request, qs)
         if pk is None:
-            objs, has_more = self._resource.get_objects()
+            objs, has_more = self._resource.get_objects(qfilter=qfilter)
             ret = {
                 'data': [self._resource.serialize(obj, params=request.args) for obj in objs]
             }
             if has_more != None:
                 ret['has_more'] = has_more
         else:
-            obj = self._resource.get_object(pk)
+            qfilter = lambda qs: self.has_read_permission(request, qs)
+            obj = self._resource.get_object(pk, qfilter=qfilter)
             ret = self._resource.serialize(obj, params=request.args)
         return ret
 
@@ -80,6 +82,7 @@ class ResourceView(View):
             # is a bulk update, only the count of objects which were updated is
             # returned.
 
+            qfilter = lambda qs: self.has_read_permission(request, qs)
             objs, has_more = self._resource.get_objects(all=True)
             count = 0
             try:
@@ -112,6 +115,11 @@ class ResourceView(View):
             raise Unauthorized
         self._resource.delete_object(obj)
         return {}
+
+    # This takes a QuerySet as an argument and then
+    # returns a query set that this request can read
+    def has_read_permission(self, request, qs):
+        return qs
 
     def has_add_permission(self, request, obj):
         return True

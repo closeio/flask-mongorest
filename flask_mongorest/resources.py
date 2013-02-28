@@ -247,15 +247,20 @@ class Resource(object):
     def get_queryset(self):
         return self.document.objects
 
-    def get_object(self, pk):
-        return self.get_queryset().get(pk=pk)
+    def get_object(self, pk, qfilter=None):
+        qs = self.get_queryset()
+        if qfilter:
+            qs = qfilter(qs)
+        return qs.get(pk=pk)
 
-    def get_objects(self, all=False, qs=None):
+    def get_objects(self, all=False, qs=None, qfilter=None):
         params = request.args
         custom_qs = True
         if qs == None:
             custom_qs = False
             qs = self.get_queryset()
+        if qfilter:
+            qs = qfilter(qs)
         for key in params:
             value = params[key]
             operator = None

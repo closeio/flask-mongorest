@@ -115,6 +115,10 @@ class RestrictedPostView(ResourceView):
     resource = PostResource
     methods = [Create, Update, Fetch, List, Delete]
 
+    # Can't read a post if it isn't published
+    def has_read_permission(self, request, qs):
+        return qs.filter(is_published=True)
+
     # Can't add a post in a published state
     def has_add_permission(self, request, obj):
         return not obj.is_published

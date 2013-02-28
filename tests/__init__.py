@@ -280,6 +280,16 @@ class MongoRestTestCase(unittest.TestCase):
 
         data = json.loads(resp.data)
 
+        resp = self.app.get('/posts/')
+        tmp = json.loads(resp.data)
+        nposts = len(tmp["data"])
+        self.assertEqual(2, nposts)
+
+        resp = self.app.get('/restricted/')
+        tmp = json.loads(resp.data)
+        npubposts = len(tmp["data"])
+        self.assertEqual(1, npubposts)
+
         post["title"] = "New title"
         resp = self.app.put('/restricted/%s/' % (str(data["id"],)),
                             data=json.dumps(post))
