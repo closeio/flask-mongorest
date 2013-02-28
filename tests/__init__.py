@@ -270,55 +270,78 @@ class MongoRestTestCase(unittest.TestCase):
 
         post = self.post_1.copy()
 
+        # Try to create an already published Post
         post["is_published"] = True
         resp = self.app.post('/restricted/', data=json.dumps(post))
+        # Not allowed, must be added in unpublished state
         response_success(resp, code=401)
 
+        # Try again, but with is_published set to False
         post["is_published"] = False
         resp = self.app.post('/restricted/', data=json.dumps(post))
+        # Should be OK
         response_success(resp, code=200)
 
+        # Get data about the Post we just POSTed
         data = json.loads(resp.data)
 
+        # Look at current number of posts through an unrestricted view
         resp = self.app.get('/posts/')
         tmp = json.loads(resp.data)
         nposts = len(tmp["data"])
+        # Should see 2
         self.assertEqual(2, nposts)
 
+        # Now look at posts through a restricted view
         resp = self.app.get('/restricted/')
         tmp = json.loads(resp.data)
         npubposts = len(tmp["data"])
+        # Should only see 1 (published)
         self.assertEqual(1, npubposts)
 
+        # Try to change the title
         post["title"] = "New title"
         resp = self.app.put('/restricted/%s/' % (str(data["id"],)),
                             data=json.dumps(post))
+        # Works because we haven't published it yet
         response_success(resp, code=200)
 
+        # Now let's publish it
         post["is_published"] = True
         resp = self.app.put('/restricted/%s/' % (str(data["id"],)),
                             data=json.dumps(post))
+        # This works because the object we are changing is still
+        # in the unpublished state before we update it
         response_success(resp, code=200)
 
+        # Now change the title again
         post["title"] = "Another title"
         resp = self.app.put('/restricted/%s/' % (str(data["id"],)),
                             data=json.dumps(post))
+        # Can't do it, object has already been published
         response_success(resp, code=401)
 
+        # Try to delete this post
         resp = self.app.delete('/restricted/%s/' % (str(data["id"],)),
                                data=json.dumps(post))
+        # Again, won't work because it was already published
         response_success(resp, code=401)
 
+        # OK, let's create another post
         post = self.post_1.copy()
 
+        # Create it in the unpublished state
         post["is_published"] = False
         resp = self.app.post('/restricted/', data=json.dumps(post))
+        # Should work
         response_success(resp, code=200)
 
         data = json.loads(resp.data)
 
+        # Now let's try and delete an unpublished post
         resp = self.app.delete('/restricted/%s/' % (data["id"],),
                                data=json.dumps(post))
+        # Should work
         response_success(resp, code=200)
 
     def test_get(self):

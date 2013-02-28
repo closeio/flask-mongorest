@@ -43,6 +43,8 @@ class ResourceView(View):
 
     def get(self, **kwargs):
         pk = kwargs.pop('pk', None)
+        # Create a queryset filter to control read access to the
+        # underlying objects
         qfilter = lambda qs: self.has_read_permission(request, qs)
         if pk is None:
             objs, has_more = self._resource.get_objects(qfilter=qfilter)
@@ -62,6 +64,7 @@ class ResourceView(View):
             raise NotFound("Did you mean to use PUT?")
         self._resource.validate_request()
         obj = self._resource.create_object()
+        # Check if we have permission to create this object
         if not self.has_add_permission(request, obj):
             raise Unauthorized
         ret = self._resource.serialize(obj, params=request.args)
@@ -101,6 +104,7 @@ class ResourceView(View):
                 return {'count': count}
         else:
             obj = self._resource.get_object(pk)
+            # Check if we have permission to change this object
             if not self.has_change_permission(request, obj):
                 raise Unauthorized
             self._resource.validate_request(obj)
@@ -111,6 +115,7 @@ class ResourceView(View):
     def delete(self, **kwargs):
         pk = kwargs.pop('pk', None)
         obj = self._resource.get_object(pk)
+        # Check if we have permission to delete this object
         if not self.has_delete_permission(request, obj):
             raise Unauthorized
         self._resource.delete_object(obj)

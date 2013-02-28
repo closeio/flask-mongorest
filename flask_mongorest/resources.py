@@ -249,6 +249,8 @@ class Resource(object):
 
     def get_object(self, pk, qfilter=None):
         qs = self.get_queryset()
+        # If a queryset filter was provided, pass our current
+        # queryset in and get a new one out
         if qfilter:
             qs = qfilter(qs)
         return qs.get(pk=pk)
@@ -259,6 +261,8 @@ class Resource(object):
         if qs == None:
             custom_qs = False
             qs = self.get_queryset()
+        # If a queryset filter was provided, pass our current
+        # queryset in and get a new one out
         if qfilter:
             qs = qfilter(qs)
         for key in params:

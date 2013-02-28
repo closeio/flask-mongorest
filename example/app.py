@@ -112,6 +112,8 @@ class DummyAuthView(ResourceView):
 
 @api.register(name='restricted', url='/restricted/')
 class RestrictedPostView(ResourceView):
+    """This class allows us to put restrictions in place regarding
+       who/what can be read, changed, added or deleted"""
     resource = PostResource
     methods = [Create, Update, Fetch, List, Delete]
 
