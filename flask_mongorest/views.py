@@ -34,8 +34,8 @@ class ResourceView(View):
         try:
             self._resource = self.resource()
             return super(ResourceView, self).dispatch_request(*args, **kwargs)
-        except mongoengine.queryset.DoesNotExist:
-            raise NotFound()
+        except mongoengine.queryset.DoesNotExist as e:
+            raise NotFound("Empty query: "+str(e))
         except ValidationError, e:
             return e.message, '400 Bad Request' 
         except mongoengine.ValidationError, e:
@@ -60,6 +60,8 @@ class ResourceView(View):
             raise NotFound("Did you mean to use PUT?")
         self._resource.validate_request()
         obj = self._resource.create_object()
+        if not self.has_add_permission(request, obj):
+            raise Unauthorized
         ret = self._resource.serialize(obj, params=request.args)
         return ret
 
@@ -84,6 +86,9 @@ class ResourceView(View):
                 for obj in objs:
                     self._resource.validate_request(obj)
                     obj = self._resource.update_object(obj)
+                    # Raise or skip?
+                    if not self.has_change_permission(request, obj):
+                        raise Unauthorized
                     obj.save()
                     count += 1
             except ValidationError, e:
@@ -93,6 +98,8 @@ class ResourceView(View):
                 return {'count': count}
         else:
             obj = self._resource.get_object(pk)
+            if not self.has_change_permission(request, obj):
+                raise Unauthorized
             self._resource.validate_request(obj)
             obj = self._resource.update_object(obj)
             ret = self._resource.serialize(obj, params=request.args)
@@ -101,5 +108,16 @@ class ResourceView(View):
     def delete(self, **kwargs):
         pk = kwargs.pop('pk', None)
         obj = self._resource.get_object(pk)
+        if not self.has_delete_permission(request, obj):
+            raise Unauthorized
         self._resource.delete_object(obj)
         return {}
+
+    def has_add_permission(self, request, obj):
+        return True
+
+    def has_change_permission(self, request, obj):
+        return True
+
+    def has_delete_permission(self, request, obj):
+        return True

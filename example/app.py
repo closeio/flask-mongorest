@@ -110,6 +110,23 @@ class DummyAuthView(ResourceView):
     methods = [Create, Update, Fetch, List, Delete]
     authentication_methods = [DummyAuthenication]
 
+@api.register(name='restricted', url='/restricted/')
+class RestrictedPostView(ResourceView):
+    resource = PostResource
+    methods = [Create, Update, Fetch, List, Delete]
+
+    # Can't add a post in a published state
+    def has_add_permission(self, request, obj):
+        return not obj.is_published
+
+    # Can't change a post if it is published
+    def has_change_permission(self, request, obj):
+        return not obj.is_published
+
+    # Can't delete a post if it is published
+    def has_delete_permission(self, request, obj):
+        return not obj.is_published
+
 from flask.ext.wtf import TextField, length
 class TestDocument(db.Document):
     name = db.StringField()
@@ -169,7 +186,6 @@ class PersonResource(Resource):
 class PersonView(ResourceView):
     resource = PersonResource
     methods = [Create, Update, Fetch, List]
-
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8000))

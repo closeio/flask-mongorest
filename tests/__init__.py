@@ -259,6 +259,58 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(test_2['name'], 'name2')
         self.assertEqual(test_2['other'], 'new')
 
+    def test_restricted_auth(self):
+        self.post_1['author_id'] = self.user_1_obj['id']
+        self.post_1['editor'] = self.user_2_obj['id']
+        self.post_1['user_lists'] = [[self.user_1_obj['id']],[self.user_1_obj['id'], self.user_2_obj['id']]]
+
+        resp = self.app.get('/user/')
+        objs = json.loads(resp.data)['data']
+        self.assertEqual(len(objs), 2)
+
+        post = self.post_1.copy()
+
+        post["is_published"] = True
+        resp = self.app.post('/restricted/', data=json.dumps(post))
+        response_success(resp, code=401)
+
+        post["is_published"] = False
+        resp = self.app.post('/restricted/', data=json.dumps(post))
+        response_success(resp, code=200)
+
+        data = json.loads(resp.data)
+
+        post["title"] = "New title"
+        resp = self.app.put('/restricted/%s/' % (str(data["id"],)),
+                            data=json.dumps(post))
+        response_success(resp, code=200)
+
+        post["is_published"] = True
+        resp = self.app.put('/restricted/%s/' % (str(data["id"],)),
+                            data=json.dumps(post))
+        response_success(resp, code=200)
+
+        post["title"] = "Another title"
+        resp = self.app.put('/restricted/%s/' % (str(data["id"],)),
+                            data=json.dumps(post))
+        response_success(resp, code=401)
+
+        resp = self.app.delete('/restricted/%s/' % (str(data["id"],)),
+                               data=json.dumps(post))
+        response_success(resp, code=401)
+
+        post = self.post_1.copy()
+
+        post["is_published"] = False
+        resp = self.app.post('/restricted/', data=json.dumps(post))
+        response_success(resp, code=200)
+
+        data = json.loads(resp.data)
+
+        resp = self.app.delete('/restricted/%s/' % (data["id"],),
+                               data=json.dumps(post))
+        response_success(resp, code=200)
+
     def test_get(self):
         resp = self.app.get('/user/')
         objs = json.loads(resp.data)['data']
