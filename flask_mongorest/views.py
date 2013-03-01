@@ -45,7 +45,7 @@ class ResourceView(View):
         pk = kwargs.pop('pk', None)
         # Create a queryset filter to control read access to the
         # underlying objects
-        qfilter = lambda qs: self.has_read_permission(request, qs)
+        qfilter = lambda qs: self.has_read_permission(request, qs.clone())
         if pk is None:
             objs, has_more = self._resource.get_objects(qfilter=qfilter)
             ret = {
@@ -54,7 +54,7 @@ class ResourceView(View):
             if has_more != None:
                 ret['has_more'] = has_more
         else:
-            qfilter = lambda qs: self.has_read_permission(request, qs)
+            qfilter = lambda qs: self.has_read_permission(request, qs.clone())
             obj = self._resource.get_object(pk, qfilter=qfilter)
             ret = self._resource.serialize(obj, params=request.args)
         return ret
@@ -85,7 +85,7 @@ class ResourceView(View):
             # is a bulk update, only the count of objects which were updated is
             # returned.
 
-            qfilter = lambda qs: self.has_read_permission(request, qs)
+            qfilter = lambda qs: self.has_read_permission(request, qs.clone())
             objs, has_more = self._resource.get_objects(all=True)
             count = 0
             try:
