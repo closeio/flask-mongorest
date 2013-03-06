@@ -287,36 +287,35 @@ class Resource(object):
     def get_objects(self, all=False, qs=None, qfilter=None):
         params = request.args
         custom_qs = True
-        if qs == None:
+        if qs is None:
             custom_qs = False
             qs = self.get_queryset()
-        # If a queryset filter was provided, pass our current
-        # queryset in and get a new one out
-        if qfilter:
-            qs = qfilter(qs)
-        for key in params:
-            value = params[key]
+        for key, value in params.iteritems():
             # If this is a resource identified by a URI, we need
-            # to extract the object id at this point since 
+            # to extract the object id at this point since
             # MongoEngine only understands the object id
             if self.uri_prefix:
                 url = urlparse(value)
                 uri = url.path
                 value = uri.lstrip(self.uri_prefix)
-            operator = None
             negate = False
             op_name = ''
-            parts = key.split('__')
-            if len(parts) > 1:
-                op_name = parts.pop()
-                if parts[-1] == 'not':
-                    negate = True
-                    parts.pop()
-            field = parts.pop()
-            allowed_operators = self._filters.get(field, {})
-            if op_name not in allowed_operators.keys():
+            if key in self._filters:
+                # exact query
+                field = key
+                allowed_operators = self._filters[key]
+            else:
+                parts = key.split('__')
+                if len(parts) > 1:
+                    op_name = parts.pop()
+                    if parts[-1] == 'not':
+                        negate = True
+                        parts.pop()
+                field = '__'.join(parts)
+                allowed_operators = self._filters.get(field, {})
+            operator = allowed_operators.get(op_name, None)
+            if operator is None:
                 continue
-            operator = allowed_operators[op_name]
             field = self._reverse_rename_fields.get(field, field)
             qs = operator().apply(qs, field, value, negate)
         limit = None
