@@ -290,6 +290,10 @@ class Resource(object):
         if qs is None:
             custom_qs = False
             qs = self.get_queryset()
+        # If a queryset filter was provided, pass our current
+        # queryset in and get a new one out
+        if qfilter:
+            qs = qfilter(qs)
         for key, value in params.iteritems():
             # If this is a resource identified by a URI, we need
             # to extract the object id at this point since
@@ -300,22 +304,34 @@ class Resource(object):
                 value = uri.lstrip(self.uri_prefix)
             negate = False
             op_name = ''
-            if key in self._filters:
-                # exact query
-                field = key
-                allowed_operators = self._filters[key]
-            else:
-                parts = key.split('__')
-                if len(parts) > 1:
-                    op_name = parts.pop()
-                    if parts[-1] == 'not':
-                        negate = True
-                        parts.pop()
-                field = '__'.join(parts)
-                allowed_operators = self._filters.get(field, {})
+            parts = key.split('__')
+            for i in range(len(parts) + 1, 0, -1):
+                field = '__'.join(parts[:i])
+                allowed_operators = self._filters.get(field)
+                if allowed_operators:
+                    parts = parts[i:]
+                    break
+            if allowed_operators is None:
+                continue
+
+            if parts:
+                # either an operator or a query lookup!  See what's allowed.
+                op_name = parts[-1]
+                if op_name in allowed_operators:
+                    # operator; drop it
+                    parts.pop()
+                else:
+                    # assume it's part of a lookup
+                    op_name = ''
+                if parts and parts[-1] == 'not':
+                    negate = True
+                    parts.pop()
+
             operator = allowed_operators.get(op_name, None)
             if operator is None:
                 continue
+            if parts:
+                field = '%s__%s' % (field, '__'.join(parts))
             field = self._reverse_rename_fields.get(field, field)
             qs = operator().apply(qs, field, value, negate)
         limit = None
