@@ -54,10 +54,12 @@ class Resource(object):
         self.raw_data = {}
         self._dirty_fields = None
         if request.method in ('PUT', 'POST'):
+            if request.mimetype and 'json' not in request.mimetype:
+                raise ValidationError({'error': "Please send valid JSON with a 'Content-Type: application/json' header."})
             try:
                 self.raw_data = json.loads(request.data)
             except ValueError, e:
-                raise ValidationError({'error': 'invalid json.'})
+                raise ValidationError({'error': 'The request contains invalid JSON.'})
 
     def get_fields(self):
         return self.fields
@@ -132,7 +134,7 @@ class Resource(object):
                         value = field_value()
                     else:
                         value = field_instance(obj)
-                     
+
                 if field_name in self._related_resources:
                     return [self._related_resources[field_name]().serialize(o, **kwargs) for o in value]
                 return value
@@ -328,7 +330,7 @@ class Resource(object):
                     if callable(method):
                         q = method()
                         if field_name in document_queryset.keys():
-                            document_queryset[field_name] = (document_queryset[field_name] | q._query_obj)          
+                            document_queryset[field_name] = (document_queryset[field_name] | q._query_obj)
                         else:
                             document_queryset[field_name] = q._query_obj
 
@@ -362,7 +364,7 @@ class Resource(object):
                             hint_index[hinted].append(obj)
 
                     hints[k] = hint_index
-        
+
             for obj in qs:
                 for field, hint_index in hints.iteritems():
                     obj_id = obj.id
@@ -374,7 +376,7 @@ class Resource(object):
                         setattr(obj, field, [])
                         continue
                     setattr(obj, field, hint_index[obj_id])
-                    
+
         return qs, has_more
 
     def _get(self, method, data, field_name, field_instance=None, parent_resources=None):

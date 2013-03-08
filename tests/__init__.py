@@ -445,7 +445,7 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.post('/user/', data='{\"}')
         response_error(resp, code=400)
         resp = json.loads(resp.data)
-        self.assertEqual(resp['error'], 'invalid json.')
+        self.assertEqual(resp['error'], 'The request contains invalid JSON.')
 
 
 class MongoRestSchemaTestCase(unittest.TestCase):
