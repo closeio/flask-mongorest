@@ -71,13 +71,22 @@ class MongoRestTestCase(unittest.TestCase):
 
         # create user 1
         resp = self.app.post('/user/', data=json.dumps(self.user_1))
+        assert "Location" in resp.headers
+        loc1 = resp.headers["Location"]
+        assert "/user/" in loc1
+        assert loc1.startswith("http")
         response_success(resp)
         self.user_1_obj = json.loads(resp.data)
+        self.user_1_loc = loc1
         compare_req_resp(self.user_1, self.user_1_obj)
         # create user 2
         resp = self.app.post('/user/', data=json.dumps(self.user_2))
+        loc2 = resp.headers["Location"]
+        assert "/user/" in loc2
+        assert loc2.startswith("http")
         response_success(resp)
         self.user_2_obj = json.loads(resp.data)
+        self.user_2_loc = loc2
         compare_req_resp(self.user_2, self.user_2_obj)
 
     def tearDown(self):
@@ -154,6 +163,9 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.post('/testform/', data=json.dumps({
             'name': 'okay',
         }))
+        assert "Location" in resp.headers
+        loc = resp.headers["Location"]
+        assert "/testform/" in loc
         response_success(resp)
         data = json.loads(resp.data)
         self.assertEqual(data['name'], 'okay')
@@ -345,14 +357,14 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp, code=200)
 
     def test_get(self):
-        resp = self.app.get('/user/')
+        resp = self.app.get(example.UserResource.uri_prefix) # /users/
         objs = json.loads(resp.data)['data']
         self.assertEqual(len(objs), 2)
 
     def test_post(self):
-        self.post_1['author_id'] = self.user_1_obj['id']
-        self.post_1['editor'] = self.user_2_obj['id']
-        self.post_1['user_lists'] = [[self.user_1_obj['id']],[self.user_1_obj['id'], self.user_2_obj['id']]]
+        self.post_1['author_id'] = self.user_1_loc
+        self.post_1['editor'] = self.user_2_loc
+        self.post_1['user_lists'] = [[self.user_1_loc], [self.user_1_loc, self.user_2_loc]]
         resp = self.app.post('/posts/', data=json.dumps(self.post_1))
         response_success(resp)
         compare_req_resp(self.post_1, json.loads(resp.data))
@@ -361,8 +373,11 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
         compare_req_resp(self.post_1_obj, json.loads(resp.data))
 
-        self.post_1_obj['author_id'] = self.user_2_obj['id']
+        self.post_1_obj['author_id'] = self.user_2_loc
         resp = self.app.put('/posts/%s/' % self.post_1_obj['id'], data=json.dumps(self.post_1_obj))
+        jd = json.loads(resp.data)
+        self.assertEqual(self.post_1_obj['author_id'], jd["author_id"])
+        
         response_success(resp)
         compare_req_resp(self.post_1_obj, json.loads(resp.data))
         self.post_1_obj = json.loads(resp.data)
@@ -521,7 +536,7 @@ class MongoRestTestCase(unittest.TestCase):
         user = json.loads(resp.data)
         self.assertEqual(user.keys(), ['id'])
 
-        resp = self.app.get('/user/%s/' % user['id'])
+        resp = self.app.get(example.UserResource.uri(user['id'])) # /user/:id
         response_success(resp)
         user = json.loads(resp.data)
         compare_req_resp(test_user_data, user)
