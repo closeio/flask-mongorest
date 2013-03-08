@@ -34,8 +34,8 @@ class ResourceView(View):
         try:
             self._resource = self.requested_resource(request)
             return super(ResourceView, self).dispatch_request(*args, **kwargs)
-        except mongoengine.queryset.DoesNotExist:
-            raise NotFound()
+        except mongoengine.queryset.DoesNotExist as e:
+            raise NotFound("Empty query: "+str(e))
         except ValidationError, e:
             return e.message, '400 Bad Request' 
         except mongoengine.ValidationError, e:
@@ -51,15 +51,19 @@ class ResourceView(View):
 
     def get(self, **kwargs):
         pk = kwargs.pop('pk', None)
+        # Create a queryset filter to control read access to the
+        # underlying objects
+        qfilter = lambda qs: self.has_read_permission(request, qs.clone())
         if pk is None:
-            objs, has_more = self._resource.get_objects()
+            objs, has_more = self._resource.get_objects(qfilter=qfilter)
             ret = {
                 'data': [self._resource.serialize(obj, params=request.args) for obj in objs]
             }
             if has_more != None:
                 ret['has_more'] = has_more
         else:
-            obj = self._resource.get_object(pk)
+            qfilter = lambda qs: self.has_read_permission(request, qs.clone())
+            obj = self._resource.get_object(pk, qfilter=qfilter)
             ret = self._resource.serialize(obj, params=request.args)
         return ret
 
@@ -68,6 +72,9 @@ class ResourceView(View):
             raise NotFound("Did you mean to use PUT?")
         self._resource.validate_request()
         obj = self._resource.create_object()
+        # Check if we have permission to create this object
+        if not self.has_add_permission(request, obj):
+            raise Unauthorized
         ret = self._resource.serialize(obj, params=request.args)
         return ret
 
@@ -86,12 +93,16 @@ class ResourceView(View):
             # is a bulk update, only the count of objects which were updated is
             # returned.
 
+            qfilter = lambda qs: self.has_read_permission(request, qs.clone())
             objs, has_more = self._resource.get_objects(all=True)
             count = 0
             try:
                 for obj in objs:
                     self._resource.validate_request(obj)
                     obj = self._resource.update_object(obj)
+                    # Raise or skip?
+                    if not self.has_change_permission(request, obj):
+                        raise Unauthorized
                     obj.save()
                     count += 1
             except ValidationError, e:
@@ -101,6 +112,9 @@ class ResourceView(View):
                 return {'count': count}
         else:
             obj = self._resource.get_object(pk)
+            # Check if we have permission to change this object
+            if not self.has_change_permission(request, obj):
+                raise Unauthorized
             self._resource.validate_request(obj)
             obj = self._resource.update_object(obj)
             ret = self._resource.serialize(obj, params=request.args)
@@ -109,5 +123,22 @@ class ResourceView(View):
     def delete(self, **kwargs):
         pk = kwargs.pop('pk', None)
         obj = self._resource.get_object(pk)
+        # Check if we have permission to delete this object
+        if not self.has_delete_permission(request, obj):
+            raise Unauthorized
         self._resource.delete_object(obj)
         return {}
+
+    # This takes a QuerySet as an argument and then
+    # returns a query set that this request can read
+    def has_read_permission(self, request, qs):
+        return qs
+
+    def has_add_permission(self, request, obj):
+        return True
+
+    def has_change_permission(self, request, obj):
+        return True
+
+    def has_delete_permission(self, request, obj):
+        return True
