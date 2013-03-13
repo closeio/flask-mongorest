@@ -1,8 +1,9 @@
 import json
 import decimal
 import datetime
+from urlparse import urlparse
 import mongoengine
-from flask import request
+from flask import request, url_for
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, DateTimeField, DecimalField
@@ -33,6 +34,7 @@ class Resource(object):
     paginate = True
     select_related = False
     allowed_ordering = []
+    uri_prefix = None # Must start and end with a "/"
     max_limit = 1000 # cap the number of records in the _limit param to avoid DDoS'ing the API.
 
     __metaclass__ = ResourceMeta
@@ -60,6 +62,25 @@ class Resource(object):
                 self.raw_data = json.loads(request.data)
             except ValueError, e:
                 raise ValidationError({'error': 'The request contains invalid JSON.'})
+
+    @classmethod
+    def uri(self, path):
+        """This generates a URI reference for the given path"""
+        if self.uri_prefix:
+            ret = self.uri_prefix+path
+            return ret
+        else:
+            raise ValueError("Cannot generate URI for resources that do not specify a uri_prefix")
+
+    @classmethod
+    def _url(self, path):
+        """This generates a complete URL for the given path.  Requires application context."""
+        if self.uri_prefix:
+            url = url_for(self.uri_prefix.lstrip("/").rstrip("/"),_external=True)
+            ret = url+path
+            return ret
+        else:
+            raise ValueError("Cannot generate URL for resources that do not specify a uri_prefix")
 
     def get_fields(self):
         return self.fields
@@ -91,13 +112,19 @@ class Resource(object):
         return filters
 
 
+    def serialize_field(self, obj, **kwargs):
+        if self.uri_prefix and hasattr(obj, "id"):
+            return self._url(str(obj.id))
+        else:
+            return self.serialize(obj, **kwargs)
+            
     def serialize(self, obj, **kwargs):
         if not obj:
             return {}
 
         if obj.__class__ in self._child_document_resources \
         and self._child_document_resources[obj.__class__] != self.__class__:
-            return obj and self._child_document_resources[obj.__class__]().serialize(obj, **kwargs)
+            return obj and self._child_document_resources[obj.__class__]().serialize_field(obj, **kwargs)
 
         def get(obj, field_name, field_instance=None):
             """
@@ -117,7 +144,7 @@ class Resource(object):
 
             if isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)):
                 if field_name in self._related_resources:
-                    return field_value and not isinstance(field_value, DBRef) and self._related_resources[field_name]().serialize(field_value, **kwargs)
+                    return field_value and not isinstance(field_value, DBRef) and self._related_resources[field_name]().serialize_field(field_value, **kwargs)
                 else:
                     if isinstance(field_value, DBRef):
                         return field_value
@@ -136,7 +163,7 @@ class Resource(object):
                         value = field_instance(obj)
 
                 if field_name in self._related_resources:
-                    return [self._related_resources[field_name]().serialize(o, **kwargs) for o in value]
+                    return [self._related_resources[field_name]().serialize_field(o, **kwargs) for o in value]
                 return value
             return field_value
 
@@ -158,9 +185,9 @@ class Resource(object):
                 value = getattr(self, field)(obj)
                 if field in self._related_resources and value != None:
                     if isinstance(value, mongoengine.document.Document):
-                        value = self._related_resources[field]().serialize(value)
+                        value = self._related_resources[field]().serialize_field(value)
                     else: # assume queryset or list
-                        value = [self._related_resources[field]().serialize(o) for o in value]
+                        value = [self._related_resources[field]().serialize_field(o) for o in value]
                 data[renamed_field] = value
             else:
                 data[renamed_field] = get(obj, field)
@@ -269,6 +296,13 @@ class Resource(object):
             qs = qfilter(qs)
         for key in params:
             value = params[key]
+            # If this is a resource identified by a URI, we need
+            # to extract the object id at this point since 
+            # MongoEngine only understands the object id
+            if self.uri_prefix:
+                url = urlparse(value)
+                uri = url.path
+                value = uri.lstrip(self.uri_prefix)
             operator = None
             negate = False
             op_name = ''
@@ -400,7 +434,15 @@ class Resource(object):
 
         if isinstance(field_instance, ReferenceField):
             if field_name in self._related_resources:
-                return self.get_related_resources()[field_name]().create_object(data=field_data_value, save=True, parent_resources=parent_resources+[self])
+                restype = self.get_related_resources()[field_name]
+                if restype.uri_prefix:
+                    url = urlparse(field_data_value)
+                    uri = url.path
+                    objid = uri.lstrip(restype.uri_prefix)
+                    qobj = field_instance.document_type.objects.get(pk=objid)
+                    retobj = qobj.to_dbref()
+                    return retobj
+                return restype().create_object(data=field_data_value, save=True, parent_resources=parent_resources+[self])
             else:
                 if isinstance(field_data_value, mongoengine.Document):
                     return field_data_value
@@ -524,7 +566,7 @@ class Resource(object):
             else:
                 # TODO: remove old code
                 if field in self.document._fields.keys() and field not in self.readonly_fields and field in data:
-                    if field in self._related_resources:
+                    if field in self._related_resources and not hasattr(self._related_resources[field], 'uri_prefix'):
                         field_instance = getattr(self.document, field)
                         if isinstance(field_instance, ReferenceField) or (isinstance(field_instance, ListField) and isinstance(field_instance.field, ReferenceField)):
                             continue # Not implemented.

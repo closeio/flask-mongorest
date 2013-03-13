@@ -76,7 +76,10 @@ class ResourceView(View):
         if not self.has_add_permission(request, obj):
             raise Unauthorized
         ret = self._resource.serialize(obj, params=request.args)
-        return ret
+        if isinstance(obj, mongoengine.Document) and self._resource.uri_prefix:
+            return ret, "201 Created", {"Location": self._resource._url(str(obj.id))}
+        else:
+            return ret
 
     def put(self, **kwargs):
         pk = kwargs.pop('pk', None)

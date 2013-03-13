@@ -15,6 +15,8 @@ from example import schemas, documents
 
 app = Flask(__name__)
 
+app.url_map.strict_slashes = False
+
 app.config.update(
     DEBUG = True,
     TESTING = True,
@@ -43,8 +45,7 @@ class UserResource(Resource):
     filters = {
         'datetime': [ops.Exact]
     }
-
-
+    uri_prefix = "/user/"
 
 @api.register()
 class UserView(ResourceView):
@@ -74,6 +75,9 @@ class PostResource(Resource):
     related_resources = {
         'content': ContentResource,
         'sections': ContentResource, #nested complex objects
+        'author': UserResource,
+        'editor': UserResource,
+        'user_lists': UserResource,
     }
     filters = {
         'title': [ops.Exact, ops.Startswith, ops.In],
@@ -153,6 +157,7 @@ class TestResource(Resource):
 class TestFormResource(Resource):
     form = TestForm
     document = TestDocument
+    uri_prefix = "/testform/"
 
 class TestFieldsResource(Resource):
     document = TestDocument
