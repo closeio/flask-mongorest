@@ -9,8 +9,8 @@ from werkzeug.exceptions import Unauthorized
 from flask.ext.mongorest.utils import MongoEncoder
 from flask.ext.mongorest.exceptions import ValidationError
 
-
 mimerender = mimerender.FlaskMimeRender()
+
 render_json = lambda **payload: json.dumps(payload, cls=MongoEncoder)
 render_html = lambda **payload: render_template('mongorest/debug.html', data=json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4))
 
@@ -22,8 +22,15 @@ class ResourceView(View):
     def __init__(self):
         assert(self.resource and self.methods)
 
-    @mimerender(default='json', json = render_json, html = render_html)
+    @mimerender(default='json', json=render_json, html=render_html)
     def dispatch_request(self, *args, **kwargs):
+        # keep all the logic in a helper method (_dispatch_request) so that
+        # it's easy for subclasses to override this method (when they don't want to use
+        # this mimerender decorator) without them also having to copy/paste all the
+        # authentication logic, etc.
+        return self._dispatch_request(*args, **kwargs)
+
+    def _dispatch_request(self, *args, **kwargs):
         authorized = True if len(self.authentication_methods) == 0 else False
         for authentication_method in self.authentication_methods:
             if authentication_method().authorized():
@@ -37,7 +44,7 @@ class ResourceView(View):
         except mongoengine.queryset.DoesNotExist as e:
             raise NotFound("Empty query: "+str(e))
         except ValidationError, e:
-            return e.message, '400 Bad Request' 
+            return e.message, '400 Bad Request'
         except mongoengine.ValidationError, e:
             raise BadRequest(description=e)
 
