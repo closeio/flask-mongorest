@@ -561,7 +561,12 @@ class Resource(object):
             # in this case we want to check if the data is equal. Note this
             # doesn't look into mongoengine documents which are nested within
             # mongoengine documents.
-            if a != b:
+            def cmp(a, b):
+                try:
+                    return a == b
+                except: # Exception during comparison, mainly datetimes.
+                    return False
+            if not cmp(a, b):
                 return False
             else:
                 if isinstance(a, list):
@@ -569,7 +574,7 @@ class Resource(object):
                 elif isinstance(a, dict):
                     return all([equal(m, n) for (m, n) in zip(a.values(), b.values())])
                 elif isinstance(a, mongoengine.Document):
-                    return a._data == b._data
+                    return cmp(a._data, b._data)
                 else:
                     return True
 
