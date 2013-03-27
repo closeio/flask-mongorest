@@ -238,7 +238,7 @@ class Resource(object):
             try:
                 self.data = schema.full_clean()
             except SchemaValidationError, e:
-                raise ValidationError({'field-errors': schema.errors, 'errors': schema.non_field_errors })
+                raise ValidationError({'field-errors': schema.field_errors, 'errors': schema.errors })
 
         elif self.form:
             # We need to convert JSON data into form data.
