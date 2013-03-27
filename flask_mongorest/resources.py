@@ -556,13 +556,31 @@ class Resource(object):
         return obj
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
+        def equal(a, b):
+            # Two mongoengine objects are equal if their ID is equal. However,
+            # in this case we want to check if the data is equal. Note this
+            # doesn't look into mongoengine documents which are nested within
+            # mongoengine documents.
+            if a != b:
+                return False
+            else:
+                if isinstance(a, list):
+                    return all([equal(m, n) for (m, n) in zip(a, b)])
+                elif isinstance(a, dict):
+                    return all([equal(m, n) for (m, n) in zip(a.values(), b.values())])
+                elif isinstance(a, mongoengine.Document):
+                    return a._data == b._data
+                else:
+                    return True
+
         self._dirty_fields = []
         data = data or self.data
         for field in self.get_fields():
             if self.schema:
                 if field in self.document._fields.keys() and field not in self.readonly_fields and (type(data) is list or (type(data) is dict and data.has_key(field))):
-                    setattr(obj, field, data[field])
-                    self._dirty_fields.append(field)
+                    if not equal(getattr(obj, field), data[field]):
+                        setattr(obj, field, data[field])
+                        self._dirty_fields.append(field)
             else:
                 # TODO: remove old code
                 if field in self.document._fields.keys() and field not in self.readonly_fields and field in data:
