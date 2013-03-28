@@ -28,7 +28,12 @@ class Gte(Operator):
 
 class Exact(Operator):
     op = 'exact'
-    
+
+    def prepare_queryset_kwargs(self, field, value, negate):
+        # Using <field>__exact causes mongoengine to generate an regular
+        # expresison query, which we'd like to avoid.
+        return {field: value}
+
 class IExact(Operator):
     op = 'iexact'
 
