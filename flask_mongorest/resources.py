@@ -6,7 +6,8 @@ import mongoengine
 from flask import request, url_for
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
-from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, DateTimeField, DecimalField
+from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField
+from mongoengine.fields import DateTimeField, DecimalField, DictField
 from flask.ext.mongorest.exceptions import ValidationError
 from flask.ext.mongorest.utils import isbound
 from flask.ext.mongorest.utils import MongoEncoder
@@ -139,6 +140,8 @@ class Resource(object):
             elif isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)) and field_name not in self._related_resources:
                 # Don't dereference references if no related resource is specified.
                 field_value = obj._data[field_name]
+            elif isinstance(obj, dict):
+                return obj[field_name]
             else:
                 field_value = getattr(obj, field_name)
 
@@ -151,6 +154,14 @@ class Resource(object):
                     return field_value and field_value.to_dbref()
             elif isinstance(field_instance, ListField):
                 return [val for val in [get(elem, field_name, field_instance=field_instance.field) for elem in field_value] if val]
+            elif isinstance(field_instance, DictField):
+                if field_instance.field:
+                    return dict(
+                        (key, get(elem, field_name,
+                                  field_instance=field_instance.field))
+                        for (key, elem) in field_value.iteritems())
+                else:
+                    return field_value
             elif callable(field_instance):
                 if isinstance(field_value, list):
                     value = field_value
@@ -179,15 +190,20 @@ class Resource(object):
         data = {}
         for field in fields:
             renamed_field = self._rename_fields.get(field, field)
-            if only_fields != None and renamed_field not in only_fields:
+            if only_fields is not None and renamed_field not in only_fields:
                 continue
             if hasattr(self, field) and callable(getattr(self, field)):
                 value = getattr(self, field)(obj)
-                if field in self._related_resources and value != None:
+                if field in self._related_resources and value is not None:
+                    related_resource = self._related_resources[field]()
                     if isinstance(value, mongoengine.document.Document):
-                        value = self._related_resources[field]().serialize_field(value)
-                    else: # assume queryset or list
-                        value = [self._related_resources[field]().serialize_field(o) for o in value]
+                        value = related_resource.serialize_field(value)
+                    elif isinstance(value, dict):
+                        value = dict((k, related_resource.serialize_field(v))
+                                     for (k, v) in value.iteritems())
+                    else:  # assume queryset or list
+                        value = [related_resource.serialize_field(o)
+                                 for o in value]
                 data[renamed_field] = value
             else:
                 data[renamed_field] = get(obj, field)
@@ -482,6 +498,19 @@ class Resource(object):
                     return self._get(method, inner_data, field_name, field_instance=inner_field, parent_resources=parent_resources)
             return [expand_list(field_instance.field, elem) for elem in field_data_value]
 
+        elif isinstance(field_instance, DictField) and field_instance.field:
+            def expand_map(inner_field, inner_data):
+                if isinstance(inner_field, DictField) and inner_field.field:
+                    return dict(
+                        (key, expand_map(inner_field.field, elem))
+                        for key, elem in inner_data.items())
+                elif isinstance(inner_field, EmbeddedDocumentField):
+                    return self.related_resources[field_name]().create_object(data=inner_data, save=False, parent_resources=parent_resources+[self])
+                else:
+                    return self._get(method, inner_data, field_name, field_instance=inner_field, parent_resources=parent_resources)
+            return dict(
+                (key, expand_map(field_instance.field, elem))
+                for key, elem in field_data_value.items())
         else:
             return field_data_value
 
