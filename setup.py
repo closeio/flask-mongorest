@@ -20,6 +20,9 @@ setup(
     packages=[
         'flask_mongorest',
     ],
+    package_data={
+        'flask_mongorest': ['templates/mongorest/*']
+    },
     test_suite='nose.collector',
     zip_safe=False,
     platforms='any',
