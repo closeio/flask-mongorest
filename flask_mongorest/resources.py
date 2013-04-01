@@ -118,7 +118,7 @@ class Resource(object):
             return self._url(str(obj.id))
         else:
             return self.serialize(obj, **kwargs)
-            
+
     def serialize(self, obj, **kwargs):
         if not obj:
             return {}
@@ -351,6 +351,9 @@ class Resource(object):
             field = self._reverse_rename_fields.get(field, field)
             qs = operator().apply(qs, field, value, negate)
         limit = None
+        if self.allowed_ordering and params.get('_order_by') in self.allowed_ordering:
+            qs = qs.order_by(*params['_order_by'].split(','))
+
         if not custom_qs and not all:
             if self.paginate:
                 limit = min(int(params.get('_limit', 100)), self.max_limit)+1
@@ -358,8 +361,7 @@ class Resource(object):
                 qs = qs.skip(int(params.get('_skip', 0))).limit(limit)
             else:
                 qs = qs.limit(self.max_limit+1)
-        if self.allowed_ordering and params.get('_order_by', None) in self.allowed_ordering:
-            qs = qs.order_by(*params['_order_by'].split(','))
+
         # Needs to be at the end as it returns a list.
         if self.select_related:
             qs = qs.select_related()
