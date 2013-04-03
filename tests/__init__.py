@@ -377,7 +377,7 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.put('/posts/%s/' % self.post_1_obj['id'], data=json.dumps(self.post_1_obj))
         jd = json.loads(resp.data)
         self.assertEqual(self.post_1_obj['author_id'], jd["author_id"])
-        
+
         response_success(resp)
         compare_req_resp(self.post_1_obj, json.loads(resp.data))
         self.post_1_obj = json.loads(resp.data)
@@ -507,6 +507,24 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(data['has_more'], True)
 
         resp = self.app.get('/posts/?_skip=100')
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 1)
+        self.assertEqual(data['has_more'], False)
+
+        resp = self.app.get('/posts/?_limit=1')
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 1)
+        self.assertEqual(data['has_more'], True)
+
+        resp = self.app.get('/posts/?_limit=0')
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 0)
+        self.assertEqual(data['has_more'], True)
+
+        resp = self.app.get('/posts/?_skip=100&_limit=1')
         response_success(resp)
         data = json.loads(resp.data)
         self.assertEqual(len(data['data']), 1)
