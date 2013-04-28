@@ -26,7 +26,7 @@ setup(
     test_suite='nose.collector',
     zip_safe=False,
     platforms='any',
-    setup_requires=[
+    install_requires=[
         'Flask-Views',
         'Flask-MongoEngine',
         'mimerender',
