@@ -133,7 +133,7 @@ class Resource(object):
             """
 
             has_field_instance = bool(field_instance)
-            field_instance = field_instance or getattr(self.document, field_name)
+            field_instance = field_instance or getattr(self.document, field_name, None)
 
             if has_field_instance:
                 field_value = obj
