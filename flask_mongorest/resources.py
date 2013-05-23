@@ -351,14 +351,38 @@ class Resource(object):
             field = self._reverse_rename_fields.get(field, field)
             qs = operator().apply(qs, field, value, negate)
         limit = None
-        if self.allowed_ordering and params.get('_order_by') in self.allowed_ordering:
+        if params.get('_order_by'):
+            param = params.get('_order_by')
+            if not self.allowed_ordering:
+                raise ValidationError(
+                    {"field-errors":
+                     {"_order_by": "Ordering is not allowed for this resource"}
+                 })
+            elif param not in self.allowed_ordering:
+                raise ValidationError(
+                    {"field-errors":
+                     {"_order_by": "Ordering is not allowed for %s" % param}
+                 })
             qs = qs.order_by(*params['_order_by'].split(','))
-
         if not custom_qs and not all:
             if self.paginate:
-                limit = min(int(params.get('_limit', 100)), self.max_limit)+1
+                try:
+                    limit = min(int(params.get('_limit', 100)), self.max_limit)+1
+                    if not limit > 1:
+                        raise ValidationError(
+                            {"field-errors": {
+                                "_limit": "Limit must be a positive number"
+                            }
+                         })
+                    qs = qs.skip(int(params.get('_skip', 0))).limit(limit)
+                except ValueError:
+                    raise ValidationError(
+                        {"field-errors":
+                         {'_limit': 'should be a number',
+                          '_skip': 'should be a number',
+                          }
+                      })
                 # Fetch one more so we know if there are more results.
-                qs = qs.skip(int(params.get('_skip', 0))).limit(limit)
             else:
                 qs = qs.limit(self.max_limit+1)
 
