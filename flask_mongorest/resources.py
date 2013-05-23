@@ -356,9 +356,23 @@ class Resource(object):
 
         if not custom_qs and not all:
             if self.paginate:
-                limit = min(int(params.get('_limit', 100)), self.max_limit)+1
+                try:
+                    limit = min(int(params.get('_limit', 100)), self.max_limit)+1
+                    if not limit > 1:
+                        raise ValidationError(
+                            {"field-errors": {
+                                "_limit": "Limit must be a positive number"
+                            }
+                         })
+                    qs = qs.skip(int(params.get('_skip', 0))).limit(limit)
+                except ValueError:
+                    raise ValidationError(
+                        {"field-errors":
+                         {'_limit': 'should be a number',
+                          '_skip': 'should be a number',
+                          }
+                      })
                 # Fetch one more so we know if there are more results.
-                qs = qs.skip(int(params.get('_skip', 0))).limit(limit)
             else:
                 qs = qs.limit(self.max_limit+1)
 
