@@ -578,7 +578,7 @@ class Resource(object):
         from flask.ext.login import current_user
 
         self.save_related_objects(obj, **kwargs)
-        obj.save()
+        obj.save(write_concern={'w': 1})
         if 'admin' not in getattr(current_user, 'roles', []):
             import time
             time.sleep(0.1)
