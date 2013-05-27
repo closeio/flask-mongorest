@@ -579,9 +579,6 @@ class Resource(object):
 
         self.save_related_objects(obj, **kwargs)
         obj.save(write_concern={'w': 1})
-        if 'admin' not in getattr(current_user, 'roles', []):
-            import time
-            time.sleep(0.1)
         obj.reload()
 
         self._dirty_fields = None # No longer dirty.
