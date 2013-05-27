@@ -575,8 +575,6 @@ class Resource(object):
                             instance.save()
 
     def save_object(self, obj, **kwargs):
-        from flask.ext.login import current_user
-
         self.save_related_objects(obj, **kwargs)
         obj.save(write_concern={'w': 1})
         obj.reload()
