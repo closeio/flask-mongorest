@@ -147,7 +147,7 @@ class Resource(object):
 
             if isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)):
                 if field_name in self._related_resources:
-                    return field_value and not isinstance(field_value, DBRef) and self._related_resources[field_name]().serialize_field(field_value, **kwargs)
+                    return field_value and self._related_resources[field_name]().serialize_field(field_value, **kwargs)
                 else:
                     if isinstance(field_value, DBRef):
                         return field_value
