@@ -1,6 +1,6 @@
 from flask import Blueprint
 from functools import wraps
-from flask_mongorest.methods import Create, Update, BulkUpdate, Fetch, List, Delete
+from flask_mongorest.methods import Create, Update, BulkUpdate, Fetch, List
 
 
 class MongoRest(object):
