@@ -7,7 +7,7 @@ from flask import request, url_for
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField
-from mongoengine.fields import DateTimeField, DecimalField, DictField
+from mongoengine.fields import DateTimeField, DictField
 from flask.ext.mongorest.exceptions import ValidationError
 from flask.ext.mongorest.utils import isbound
 from flask.ext.mongorest.utils import MongoEncoder
@@ -141,13 +141,10 @@ class Resource(object):
             """
 
             has_field_instance = bool(field_instance)
-            field_instance = field_instance or getattr(self.document, field_name, None)
+            field_instance = field_instance or self.document._fields.get(field_name, None) or getattr(self.document, field_name, None)
 
             if has_field_instance:
                 field_value = obj
-            elif isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)) and field_name not in self._related_resources:
-                # Don't dereference references if no related resource is specified.
-                field_value = obj._data[field_name]
             elif isinstance(obj, dict):
                 return obj[field_name]
             else:
@@ -494,12 +491,6 @@ class Resource(object):
                 return field_data_value
             else:
                 return field_data_value and dateutil.parser.parse(field_data_value)
-
-        elif isinstance(field_instance, DecimalField):
-            if isinstance(field_data_value, decimal.Decimal):
-                return field_data_value
-            else:
-                return field_data_value and decimal.Decimal(field_data_value)
 
         elif isinstance(field_instance, EmbeddedDocumentField):
             if field_data_value == None:
