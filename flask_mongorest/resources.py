@@ -438,7 +438,7 @@ class Resource(object):
                 if k in self.related_resources_hints.keys():
                     hint_field = self.related_resources_hints[k]
                     for obj in document_queryset[k]:
-                        hinted = str(obj._data[hint_field].id)
+                        hinted = str(getattr(obj, hint_field).id)
                         if hinted not in hint_index:
                             hint_index[hinted] = [obj]
                         else:
@@ -549,7 +549,7 @@ class Resource(object):
                 if isinstance(field_instance, ReferenceField):
                     instance = getattr(obj, field_name)
                     if instance:
-                        instance_data = instance._data
+                        instance_data = instance.to_dict()
                         if related_resource:
                             related_resource().save_object(instance, parent_resources=parent_resources)
                         else:
@@ -559,7 +559,7 @@ class Resource(object):
                 if isinstance(field_instance, ListField) and isinstance(field_instance.field, ReferenceField):
                     instance_list = getattr(obj, field_name)
                     for instance in instance_list:
-                        instance_data = instance._data
+                        instance_data = instance.to_dict()
                         if related_resource:
                             related_resource().save_object(instance, parent_resources=parent_resources)
                         else:
@@ -621,7 +621,7 @@ class Resource(object):
                 elif isinstance(a, dict):
                     return all([equal(m, n) for (m, n) in zip(a.values(), b.values())])
                 elif isinstance(a, mongoengine.Document):
-                    return cmp(a._data, b._data)
+                    return cmp(a.to_dict(), b.to_dict())
                 else:
                     return True
 
