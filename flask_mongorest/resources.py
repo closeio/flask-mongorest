@@ -568,8 +568,6 @@ class Resource(object):
     def save_object(self, obj, **kwargs):
         self.save_related_objects(obj, **kwargs)
         obj.save()
-        import time
-        time.sleep(0.1)
         obj.reload()
 
         self._dirty_fields = None # No longer dirty.
