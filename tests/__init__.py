@@ -608,7 +608,13 @@ class MongoRestTestCase(unittest.TestCase):
     def test_garbage_args(self):
         resp = self.app.get('/posts/?_limit=garbage')
         response_error(resp, code=400)
-        data = json.loads(resp.data)
+        self.assertEqual(json.loads(resp.data)['error'],
+                        '_limit must be an integer (got "garbage" instead).')
+
+        resp = self.app.get('/posts/?_skip=garbage')
+        response_error(resp, code=400)
+        self.assertEqual(json.loads(resp.data)['error'],
+                        '_skip must be an integer (got "garbage" instead).')
 
     def test_fields(self):
         resp = self.app.get('/user/%s/?_fields=email' % self.user_1_obj['id'])

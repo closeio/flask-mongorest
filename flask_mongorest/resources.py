@@ -9,7 +9,7 @@ from bson.objectid import ObjectId
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField
 from mongoengine.fields import DateTimeField, DecimalField, DictField
 from flask.ext.mongorest.exceptions import ValidationError
-from flask.ext.mongorest.utils import isbound
+from flask.ext.mongorest.utils import isbound, isint
 from flask.ext.mongorest.utils import MongoEncoder
 import dateutil.parser
 
@@ -364,11 +364,15 @@ class Resource(object):
 
         if not custom_qs and not all:
             if self.paginate:
-                try:
-                    if params.get('_limit') and int(params['_limit']) > self.max_limit:
-                        raise ValidationError({'error': "The limit you set is larger than the maximum limit for this resource (max_limit = %d)." % self.max_limit})
-                except ValueError:
-                    raise ValidationError({'error': "_limit must be an integer (got %s instead)." % params['_limit']})
+
+                # _limit and _skip validation
+                if not isint(params.get('_limit', 1)):
+                    raise ValidationError({'error': '_limit must be an integer (got "%s" instead).' % params['_limit']})
+                if not isint(params.get('_skip', 1)):
+                    raise ValidationError({'error': '_skip must be an integer (got "%s" instead).' % params['_skip']})
+                if params.get('_limit') and int(params['_limit']) > self.max_limit:
+                    raise ValidationError({'error': "The limit you set is larger than the maximum limit for this resource (max_limit = %d)." % self.max_limit})
+
                 limit = min(int(params.get('_limit', 100)), self.max_limit)+1
                 # Fetch one more so we know if there are more results.
                 qs = qs.skip(int(params.get('_skip', 0))).limit(limit)
