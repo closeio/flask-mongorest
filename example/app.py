@@ -198,6 +198,25 @@ class PersonView(ResourceView):
     resource = PersonResource
     methods = [Create, Update, Fetch, List]
 
+# extra resources for testing max_limit
+class Post10Resource(PostResource):
+    max_limit = 10
+
+class Post250Resource(PostResource):
+    max_limit = 250
+
+@api.register(name='posts10', url='/posts10/')
+class Post10View(ResourceView):
+    resource = Post10Resource
+    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+
+@api.register(name='posts250', url='/posts250/')
+class Post250View(ResourceView):
+    resource = Post250Resource
+    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+
+
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8000))
     app.run(host='0.0.0.0', port=port)
+
