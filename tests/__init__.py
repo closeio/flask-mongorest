@@ -573,6 +573,12 @@ class MongoRestTestCase(unittest.TestCase):
         data = json.loads(resp.data)
         self.assertEqual(len(data['data']), 10)
 
+    def test_garbage_args(self):
+        resp = self.app.get('/posts/?_limit=garbage')
+        response_error(resp, code=400)
+        data = json.loads(resp.data)
+        print data
+
     def test_fields(self):
         resp = self.app.get('/user/%s/?_fields=email' % self.user_1_obj['id'])
         response_success(resp)

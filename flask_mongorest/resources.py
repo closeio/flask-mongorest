@@ -364,8 +364,11 @@ class Resource(object):
 
         if not custom_qs and not all:
             if self.paginate:
-                if params.get('_limit') and int(params['_limit']) > self.max_limit:
-                    raise ValidationError({'error': "The limit you set is larger than the maximum limit for this resource (max_limit = %d)." % self.max_limit})
+                try:
+                    if params.get('_limit') and int(params['_limit']) > self.max_limit:
+                        raise ValidationError({'error': "The limit you set is larger than the maximum limit for this resource (max_limit = %d)." % self.max_limit})
+                except ValueError:
+                    raise ValidationError({'error': "_limit must be an integer (got %s instead)." % params['_limit']})
                 limit = min(int(params.get('_limit', 100)), self.max_limit)+1
                 # Fetch one more so we know if there are more results.
                 qs = qs.skip(int(params.get('_skip', 0))).limit(limit)
