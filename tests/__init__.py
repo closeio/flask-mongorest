@@ -530,6 +530,49 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(len(data['data']), 1)
         self.assertEqual(data['has_more'], False)
 
+        # default limit
+        resp = self.app.get('/posts/')
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 100)
+
+        # _limit > max_limit
+        resp = self.app.get('/posts/?_limit=101')
+        response_error(resp, code=400)
+        data = json.loads(resp.data)
+        self.assertEqual(data['error'], 'The limit you set is larger than the maximum limit for this resource (max_limit = 100).')
+
+        # respect custom max_limit
+        resp = self.app.get('/posts10/?_limit=11')
+        response_error(resp, code=400)
+        data = json.loads(resp.data)
+        self.assertEqual(data['error'], 'The limit you set is larger than the maximum limit for this resource (max_limit = 10).')
+
+        resp = self.app.get('/posts10/')
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 10)
+
+        resp = self.app.get('/posts10/?_limit=5')
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 5)
+
+        resp = self.app.get('/posts250/?_limit=251')
+        response_error(resp, code=400)
+        data = json.loads(resp.data)
+        self.assertEqual(data['error'], 'The limit you set is larger than the maximum limit for this resource (max_limit = 250).')
+
+        resp = self.app.get('/posts250/')
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 100)
+
+        resp = self.app.get('/posts250/?_limit=10')
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 10)
+
     def test_fields(self):
         resp = self.app.get('/user/%s/?_fields=email' % self.user_1_obj['id'])
         response_success(resp)
