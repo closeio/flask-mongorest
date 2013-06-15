@@ -619,6 +619,9 @@ class Resource(object):
                 elif isinstance(a, dict):
                     return all([equal(m, n) for (m, n) in zip(a.values(), b.values())])
                 elif isinstance(a, mongoengine.Document):
+                    # Don't evaluate lazy documents
+                    if getattr(a, '_lazy', False) and getattr(b, '_lazy', False):
+                        return True
                     return cmp(a.to_dict(), b.to_dict())
                 else:
                     return True
