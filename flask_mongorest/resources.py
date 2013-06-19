@@ -305,6 +305,76 @@ class Resource(object):
             qs = qfilter(qs)
         return qs.get(pk=pk)
 
+    def fetch_related_resources(self, objs, only_fields=None):
+        def cmp_fields(ordering):
+            # Takes a list of fields and directions and returns a
+            # comparison function for sorted() to perform client-side
+            # sorting.
+            # Example: sorted(objs, cmp_fields([('date_created', -1)]))
+            def _cmp(x, y):
+                for field, direction in ordering:
+                    result = cmp(getattr(x, field), getattr(y, field)) * direction
+                    if result:
+                        return result
+                return 0
+            return _cmp
+
+        document_queryset = {}
+        for obj in objs:
+            for field_name in self.related_resources_hints.keys():
+                if only_fields != None and field_name not in only_fields:
+                    continue
+                resource = self.get_related_resources()[field_name]
+                method = getattr(obj, field_name)
+                if callable(method):
+                    q = method()
+                    if field_name in document_queryset.keys():
+                        document_queryset[field_name] = (document_queryset[field_name] | q._query_obj)
+                    else:
+                        document_queryset[field_name] = q._query_obj
+
+        hints = {}
+        for k,v in document_queryset.iteritems():
+            doc = self.get_related_resources()[k].document
+
+            query = doc.objects.filter(v)
+
+            # Don't let MongoDB do the sorting as it won't use the index.
+            # Store the ordering so we can do client sorting afterwards.
+            ordering = query._ordering or query._get_order_by(query._document._meta['ordering'])
+            query = query.order_by()
+
+            results = [o for o in query] # don't use list() because mongoengine will do a count query
+
+            if ordering:
+                document_queryset[k] = sorted(results, cmp_fields(ordering))
+            else:
+                document_queryset[k] = results
+
+            hint_index = {}
+            if k in self.related_resources_hints.keys():
+                hint_field = self.related_resources_hints[k]
+                for obj in document_queryset[k]:
+                    hinted = str(getattr(obj, hint_field).id)
+                    if hinted not in hint_index:
+                        hint_index[hinted] = [obj]
+                    else:
+                        hint_index[hinted].append(obj)
+
+                hints[k] = hint_index
+
+        for obj in objs:
+            for field, hint_index in hints.iteritems():
+                obj_id = obj.id
+                if isinstance(obj_id, DBRef):
+                    obj_id = obj_id.id
+                elif isinstance(obj_id, ObjectId):
+                    obj_id = str(obj_id)
+                if obj_id not in hint_index.keys():
+                    setattr(obj, field, [])
+                    continue
+                setattr(obj, field, hint_index[obj_id])
+
     def get_objects(self, all=False, qs=None, qfilter=None):
         params = request.args
         custom_qs = True
@@ -381,82 +451,12 @@ class Resource(object):
             has_more = None
 
         # bulk-fetch related resources for moar speed
-
-        def cmp_fields(ordering):
-            # Takes a list of fields and directions and returns a
-            # comparison function for sorted() to perform client-side
-            # sorting.
-            # Example: sorted(objs, cmp_fields([('date_created', -1)]))
-            def _cmp(x, y):
-                for field, direction in ordering:
-                    result = cmp(x, y) * direction
-                    if result:
-                        return result
-                return 0
-            return _cmp
-
         if self.related_resources_hints:
             if params and '_fields' in params:
                 only_fields = set(params['_fields'].split(','))
             else:
                 only_fields = None
-
-            document_queryset = {}
-            for obj in qs:
-                for field_name in self.related_resources_hints.keys():
-                    if only_fields and field_name not in only_fields:
-                        continue
-                    resource = self.get_related_resources()[field_name]
-                    method = getattr(obj, field_name)
-                    if callable(method):
-                        q = method()
-                        if field_name in document_queryset.keys():
-                            document_queryset[field_name] = (document_queryset[field_name] | q._query_obj)
-                        else:
-                            document_queryset[field_name] = q._query_obj
-
-            hints = {}
-            for k,v in document_queryset.iteritems():
-                doc = self.get_related_resources()[k].document
-
-                query = doc.objects.filter(v)
-
-                # Don't let MongoDB do the sorting as it won't use the index.
-                # Store the ordering so we can do client sorting afterwards.
-                ordering = query._ordering
-                query._ordering = []
-
-                # NO I REALLY DONT WANT YOUR ORDERING
-                document_ordering = query._document._meta['ordering']
-                query._document._meta['ordering'] = []
-                results = [o for o in query] # don't use list() because mongoengine will do a count query
-                query._document._meta['ordering'] = document_ordering
-
-                document_queryset[k] = sorted(results, cmp_fields(ordering))
-
-                hint_index = {}
-                if k in self.related_resources_hints.keys():
-                    hint_field = self.related_resources_hints[k]
-                    for obj in document_queryset[k]:
-                        hinted = str(getattr(obj, hint_field).id)
-                        if hinted not in hint_index:
-                            hint_index[hinted] = [obj]
-                        else:
-                            hint_index[hinted].append(obj)
-
-                    hints[k] = hint_index
-
-            for obj in qs:
-                for field, hint_index in hints.iteritems():
-                    obj_id = obj.id
-                    if isinstance(obj_id, DBRef):
-                        obj_id = obj_id.id
-                    elif isinstance(obj_id, ObjectId):
-                        obj_id = str(obj_id)
-                    if obj_id not in hint_index.keys():
-                        setattr(obj, field, [])
-                        continue
-                    setattr(obj, field, hint_index[obj_id])
+            self.fetch_related_resources(qs, only_fields)
 
         return qs, has_more
 
