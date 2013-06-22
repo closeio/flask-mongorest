@@ -26,11 +26,11 @@ setup(
     test_suite='nose.collector',
     zip_safe=False,
     platforms='any',
-    install_requires=[
+    setup_requires=[
         'Flask-Views',
         'Flask-MongoEngine',
         'mimerender',
-        'nose', 
+        'nose',
         'coverage',
         'python-dateutil',
         'cleancat'
