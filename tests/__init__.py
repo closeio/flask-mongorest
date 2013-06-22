@@ -387,7 +387,6 @@ class MongoRestTestCase(unittest.TestCase):
         compare_req_resp(self.post_2, json.loads(resp.data))
         self.post_2_obj = json.loads(resp.data)
 
-
         #test filtering
 
         resp = self.app.get('/posts/?title__startswith=first')
@@ -487,6 +486,39 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(data['count'], 0)
         self.assertEqual(data['field-errors'].keys(), ['description'])
 
+    def test_broken_reference(self):
+        # create a new user
+        resp = self.app.post('/user/', data=json.dumps({
+            'email': '3@b.com',
+            'first_name': 'steve',
+            'last_name': 'wiseman',
+            'datetime': '2012-11-09T11:00:00+00:00',
+        }))
+        response_success(resp)
+        user_3 = json.loads(resp.data)
+        user_3_loc = resp.headers["Location"]
+
+        post = self.post_1.copy()
+        post['author_id'] = self.user_1_loc
+        post['editor'] = self.user_2_loc
+        post['user_lists'] = [[user_3_loc]]
+        resp = self.app.post('/posts/', data=json.dumps(post))
+        response_success(resp)
+        compare_req_resp(post, json.loads(resp.data))
+
+        post = json.loads(resp.data)
+
+        # remove the user and see if its reference is cleaned up properly
+        resp = self.app.delete('/user/%s/' % user_3['id'])
+        response_success(resp)
+
+        resp = self.app.get('/posts/%s/' % post['id'])
+        response_success(resp)
+
+        self.assertEqual(json.loads(resp.data)['user_lists'], [])
+
+        post['user_lists'] = []
+        compare_req_resp(post, json.loads(resp.data))
 
     def test_dummy_auth(self):
         resp = self.app.get('/auth/')
@@ -529,6 +561,60 @@ class MongoRestTestCase(unittest.TestCase):
         data = json.loads(resp.data)
         self.assertEqual(len(data['data']), 1)
         self.assertEqual(data['has_more'], False)
+
+        # default limit
+        resp = self.app.get('/posts/')
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 100)
+
+        # _limit > max_limit
+        resp = self.app.get('/posts/?_limit=101')
+        response_error(resp, code=400)
+        data = json.loads(resp.data)
+        self.assertEqual(data['error'], 'The limit you set is larger than the maximum limit for this resource (max_limit = 100).')
+
+        # respect custom max_limit
+        resp = self.app.get('/posts10/?_limit=11')
+        response_error(resp, code=400)
+        data = json.loads(resp.data)
+        self.assertEqual(data['error'], 'The limit you set is larger than the maximum limit for this resource (max_limit = 10).')
+
+        resp = self.app.get('/posts10/')
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 10)
+
+        resp = self.app.get('/posts10/?_limit=5')
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 5)
+
+        resp = self.app.get('/posts250/?_limit=251')
+        response_error(resp, code=400)
+        data = json.loads(resp.data)
+        self.assertEqual(data['error'], 'The limit you set is larger than the maximum limit for this resource (max_limit = 250).')
+
+        resp = self.app.get('/posts250/')
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 100)
+
+        resp = self.app.get('/posts250/?_limit=10')
+        response_success(resp)
+        data = json.loads(resp.data)
+        self.assertEqual(len(data['data']), 10)
+
+    def test_garbage_args(self):
+        resp = self.app.get('/posts/?_limit=garbage')
+        response_error(resp, code=400)
+        self.assertEqual(json.loads(resp.data)['error'],
+                        '_limit must be an integer (got "garbage" instead).')
+
+        resp = self.app.get('/posts/?_skip=garbage')
+        response_error(resp, code=400)
+        self.assertEqual(json.loads(resp.data)['error'],
+                        '_skip must be an integer (got "garbage" instead).')
 
     def test_fields(self):
         resp = self.app.get('/user/%s/?_fields=email' % self.user_1_obj['id'])

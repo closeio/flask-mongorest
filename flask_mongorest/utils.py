@@ -7,6 +7,13 @@ from mongoengine.base import BaseDocument
 
 isbound = lambda m: getattr(m, 'im_self', None) is not None
 
+def isint(int_str):
+    try:
+        int(int_str)
+        return True
+    except ValueError:
+        return False
+
 class MongoEncoder(json.JSONEncoder):
     def default(self, value, **kwargs):
         if isinstance(value, ObjectId):
@@ -19,4 +26,4 @@ class MongoEncoder(json.JSONEncoder):
             return value.strftime("%Y-%m-%d")
         if isinstance(value, decimal.Decimal):
             return str(value)
-        return json.JSONEncoder.default(value, **kwargs)
+        return super(MongoEncoder, self).default(value, **kwargs)
