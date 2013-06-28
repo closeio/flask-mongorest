@@ -362,15 +362,9 @@ class Resource(object):
         if params.get('_order_by'):
             param = params.get('_order_by')
             if not self.allowed_ordering:
-                raise ValidationError(
-                    {"field-errors":
-                     {"_order_by": "Ordering is not allowed for this resource"}
-                 })
+                raise ValidationError({"field-errors": {"_order_by": "Ordering is not allowed on this resource"}})
             elif param not in self.allowed_ordering:
-                raise ValidationError(
-                    {"field-errors":
-                     {"_order_by": "Ordering is not allowed for %s" % param}
-                 })
+                raise ValidationError({"field-errors": {"_order_by": "Ordering is not allowed on %s" % param}})
             qs = qs.order_by(*params['_order_by'].split(','))
         if not custom_qs and not all:
             if self.paginate:
