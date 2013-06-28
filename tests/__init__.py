@@ -551,10 +551,7 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(data['has_more'], True)
 
         resp = self.app.get('/posts/?_limit=0')
-        response_success(resp)
-        data = json.loads(resp.data)
-        self.assertEqual(len(data['data']), 0)
-        self.assertEqual(data['has_more'], True)
+        response_error(resp)
 
         resp = self.app.get('/posts/?_skip=100&_limit=1')
         response_success(resp)
