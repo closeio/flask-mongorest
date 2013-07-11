@@ -38,7 +38,7 @@ class User(db.Document):
     emails = db.ListField(db.EmailField())
     datetime = db.DateTimeField()
     datetime_local = db.DateTimeField()
-    balance = db.DecimalField()
+    balance = db.IntField() # in cents
 
 class UserResource(Resource):
     document = User
