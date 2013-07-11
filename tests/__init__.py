@@ -274,7 +274,7 @@ class MongoRestTestCase(unittest.TestCase):
     def test_restricted_auth(self):
         self.post_1['author_id'] = self.user_1_obj['id']
         self.post_1['editor'] = self.user_2_obj['id']
-        self.post_1['user_lists'] = [[self.user_1_obj['id']],[self.user_1_obj['id'], self.user_2_obj['id']]]
+        self.post_1['user_lists'] = [self.user_1_obj['id'], self.user_2_obj['id']]
 
         resp = self.app.get('/user/')
         objs = json.loads(resp.data)['data']
@@ -364,7 +364,7 @@ class MongoRestTestCase(unittest.TestCase):
     def test_post(self):
         self.post_1['author_id'] = self.user_1_loc
         self.post_1['editor'] = self.user_2_loc
-        self.post_1['user_lists'] = [[self.user_1_loc], [self.user_1_loc, self.user_2_loc]]
+        self.post_1['user_lists'] = [self.user_1_loc, self.user_2_loc]
         resp = self.app.post('/posts/', data=json.dumps(self.post_1))
         response_success(resp)
         compare_req_resp(self.post_1, json.loads(resp.data))
@@ -501,7 +501,7 @@ class MongoRestTestCase(unittest.TestCase):
         post = self.post_1.copy()
         post['author_id'] = self.user_1_loc
         post['editor'] = self.user_2_loc
-        post['user_lists'] = [[user_3_loc]]
+        post['user_lists'] = [user_3_loc]
         resp = self.app.post('/posts/', data=json.dumps(post))
         response_success(resp)
         compare_req_resp(post, json.loads(resp.data))

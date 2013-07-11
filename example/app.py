@@ -65,7 +65,7 @@ class Post(db.Document):
     author = db.ReferenceField(User)
     editor = db.ReferenceField(User)
     tags = db.ListField(db.StringField(max_length=30))
-    user_lists = db.ListField(db.ListField(db.ReferenceField(User)))
+    user_lists = db.ListField(db.SafeReferenceField(User))
     sections = db.ListField(db.EmbeddedDocumentField(Content))
     content = db.EmbeddedDocumentField(Content)
     is_published = db.BooleanField()
