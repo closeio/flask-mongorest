@@ -632,7 +632,7 @@ class MongoRestTestCase(unittest.TestCase):
             'email': 'u@example.com',
             'first_name': 'first',
             'last_name': 'first',
-            'balance': '0.54',
+            'balance': 54,
         }
 
         resp = self.app.post('/user/?_fields=id', data=json.dumps(test_user_data))
