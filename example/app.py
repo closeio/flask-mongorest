@@ -1,6 +1,7 @@
 import os
 import datetime
 
+from urlparse import urlparse
 from flask import Flask
 from flask.ext.mongoengine import MongoEngine
 from flask.ext.mongorest import MongoRest
@@ -87,6 +88,16 @@ class PostResource(Resource):
     rename_fields = {
         'author': 'author_id',
     }
+
+    def update_object(self, obj, data=None, save=True, parent_resources=None):
+        data = data or self.data
+        if data.get('author'):
+            author_uri = urlparse(data['author']).path
+            author_id = author_uri.lstrip(UserResource.uri_prefix)
+            author = User.objects.get(pk=author_id)
+            if author.email == 'vincent@vangogh.com':
+                obj.tags.append('art')
+        return super(PostResource, self).update_object(obj, data, save, parent_resources)
 
 @api.register(name='posts', url='/posts/')
 class PostView(ResourceView):

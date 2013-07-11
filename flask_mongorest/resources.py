@@ -637,7 +637,12 @@ class Resource(object):
 
         self._dirty_fields = []
         data = data or self.data
-        for field in self.get_fields():
+
+        # For updates, we want to update only the fields that appear in the request data rather than
+        # re-updating all the document's existing/other fields.
+        raw_fields = [self._reverse_rename_fields.get(field, field) for field in self.raw_data.keys()]
+        fields = self.get_fields() if not obj.pk else list(set(self.get_fields()) & set(raw_fields))
+        for field in fields:
             if self.schema:
                 if field in self.document._fields.keys() and field not in self.readonly_fields and (type(data) is list or (type(data) is dict and data.has_key(field))):
                     if not equal(getattr(obj, field), data[field]):

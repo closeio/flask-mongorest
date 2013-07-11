@@ -24,46 +24,46 @@ def compare_req_resp(req_obj, resp_obj):
 
 class MongoRestTestCase(unittest.TestCase):
 
-    user_1 = {
-        'email': '1@b.com',
-        'first_name': 'alan',
-        'last_name': 'baker',
-        'datetime': '2012-10-09T10:00:00+00:00',
-    }
-    user_2 = {
-        'email': '2@b.com',
-        'first_name': 'olivia',
-        'last_name': 'baker',
-        'datetime': '2012-11-09T11:00:00+00:00',
-    }
-
-    post_1 = {
-        'title': 'first post!',
-        #author
-        #editor
-        'tags': ['tag1', 'tag2', 'tag3'],
-        #user_lists
-        'sections': [
-            {'text': 'this is the first section of the first post.',
-            'lang': 'en'},
-            {'text': 'this is the second section of the first post.',
-            'lang': 'de'},
-            {'text': 'this is the third section of the first post.',
-            'lang': 'fr'},
-        ],
-        'content': {
-            'text': 'this is the content for my first post.',
-            'lang': 'cn',
-        },
-        'is_published': True,
-    }
-
-    post_2 = {
-        'title': 'Second post',
-        'is_published': False,
-    }
-
     def setUp(self):
+        self.user_1 = {
+            'email': '1@b.com',
+            'first_name': 'alan',
+            'last_name': 'baker',
+            'datetime': '2012-10-09T10:00:00+00:00',
+        }
+        self.user_2 = {
+            'email': '2@b.com',
+            'first_name': 'olivia',
+            'last_name': 'baker',
+            'datetime': '2012-11-09T11:00:00+00:00',
+        }
+
+        self.post_1 = {
+            'title': 'first post!',
+            #author
+            #editor
+            'tags': ['tag1', 'tag2', 'tag3'],
+            #user_lists
+            'sections': [
+                {'text': 'this is the first section of the first post.',
+                'lang': 'en'},
+                {'text': 'this is the second section of the first post.',
+                'lang': 'de'},
+                {'text': 'this is the third section of the first post.',
+                'lang': 'fr'},
+            ],
+            'content': {
+                'text': 'this is the content for my first post.',
+                'lang': 'cn',
+            },
+            'is_published': True,
+        }
+
+        self.post_2 = {
+            'title': 'Second post',
+            'is_published': False,
+        }
+
         self.app = example.app.test_client()
         example.User.drop_collection()
         example.Post.drop_collection()
@@ -375,6 +375,7 @@ class MongoRestTestCase(unittest.TestCase):
 
         self.post_1_obj['author_id'] = self.user_2_loc
         resp = self.app.put('/posts/%s/' % self.post_1_obj['id'], data=json.dumps(self.post_1_obj))
+        response_success(resp)
         jd = json.loads(resp.data)
         self.assertEqual(self.post_1_obj['author_id'], jd["author_id"])
 
@@ -485,6 +486,32 @@ class MongoRestTestCase(unittest.TestCase):
         data = json.loads(resp.data)
         self.assertEqual(data['count'], 0)
         self.assertEqual(data['field-errors'].keys(), ['description'])
+
+    def test_post_auto_art_tag(self):
+        # create a post by vangogh and an 'art' tag should be added automatically
+
+        # create vangogh
+        resp = self.app.post('/user/', data=json.dumps({
+            'email': 'vincent@vangogh.com',
+            'first_name': 'Vincent',
+            'last_name': 'Vangogh',
+        }))
+        response_success(resp)
+        author = resp.headers["Location"]
+
+        # create a post
+        resp = self.app.post('/posts/', data=json.dumps(self.post_1))
+        response_success(resp)
+        post = json.loads(resp.data)
+
+        resp = self.app.put('/posts/%s/' % post['id'], data=json.dumps({
+            'author_id': author
+        }))
+        response_success(resp)
+        post = json.loads(resp.data)
+        post_obj = example.Post.objects.get(pk=post['id'])
+        self.assertTrue('art' in post_obj.tags)
+        self.assertTrue('art' in post['tags'])
 
     def test_broken_reference(self):
         # create a new user
