@@ -40,6 +40,7 @@ class ResourceView(View):
 
         try:
             self._resource = self.requested_resource(request)
+            self._resource.view = self
             return super(ResourceView, self).dispatch_request(*args, **kwargs)
         except mongoengine.queryset.DoesNotExist as e:
             raise NotFound("Empty query: "+str(e))

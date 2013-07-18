@@ -37,6 +37,7 @@ class Resource(object):
     allowed_ordering = []
     uri_prefix = None # Must start and end with a "/"
     max_limit = 100 # cap the number of records in the _limit param to avoid DDoS'ing the API.
+    view = None
 
     __metaclass__ = ResourceMeta
 
