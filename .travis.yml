@@ -4,6 +4,6 @@ services: mongodb
 python:
     - 2.7
 install:
-    - python setup.py install
+    - pip install -r requirements.txt
 script:
     - python setup.py nosetests
