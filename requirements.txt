@@ -1,7 +1,7 @@
+-e git://github.com/elasticsales/mongoengine.git#egg=mongoengine-dev
+-e git://github.com/elasticsales/flask-mongoengine.git#egg=flask-mongoengine
 Flask-Views
--e git+ssh://git@github.com/elasticsales/flask-mongoengine.git#egg=flask-mongoengine
--e git+ssh://git@github.com/elasticsales/mongoengine.git#egg=mongoengine-dev
 mimerender
 python-dateutil
 sphinx
-cleancat
+cleancat>=0.3
