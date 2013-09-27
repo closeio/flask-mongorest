@@ -5,3 +5,4 @@ mimerender
 python-dateutil
 sphinx
 cleancat>=0.3
+Flask-WTF==0.8.4
