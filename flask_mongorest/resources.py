@@ -68,6 +68,8 @@ class Resource(object):
                     self._raw_data = json.loads(request.data)
                 except ValueError, e:
                     raise ValidationError({'error': 'The request contains invalid JSON.'})
+                if not isinstance(self._raw_data, dict):
+                    raise ValidationError({'error': 'JSON data must be a dict.'})
             else:
                 self._raw_data = {}
 
