@@ -428,6 +428,8 @@ class Resource(object):
             operator = allowed_operators.get(op_name, None)
             if operator is None:
                 continue
+            if negate and not operator.allow_negation:
+                continue
             if parts:
                 field = '%s__%s' % (field, '__'.join(parts))
             field = self._reverse_rename_fields.get(field, field)

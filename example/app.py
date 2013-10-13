@@ -81,7 +81,7 @@ class PostResource(Resource):
         'user_lists': UserResource,
     }
     filters = {
-        'title': [ops.Exact, ops.Startswith, ops.In],
+        'title': [ops.Exact, ops.Startswith, ops.In(allow_negation=True)],
         'author_id': [ops.Exact],
         'is_published': [ops.Boolean],
     }
