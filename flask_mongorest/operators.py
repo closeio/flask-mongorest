@@ -14,9 +14,9 @@ class Operator(object):
 
     def prepare_queryset_kwargs(self, field, value, negate):
         if negate:
-            return {'%s__not__%s' % (field, self.op): value}
+            return {'__'.join(filter(None, [field, 'not', self.op])): value}
         else:
-            return {'%s__%s' % (field, self.op): value}
+            return {'__'.join(filter(None, [field, self.op])): value}
 
     def apply(self, queryset, field, value, negate=False):
         kwargs = self.prepare_queryset_kwargs(field, value, negate)
@@ -61,7 +61,7 @@ class In(Operator):
             op = negate and 'nin' or self.op
         else:
             op = negate and 'ne' or ''
-        return {'%s__%s' % (field, op): value}
+        return {'__'.join(filter(None, [field, op])): value}
 
 class Contains(Operator):
     op = 'contains'
