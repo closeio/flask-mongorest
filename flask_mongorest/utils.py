@@ -27,3 +27,16 @@ class MongoEncoder(json.JSONEncoder):
         if isinstance(value, decimal.Decimal):
             return str(value)
         return super(MongoEncoder, self).default(value, **kwargs)
+
+def cmp_fields(ordering):
+    # Takes a list of fields and directions and returns a
+    # comparison function for sorted() to perform client-side
+    # sorting.
+    # Example: sorted(objs, cmp_fields([('date_created', -1)]))
+    def _cmp(x, y):
+        for field, direction in ordering:
+            result = cmp(getattr(x, field), getattr(y, field)) * direction
+            if result:
+                return result
+        return 0
+    return _cmp

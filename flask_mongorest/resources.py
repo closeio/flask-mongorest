@@ -10,7 +10,7 @@ from mongoengine.base.proxy import DocumentProxy
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField
 from mongoengine.fields import DateTimeField, DictField
 from flask.ext.mongorest.exceptions import ValidationError
-from flask.ext.mongorest.utils import isbound, isint
+from flask.ext.mongorest.utils import cmp_fields, isbound, isint
 from flask.ext.mongorest.utils import MongoEncoder
 import dateutil.parser
 
@@ -313,19 +313,6 @@ class Resource(object):
         return qs.get(pk=pk)
 
     def fetch_related_resources(self, objs, only_fields=None):
-        def cmp_fields(ordering):
-            # Takes a list of fields and directions and returns a
-            # comparison function for sorted() to perform client-side
-            # sorting.
-            # Example: sorted(objs, cmp_fields([('date_created', -1)]))
-            def _cmp(x, y):
-                for field, direction in ordering:
-                    result = cmp(getattr(x, field), getattr(y, field)) * direction
-                    if result:
-                        return result
-                return 0
-            return _cmp
-
         document_queryset = {}
         for obj in objs:
             for field_name in self.related_resources_hints.keys():
@@ -382,16 +369,10 @@ class Resource(object):
                     continue
                 setattr(obj, field, hint_index[obj_id])
 
-    def get_objects(self, all=False, qs=None, qfilter=None):
-        params = request.args
-        custom_qs = True
-        if qs is None:
-            custom_qs = False
-            qs = self.get_queryset()
-        # If a queryset filter was provided, pass our current
-        # queryset in and get a new one out
-        if qfilter:
-            qs = qfilter(qs)
+    def apply_filters(self, qs, params=None):
+        if params is None:
+            params = request.args
+
         for key, value in params.iteritems():
             # If this is a resource identified by a URI, we need
             # to extract the object id at this point since
@@ -434,35 +415,60 @@ class Resource(object):
                 field = '%s__%s' % (field, '__'.join(parts))
             field = self._reverse_rename_fields.get(field, field)
             qs = operator().apply(qs, field, value, negate)
-        limit = None
+        return qs
+
+    def apply_ordering(self, qs, params=None):
+        if params is None:
+            params = request.args
         if self.allowed_ordering and params.get('_order_by') in self.allowed_ordering:
             qs = qs.order_by(*params['_order_by'].split(','))
+        return qs
 
+    def get_skip_and_limit(self, params=None):
+        if params is None:
+            params = request.args
+        if self.paginate:
+            # _limit and _skip validation
+            if not isint(params.get('_limit', 1)):
+                raise ValidationError({'error': '_limit must be an integer (got "%s" instead).' % params['_limit']})
+            if not isint(params.get('_skip', 1)):
+                raise ValidationError({'error': '_skip must be an integer (got "%s" instead).' % params['_skip']})
+            if params.get('_limit') and int(params['_limit']) > self.max_limit:
+                raise ValidationError({'error': "The limit you set is larger than the maximum limit for this resource (max_limit = %d)." % self.max_limit})
+
+            limit = min(int(params.get('_limit', 100)), self.max_limit)
+            # Fetch one more so we know if there are more results.
+            return int(params.get('_skip', 0)), limit
+        else:
+            return 0, self.max_limit
+
+    def get_objects(self, all=False, qs=None, qfilter=None):
+        params = request.args
+        custom_qs = True
+        if qs is None:
+            custom_qs = False
+            qs = self.get_queryset()
+        # If a queryset filter was provided, pass our current
+        # queryset in and get a new one out
+        if qfilter:
+            qs = qfilter(qs)
+
+        qs = self.apply_filters(qs, params)
+        qs = self.apply_ordering(qs, params)
+
+        limit = None
         if not custom_qs and not all:
-            if self.paginate:
-
-                # _limit and _skip validation
-                if not isint(params.get('_limit', 1)):
-                    raise ValidationError({'error': '_limit must be an integer (got "%s" instead).' % params['_limit']})
-                if not isint(params.get('_skip', 1)):
-                    raise ValidationError({'error': '_skip must be an integer (got "%s" instead).' % params['_skip']})
-                if params.get('_limit') and int(params['_limit']) > self.max_limit:
-                    raise ValidationError({'error': "The limit you set is larger than the maximum limit for this resource (max_limit = %d)." % self.max_limit})
-
-                limit = min(int(params.get('_limit', 100)), self.max_limit)+1
-                # Fetch one more so we know if there are more results.
-                qs = qs.skip(int(params.get('_skip', 0))).limit(limit)
-            else:
-                qs = qs.limit(self.max_limit+1)
+            skip, limit = self.get_skip_and_limit(params)
+            qs = qs.skip(skip).limit(limit+1)
 
         # Needs to be at the end as it returns a list.
         if self.select_related:
             qs = qs.select_related()
 
-        if limit:
+        if limit is not None and self.paginate:
             # It is OK to evaluate the queryset as we will do so anyway.
             qs = [o for o in qs] # don't use list() because mongoengine will do a count query
-            has_more = len(qs) == limit
+            has_more = len(qs) == limit+1
             if has_more:
                 qs = qs[:-1]
         else:
