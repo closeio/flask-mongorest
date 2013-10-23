@@ -190,7 +190,7 @@ class Resource(object):
                 return value
             return field_value
 
-        fields = self.get_fields()
+        fields = kwargs.pop('fields', self.get_fields())
 
         params = kwargs.pop('params', None)
 
