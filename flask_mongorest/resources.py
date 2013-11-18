@@ -56,14 +56,14 @@ class Resource(object):
         self._child_document_resources = self.get_child_document_resources()
         self.data = None
         self._dirty_fields = None
-        if request.method in ('PUT', 'POST'):
-            if request.mimetype and 'json' not in request.mimetype:
-                raise ValidationError({'error': "Please send valid JSON with a 'Content-Type: application/json' header."})
 
     @property
     def raw_data(self):
         if not hasattr(self, '_raw_data'):
             if request.method in ('PUT', 'POST'):
+                if request.mimetype and 'json' not in request.mimetype:
+                    raise ValidationError({'error': "Please send valid JSON with a 'Content-Type: application/json' header."})
+
                 try:
                     self._raw_data = json.loads(request.data)
                 except ValueError, e:
