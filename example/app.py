@@ -1,15 +1,16 @@
 import os
-import datetime
 
 from urlparse import urlparse
 from flask import Flask
 from flask.ext.mongoengine import MongoEngine
+from flask.ext.mongoengine.wtf.orm import model_form
 from flask.ext.mongorest import MongoRest
 from flask.ext.mongorest.views import ResourceView
 from flask.ext.mongorest.resources import Resource
 from flask.ext.mongorest import operators as ops
 from flask.ext.mongorest.methods import *
 from flask.ext.mongorest.authentication import AuthenticationBase
+from flask.ext.wtf import TextField, length
 
 from example import schemas, documents
 
@@ -148,14 +149,12 @@ class RestrictedPostView(ResourceView):
     def has_delete_permission(self, request, obj):
         return not obj.is_published
 
-from flask.ext.wtf import TextField, length
 class TestDocument(db.Document):
     name = db.StringField()
     other = db.StringField()
     dictfield = db.DictField()
     is_new = db.BooleanField()
 
-from flask.ext.mongoengine.wtf.orm import model_form
 TestBaseForm = model_form(TestDocument)
 
 class TestForm(TestBaseForm):
@@ -224,6 +223,42 @@ class Post10View(ResourceView):
 @api.register(name='posts250', url='/posts250/')
 class Post250View(ResourceView):
     resource = Post250Resource
+    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+
+# Documents, resources, and views for testing differences between db refs and object ids
+class A(db.Document):
+    txt = db.StringField()
+
+class B(db.Document):
+    ref = db.ReferenceField(A, dbref=True)
+    txt = db.StringField()
+
+class C(db.Document):
+    ref = db.ReferenceField(A)
+    txt = db.StringField()
+
+class AResource(Resource):
+    document = A
+
+class BResource(Resource):
+    document = B
+
+class CResource(Resource):
+    document = C
+
+@api.register(url='/a/')
+class AView(ResourceView):
+    resource = AResource
+    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+
+@api.register(url='/b/')
+class AView(ResourceView):
+    resource = BResource
+    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+
+@api.register(url='/c/')
+class AView(ResourceView):
+    resource = CResource
     methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
 
 

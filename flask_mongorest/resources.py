@@ -659,8 +659,22 @@ class Resource(object):
         fields = self.get_fields() if not obj.pk else list(set(self.get_fields()) & set(raw_fields))
         for field in fields:
             if self.schema:
-                if field in self.document._fields.keys() and field not in self.readonly_fields and (type(data) is list or (type(data) is dict and data.has_key(field))):
-                    if not equal(getattr(obj, field), data[field]):
+                if (field in self.document._fields.keys() and
+                    field not in self.readonly_fields and
+                    (type(data) is list or (type(data) is dict and field in data))
+                   ):
+                    update = False
+
+                    # If we're comparing reference fields, only compare ids without hitting the database
+                    if isinstance(obj._fields.get(field), ReferenceField):
+                        id_from_obj = obj._db_data.get(field) and getattr(obj._db_data[field], 'id', obj._db_data[field])
+                        id_from_data = data.get(field) and data[field].id
+                        if not equal(id_from_obj, id_from_data):
+                            update = True
+                    elif not equal(getattr(obj, field), data[field]):
+                        update = True
+
+                    if update:
                         setattr(obj, field, data[field])
                         self._dirty_fields.append(field)
             else:
