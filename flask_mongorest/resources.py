@@ -1,5 +1,4 @@
 import json
-import decimal
 import datetime
 from urlparse import urlparse
 import mongoengine
@@ -668,8 +667,8 @@ class Resource(object):
                     # If we're comparing reference fields, only compare ids without hitting the database
                     if isinstance(obj._fields.get(field), ReferenceField):
                         id_from_obj = obj._db_data.get(field) and getattr(obj._db_data[field], 'id', obj._db_data[field])
-                        id_from_data = data.get(field) and data[field].id
-                        if not equal(id_from_obj, id_from_data):
+                        id_from_data = data.get(field) and data[field].pk
+                        if id_from_obj != id_from_data:
                             update = True
                     elif not equal(getattr(obj, field), data[field]):
                         update = True
