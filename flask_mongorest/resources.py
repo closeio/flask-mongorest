@@ -65,7 +65,7 @@ class Resource(object):
 
                 try:
                     self._raw_data = json.loads(request.data)
-                except ValueError, e:
+                except ValueError:
                     raise ValidationError({'error': 'The request contains invalid JSON.'})
                 if not isinstance(self._raw_data, dict):
                     raise ValidationError({'error': 'JSON data must be a dict.'})
@@ -666,7 +666,8 @@ class Resource(object):
 
                     # If we're comparing reference fields, only compare ids without hitting the database
                     if isinstance(obj._fields.get(field), ReferenceField):
-                        id_from_obj = obj._db_data.get(field) and getattr(obj._db_data[field], 'id', obj._db_data[field])
+                        db_val = obj._db_data.get(field)
+                        id_from_obj = db_val and getattr(db_val, 'id', db_val)
                         id_from_data = data.get(field) and data[field].pk
                         if id_from_obj != id_from_data:
                             update = True
