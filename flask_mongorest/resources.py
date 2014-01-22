@@ -133,6 +133,8 @@ class Resource(object):
         if not obj:
             return {}
 
+        # If a subclass of an obj has been called with a base class' resource,
+        # use the subclass-specific serialization
         if obj.__class__ in self._child_document_resources \
         and self._child_document_resources[obj.__class__] != self.__class__:
             return obj and self._child_document_resources[obj.__class__]().serialize_field(obj, **kwargs)
@@ -203,6 +205,7 @@ class Resource(object):
             renamed_field = self._rename_fields.get(field, field)
             if only_fields is not None and renamed_field not in only_fields:
                 continue
+
             if hasattr(self, field) and callable(getattr(self, field)):
                 value = getattr(self, field)(obj)
                 if field in self._related_resources and value is not None:
