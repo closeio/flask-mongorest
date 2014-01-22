@@ -31,6 +31,7 @@ class MongoRestTestCase(unittest.TestCase):
             'last_name': 'baker',
             'datetime': '2012-10-09T10:00:00+00:00',
         }
+
         self.user_2 = {
             'email': '2@b.com',
             'first_name': 'olivia',
@@ -68,6 +69,9 @@ class MongoRestTestCase(unittest.TestCase):
         example.User.drop_collection()
         example.Post.drop_collection()
         example.TestDocument.drop_collection()
+        example.A.drop_collection()
+        example.B.drop_collection()
+        example.C.drop_collection()
 
         # create user 1
         resp = self.app.post('/user/', data=json.dumps(self.user_1))
@@ -79,6 +83,7 @@ class MongoRestTestCase(unittest.TestCase):
         self.user_1_obj = json.loads(resp.data)
         self.user_1_loc = loc1
         compare_req_resp(self.user_1, self.user_1_obj)
+
         # create user 2
         resp = self.app.post('/user/', data=json.dumps(self.user_2))
         loc2 = resp.headers["Location"]
@@ -95,6 +100,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
         resp = self.app.get('/user/%s/' % self.user_1_obj['id'])
         response_error(resp, code=404)
+
         # delete user 2
         resp = self.app.delete('/user/%s/' % self.user_2_obj['id'])
         response_success(resp)
@@ -678,6 +684,54 @@ class MongoRestTestCase(unittest.TestCase):
         resp = json.loads(resp.data)
         self.assertEqual(resp['error'], 'The request contains invalid JSON.')
 
+    def test_dbref_vs_objectid(self):
+        resp = self.app.post('/a/', data=json.dumps({ "txt": "some text 1" }))
+        response_success(resp)
+        a1 = json.loads(resp.data)
+
+        resp = self.app.post('/a/', data=json.dumps({ "txt": "some text 2" }))
+        response_success(resp)
+        a2 = json.loads(resp.data)
+
+        resp = self.app.post('/b/', data=json.dumps({ "ref": a1['id'], "txt": "text" }))
+        response_success(resp)
+        dbref_obj = json.loads(resp.data)
+
+        resp = self.app.post('/c/', data=json.dumps({ "ref": a1['id'], "txt": "text" }))
+        response_success(resp)
+        objectid_obj = json.loads(resp.data)
+
+        # compare objects with a dbref reference and an objectid reference
+        resp = self.app.get('/b/{0}/'.format(dbref_obj['id']))
+        response_success(resp)
+        dbref_obj = json.loads(resp.data)
+
+        resp = self.app.get('/c/{0}/'.format(objectid_obj['id']))
+        response_success(resp)
+        objectid_obj = json.loads(resp.data)
+
+        self.assertEqual(dbref_obj['ref'], objectid_obj['ref'])
+        self.assertEqual(dbref_obj['txt'], objectid_obj['txt'])
+
+        # make sure both dbref and objectid are updated correctly
+        resp = self.app.put('/b/{0}/'.format(dbref_obj['id']), data=json.dumps({ "ref": a2['id'] }))
+        response_success(resp)
+
+        resp = self.app.put('/c/{0}/'.format(objectid_obj['id']), data=json.dumps({ "ref": a2['id'] }))
+        response_success(resp)
+
+        resp = self.app.get('/b/{0}/'.format(dbref_obj['id']))
+        response_success(resp)
+        dbref_obj = json.loads(resp.data)
+
+        resp = self.app.get('/c/{0}/'.format(objectid_obj['id']))
+        response_success(resp)
+        objectid_obj = json.loads(resp.data)
+
+        self.assertEqual(dbref_obj['ref'], a2['id'])
+        self.assertEqual(dbref_obj['ref'], objectid_obj['ref'])
+        self.assertEqual(dbref_obj['txt'], objectid_obj['txt'])
+
 
 class MongoRestSchemaTestCase(unittest.TestCase):
 
@@ -788,8 +842,6 @@ class MongoRestSchemaTestCase(unittest.TestCase):
         self.assertEqual(person['languages'][0]['name'], 'English')
         self.assertEqual(person['languages'][1]['name'], 'Spanish')
         self.assertEqual(person['languages'][2]['name'], 'German')
-
-        spanish_id = person['languages'][1]['id']
 
         # Remove item
         resp = self.app.put('/person/%s/' % person_id, data=json.dumps({

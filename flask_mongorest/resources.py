@@ -1,5 +1,4 @@
 import json
-import decimal
 import datetime
 from urlparse import urlparse
 import mongoengine
@@ -66,7 +65,7 @@ class Resource(object):
 
                 try:
                     self._raw_data = json.loads(request.data)
-                except ValueError, e:
+                except ValueError:
                     raise ValidationError({'error': 'The request contains invalid JSON.'})
                 if not isinstance(self._raw_data, dict):
                     raise ValidationError({'error': 'JSON data must be a dict.'})
@@ -659,8 +658,23 @@ class Resource(object):
         fields = self.get_fields() if not obj.pk else list(set(self.get_fields()) & set(raw_fields))
         for field in fields:
             if self.schema:
-                if field in self.document._fields.keys() and field not in self.readonly_fields and (type(data) is list or (type(data) is dict and data.has_key(field))):
-                    if not equal(getattr(obj, field), data[field]):
+                if (field in self.document._fields.keys() and
+                    field not in self.readonly_fields and
+                    (type(data) is list or (type(data) is dict and field in data))
+                   ):
+                    update = False
+
+                    # If we're comparing reference fields, only compare ids without hitting the database
+                    if isinstance(obj._fields.get(field), ReferenceField):
+                        db_val = obj._db_data.get(field)
+                        id_from_obj = db_val and getattr(db_val, 'id', db_val)
+                        id_from_data = data.get(field) and data[field].pk
+                        if id_from_obj != id_from_data:
+                            update = True
+                    elif not equal(getattr(obj, field), data[field]):
+                        update = True
+
+                    if update:
                         setattr(obj, field, data[field])
                         self._dirty_fields.append(field)
             else:
