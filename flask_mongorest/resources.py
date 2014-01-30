@@ -5,8 +5,7 @@ import mongoengine
 from flask import request, url_for
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
-from mongoengine.base.proxy import DocumentProxy
-from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField
+from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, FileField
 from mongoengine.fields import DateTimeField, DictField
 from flask.ext.mongorest.exceptions import ValidationError
 from flask.ext.mongorest.utils import cmp_fields, isbound, isint
@@ -158,15 +157,17 @@ class Resource(object):
                 if field_name in self._related_resources:
                     return field_value and not isinstance(field_value, DBRef) and self._related_resources[field_name]().serialize_field(field_value, **kwargs)
                 else:
-                    if isinstance(field_value, DocumentProxy):
-                        # Don't perform a DBRef isinstance check below since
-                        # it might trigger an extra query.
-                        return field_value.to_dbref()
                     if isinstance(field_value, DBRef):
                         return field_value
                     return field_value and field_value.to_dbref()
             elif isinstance(field_instance, ListField):
                 return [val for val in [get(elem, field_name, field_instance=field_instance.field) for elem in field_value] if val]
+            elif isinstance(field_instance, FileField):
+                # FileField support (Returns file ID)
+                field_id = getattr(obj, field_name).grid_id
+                if field_id != None:
+                    field_id = str(field_id)
+                return field_id
             elif isinstance(field_instance, DictField):
                 if field_instance.field:
                     return dict(
