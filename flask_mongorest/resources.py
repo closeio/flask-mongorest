@@ -6,7 +6,7 @@ from flask import request, url_for
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from mongoengine.base.proxy import DocumentProxy
-from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField
+from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, FileField
 from mongoengine.fields import DateTimeField, DictField
 from flask.ext.mongorest.exceptions import ValidationError
 from flask.ext.mongorest.utils import cmp_fields, isbound, isint
@@ -167,6 +167,12 @@ class Resource(object):
                     return field_value and field_value.to_dbref()
             elif isinstance(field_instance, ListField):
                 return [val for val in [get(elem, field_name, field_instance=field_instance.field) for elem in field_value] if val]
+            elif isinstance(field_instance, FileField):
+                # FileField support (Returns file ID)
+                field_id = getattr(obj, field_name).grid_id
+                if field_id != None:
+                    field_id = str(field_id)
+                return field_id
             elif isinstance(field_instance, DictField):
                 if field_instance.field:
                     return dict(
