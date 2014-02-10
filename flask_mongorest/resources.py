@@ -1,17 +1,21 @@
 import json
 import datetime
-from urlparse import urlparse
+import dateutil.parser
 import mongoengine
-from flask import request, url_for
+
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
+from flask import request, url_for
+from urlparse import urlparse
 from mongoengine.base.proxy import DocumentProxy
-from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField
+from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, GenericReferenceField
 from mongoengine.fields import DateTimeField, DictField
+from werkzeug.datastructures import MultiDict
+
+from cleancat import ValidationError as SchemaValidationError
 from flask.ext.mongorest.exceptions import ValidationError
 from flask.ext.mongorest.utils import cmp_fields, isbound, isint
 from flask.ext.mongorest.utils import MongoEncoder
-import dateutil.parser
 
 class ResourceMeta(type):
     def __init__(cls, name, bases, classdict):
@@ -154,7 +158,7 @@ class Resource(object):
             else:
                 field_value = getattr(obj, field_name)
 
-            if isinstance(field_instance, (ReferenceField, EmbeddedDocumentField)):
+            if isinstance(field_instance, (ReferenceField, GenericReferenceField, EmbeddedDocumentField)):
                 if field_name in self._related_resources:
                     return field_value and not isinstance(field_value, DBRef) and self._related_resources[field_name]().serialize_field(field_value, **kwargs)
                 else:
@@ -229,7 +233,6 @@ class Resource(object):
         self.data = self.raw_data.copy()
 
         if not self.schema and self.form:
-            from werkzeug.datastructures import MultiDict
 
             if request.method == 'PUT' and obj != None:
                 # We treat 'PUT' like 'PATCH', i.e. when fields are not
@@ -258,7 +261,6 @@ class Resource(object):
             self.data[k] = v
 
         if self.schema:
-            from cleancat import ValidationError as SchemaValidationError
             if request.method == 'PUT' and obj != None:
                 obj_data = dict([(key, getattr(obj, key)) for key in obj._fields.keys()])
             else:

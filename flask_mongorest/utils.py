@@ -3,7 +3,6 @@ import decimal
 import datetime
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
-from mongoengine.base import BaseDocument
 
 isbound = lambda m: getattr(m, 'im_self', None) is not None
 
