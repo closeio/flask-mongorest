@@ -191,7 +191,10 @@ class Resource(object):
                         value = field_instance(obj)
 
                 if field_name in self._related_resources:
-                    return [self._related_resources[field_name]().serialize_field(o, **kwargs) for o in value]
+                    if isinstance(value, list):
+                        return [self._related_resources[field_name]().serialize_field(o, **kwargs) for o in value]
+                    else:
+                        return self._related_resources[field_name]().serialize_field(value, **kwargs)
                 return value
             return field_value
 

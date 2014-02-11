@@ -1,7 +1,7 @@
 import os
 
 from urlparse import urlparse
-from flask import Flask
+from flask import Flask, request
 from flask.ext.mongoengine import MongoEngine
 from flask.ext.mongoengine.wtf.orm import model_form
 from flask.ext.mongorest import MongoRest
@@ -72,6 +72,9 @@ class Post(db.Document):
     content = db.EmbeddedDocumentField(Content)
     is_published = db.BooleanField()
 
+    def primary_user(self):
+        return self.user_lists[0] if self.user_lists else None
+
 class PostResource(Resource):
     document = Post
     related_resources = {
@@ -80,6 +83,7 @@ class PostResource(Resource):
         'author': UserResource,
         'editor': UserResource,
         'user_lists': UserResource,
+        'primary_user': UserResource,
     }
     filters = {
         'title': [ops.Exact, ops.Startswith, ops.In(allow_negation=True)],
@@ -89,6 +93,12 @@ class PostResource(Resource):
     rename_fields = {
         'author': 'author_id',
     }
+
+    def get_fields(self):
+        fields = super(PostResource, self).get_fields()
+        if '_include_primary_user' in request.args:
+            fields = set(fields) | set(['primary_user'])
+        return fields
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
         data = data or self.data

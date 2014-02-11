@@ -367,6 +367,17 @@ class MongoRestTestCase(unittest.TestCase):
         objs = json.loads(resp.data)['data']
         self.assertEqual(len(objs), 2)
 
+    def test_get_primary_user(self):
+        self.post_1['author_id'] = self.user_1_loc
+        self.post_1['editor'] = self.user_2_loc
+        self.post_1['user_lists'] = [self.user_1_loc, self.user_2_loc]
+        resp = self.app.post('/posts/', data=json.dumps(self.post_1))
+        resp = self.app.get('/posts/?_include_primary_user=1')
+        print resp.data
+        objs = json.loads(resp.data)['data']
+        self.assertEqual(len(objs), 1)
+        self.assertTrue(len(objs[0]['primary_user']) > 0)
+
     def test_post(self):
         self.post_1['author_id'] = self.user_1_loc
         self.post_1['editor'] = self.user_2_loc
