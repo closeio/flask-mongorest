@@ -310,6 +310,9 @@ class MongoRestTestCase(unittest.TestCase):
         # Should see 2
         self.assertEqual(2, nposts)
 
+        # extra data returned in get_objects
+        self.assertEqual(tmp['more'], 'stuff')
+
         # Now look at posts through a restricted view
         resp = self.app.get('/restricted/')
         tmp = json.loads(resp.data)

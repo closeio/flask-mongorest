@@ -94,6 +94,10 @@ class PostResource(Resource):
         'author': 'author_id',
     }
 
+    def get_objects(self, **kwargs):
+        qs, has_more = super(PostResource, self).get_objects(**kwargs)
+        return qs, has_more, {'more': 'stuff'}
+
     def get_fields(self):
         fields = super(PostResource, self).get_fields()
         if '_include_primary_user' in request.args:

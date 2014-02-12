@@ -62,12 +62,19 @@ class ResourceView(View):
         # underlying objects
         qfilter = lambda qs: self.has_read_permission(request, qs.clone())
         if pk is None:
-            objs, has_more = self._resource.get_objects(qfilter=qfilter)
+            result = self._resource.get_objects(qfilter=qfilter)
+            if len(result) == 2:
+                objs, has_more = result
+                extra = {}
+            elif len(result) == 3:
+                objs, has_more, extra = result
             ret = {
                 'data': [self._resource.serialize(obj, params=request.args) for obj in objs]
             }
             if has_more != None:
                 ret['has_more'] = has_more
+            if extra:
+                ret.update(extra)
         else:
             obj = self._resource.get_object(pk, qfilter=qfilter)
             ret = self._resource.serialize(obj, params=request.args)
@@ -102,7 +109,11 @@ class ResourceView(View):
             # is a bulk update, only the count of objects which were updated is
             # returned.
 
-            objs, has_more = self._resource.get_objects(all=True)
+            result = self._resource.get_objects(all=True)
+            if len(result) == 2:
+                objs, has_more = result
+            elif len(result) == 3:
+                objs, has_more, extra = result
             count = 0
             try:
                 for obj in objs:
