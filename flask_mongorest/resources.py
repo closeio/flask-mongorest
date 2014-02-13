@@ -193,6 +193,8 @@ class Resource(object):
                 if field_name in self._related_resources:
                     if isinstance(value, list):
                         return [self._related_resources[field_name]().serialize_field(o, **kwargs) for o in value]
+                    elif value is None:
+                        return None
                     else:
                         return self._related_resources[field_name]().serialize_field(value, **kwargs)
                 return value
