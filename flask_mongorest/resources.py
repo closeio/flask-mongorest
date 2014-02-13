@@ -100,6 +100,25 @@ class Resource(object):
     def get_fields(self):
         return self.fields
 
+    def get_requested_fields(self, **kwargs):
+        fields = kwargs.get('fields', self.get_fields())
+        params = kwargs.get('params', None)
+
+        if params and '_fields' in params:
+            only_fields = set(params['_fields'].split(','))
+        else:
+            only_fields = None
+
+        requested_fields = []
+        for field in fields:
+            renamed_field = self._rename_fields.get(field, field)
+            if only_fields is not None and renamed_field not in only_fields:
+                continue
+            else:
+                requested_fields.append(field)
+
+        return requested_fields
+
     def get_related_resources(self):
         return self.related_resources
 
@@ -200,20 +219,14 @@ class Resource(object):
                 return value
             return field_value
 
-        fields = kwargs.pop('fields', self.get_fields())
+        requested_fields = self.get_requested_fields(**kwargs)
 
-        params = kwargs.pop('params', None)
-
-        if params and '_fields' in params:
-            only_fields = set(params['_fields'].split(','))
-        else:
-            only_fields = None
+        # We're passing kwargs to child resources so we don't want the fields.
+        kwargs.pop('fields', None)
 
         data = {}
-        for field in fields:
+        for field in requested_fields:
             renamed_field = self._rename_fields.get(field, field)
-            if only_fields is not None and renamed_field not in only_fields:
-                continue
 
             if hasattr(self, field) and callable(getattr(self, field)):
                 value = getattr(self, field)(obj)
