@@ -41,6 +41,7 @@ class Resource(object):
     allowed_ordering = []
     uri_prefix = None # Must start and end with a "/"
     max_limit = 100 # cap the number of records in the _limit param to avoid DDoS'ing the API.
+    default_limit = 100 # default limit if no _limit is specified
 
     __metaclass__ = ResourceMeta
 
@@ -458,7 +459,7 @@ class Resource(object):
             if params.get('_limit') and int(params['_limit']) > self.max_limit:
                 raise ValidationError({'error': "The limit you set is larger than the maximum limit for this resource (max_limit = %d)." % self.max_limit})
 
-            limit = min(int(params.get('_limit', 100)), self.max_limit)
+            limit = min(int(params.get('_limit', self.default_limit)), self.max_limit)
             # Fetch one more so we know if there are more results.
             return int(params.get('_skip', 0)), limit
         else:
