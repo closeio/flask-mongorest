@@ -224,6 +224,7 @@ class Resource(object):
 
         # We're passing kwargs to child resources so we don't want the fields.
         kwargs.pop('fields', None)
+        kwargs.pop('params', None)
 
         data = {}
         for field in requested_fields:
