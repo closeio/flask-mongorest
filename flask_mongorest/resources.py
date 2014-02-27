@@ -13,7 +13,7 @@ from mongoengine.fields import DateTimeField, DictField
 from werkzeug.datastructures import MultiDict
 
 from cleancat import ValidationError as SchemaValidationError
-from flask.ext.mongorest.exceptions import ValidationError
+from flask.ext.mongorest.exceptions import ValidationError, UnknownFieldError
 from flask.ext.mongorest.utils import cmp_fields, isbound, isint
 from flask.ext.mongorest.utils import MongoEncoder
 
@@ -195,7 +195,10 @@ class Resource(object):
             elif isinstance(obj, dict):
                 return obj[field_name]
             else:
-                field_value = getattr(obj, field_name)
+                try:
+                    field_value = getattr(obj, field_name)
+                except AttributeError:
+                    raise UnknownFieldError
 
             if isinstance(field_instance, (ReferenceField, GenericReferenceField, EmbeddedDocumentField)):
                 if field_name in self._related_resources:
@@ -263,9 +266,17 @@ class Resource(object):
                                  for o in value]
                 data[renamed_field] = value
             else:
-                data[renamed_field] = get(obj, field)
+                try:
+                    data[renamed_field] = get(obj, field)
+                except UnknownFieldError:
+                    data[renamed_field] = self.value_for_field(obj, field)
 
         return data
+
+    def value_for_field(self, obj, field):
+        # If we specify a field which doesn't exist on the resource or on the
+        # object, this method lets us return a custom value.
+        raise UnknownFieldError
 
     def validate_request(self, obj=None):
         # Don't work on original raw data, we may reuse the resource for bulk updates.
