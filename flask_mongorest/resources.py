@@ -101,22 +101,41 @@ class Resource(object):
     def get_fields(self):
         return self.fields
 
+    def get_optional_fields(self):
+        return []
+
     def get_requested_fields(self, **kwargs):
-        fields = kwargs.get('fields', self.get_fields())
         params = kwargs.get('params', None)
+
+        include_all = False
+
+        if 'fields' in kwargs:
+            fields = kwargs['fields']
+            all_fields_set = set(fields)
+        else:
+            fields = self.get_fields()
+            all_fields_set = set(fields) | set(self.get_optional_fields())
 
         if params and '_fields' in params:
             only_fields = set(params['_fields'].split(','))
+            if '_all' in only_fields:
+                include_all = True
         else:
             only_fields = None
 
         requested_fields = []
-        for field in fields:
-            renamed_field = self._rename_fields.get(field, field)
-            if only_fields is not None and renamed_field not in only_fields:
-                continue
+        if include_all or only_fields == None:
+            if include_all:
+                field_selection = all_fields_set
             else:
+                field_selection = fields
+            for field in field_selection:
                 requested_fields.append(field)
+        else:
+            for field in only_fields:
+                actual_field = self._reverse_rename_fields.get(field, field)
+                if actual_field in all_fields_set:
+                    requested_fields.append(actual_field)
 
         return requested_fields
 
