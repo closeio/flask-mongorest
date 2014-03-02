@@ -530,11 +530,7 @@ class Resource(object):
 
         # bulk-fetch related resources for moar speed
         if self.related_resources_hints:
-            if params and '_fields' in params:
-                only_fields = set(params['_fields'].split(','))
-            else:
-                only_fields = None
-            self.fetch_related_resources(qs, only_fields)
+            self.fetch_related_resources(qs, self.get_requested_fields(params=request.args))
 
         return qs, has_more
 
