@@ -269,7 +269,10 @@ class Resource(object):
                 try:
                     data[renamed_field] = get(obj, field)
                 except UnknownFieldError:
-                    data[renamed_field] = self.value_for_field(obj, field)
+                    try:
+                        data[renamed_field] = self.value_for_field(obj, field)
+                    except UnknownFieldError:
+                        pass
 
         return data
 
