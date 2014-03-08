@@ -478,7 +478,8 @@ class Resource(object):
         if params is None:
             params = request.args
         if self.allowed_ordering and params.get('_order_by') in self.allowed_ordering:
-            qs = qs.order_by(*params['_order_by'].split(','))
+            order_params = [self._reverse_rename_fields.get(p, p) for p in params['_order_by'].split(',')]
+            qs = qs.order_by(*order_params)
         return qs
 
     def get_skip_and_limit(self, params=None):
