@@ -3,11 +3,10 @@ import mimerender
 import mongoengine
 
 from flask import request, render_template
-from werkzeug.exceptions import Unauthorized
-from werkzeug.routing import NotFound
+from werkzeug.exceptions import NotFound, Unauthorized
 
-from flask.ext.mongorest.utils import MongoEncoder
 from flask.ext.mongorest.exceptions import ValidationError
+from flask.ext.mongorest.utils import MongoEncoder
 from flask.ext.views.base import View
 
 mimerender = mimerender.FlaskMimeRender()
@@ -44,12 +43,14 @@ class ResourceView(View):
             return super(ResourceView, self).dispatch_request(*args, **kwargs)
         except mongoengine.queryset.DoesNotExist as e:
             return {'error': 'Empty query: ' + str(e)}, '404 Not Found'
-        except ValidationError as e:
-            return e.message, '400 Bad Request'
         except mongoengine.ValidationError as e:
+            return e.message, '400 Bad Request'
+        except ValidationError as e:
             return e.message, '400 Bad Request'
         except Unauthorized as e:
             return {'error': 'Unauthorized'}, '401 Unauthorized'
+        except NotFound as e:
+            return {'error': unicode(e)}, '404 Not Found'
 
     def requested_resource(self, request):
         """In the case where the Resource that this view is associated with points to a Document class
