@@ -24,9 +24,10 @@ class MongoRest(object):
             Blueprint(self.url_prefix,
                       __name__,
                       template_folder=self.template_folder))
-        if isinstance(self.app, DelayedApp):
-            for args, kwargs in self.app.url_rules:
-                app.add_url_rule(*args, **kwargs)
+        if hasattr(self, 'app'):
+            if isinstance(self.app, DelayedApp):
+                for args, kwargs in self.app.url_rules:
+                    app.add_url_rule(*args, **kwargs)
         self.app = app
 
     def register(self, **kwargs):
