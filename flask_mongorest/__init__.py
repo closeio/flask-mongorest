@@ -2,22 +2,32 @@ from flask import Blueprint
 from functools import wraps
 from flask_mongorest.methods import Create, Update, BulkUpdate, Fetch, List, Delete
 
+class DelayedApp(object):
+    def __init__(self):
+        self.url_rules = []
+
+    def add_url_rule(self, *args, **kwargs):
+        self.url_rules.append((args, kwargs))
 
 class MongoRest(object):
 
     def __init__(self, app=None, **kwargs):
-        self.app = app
         self.url_prefix = kwargs.pop('url_prefix', '')
         self.template_folder = kwargs.pop('template_folder', 'templates')
         if app is not None:
             self.init_app(app, **kwargs)
+        else:
+            self.app = DelayedApp()
 
     def init_app(self, app):
-        self.app = app
         app.register_blueprint(
             Blueprint(self.url_prefix,
                       __name__,
                       template_folder=self.template_folder))
+        if isinstance(self.app, DelayedApp):
+            for args, kwargs in self.app.url_rules:
+                app.add_url_rule(*args, **kwargs)
+        self.app = app
 
     def register(self, **kwargs):
         def decorator(klass):
