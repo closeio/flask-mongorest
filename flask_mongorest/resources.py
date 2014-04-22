@@ -30,6 +30,7 @@ class Resource(object):
     related_resources_hints = {} #@todo this should be integrated into the related_resources dict, possibly as a tuple
     save_related_fields = []
     rename_fields = {}
+    filters_default = {}
     child_document_resources = {}
     paginate = True
     select_related = False
@@ -305,7 +306,16 @@ class Resource(object):
             self.data = form.data
 
     def get_queryset(self):
-        return self.document.objects
+        # Apply filters_default unless both
+        #  1. specified in request and
+        #  2. in self.filters (i.e. allowed)
+        qs = self.document.objects
+        filters_default = self.filters_default
+        for filter_name_default in self.filters_default:
+            if filter_name_default in request.args and filter_name_default in self.filters:
+                filters_default.pop(filter_name_default)
+        qs = qs.filter(**filters_default)
+        return qs
 
     def get_object(self, pk, qfilter=None):
         qs = self.get_queryset()
