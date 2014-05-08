@@ -14,6 +14,7 @@ mimerender = mimerender.FlaskMimeRender()
 render_json = lambda **payload: json.dumps(payload, cls=MongoEncoder)
 render_html = lambda **payload: render_template('mongorest/debug.html', data=json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4))
 
+
 class ResourceView(View):
     resource = None
     methods = []
@@ -62,21 +63,31 @@ class ResourceView(View):
 
     def get(self, **kwargs):
         pk = kwargs.pop('pk', None)
+
         # Create a queryset filter to control read access to the
         # underlying objects
         qfilter = lambda qs: self.has_read_permission(request, qs.clone())
         if pk is None:
             result = self._resource.get_objects(qfilter=qfilter)
+
+            # Result usually contains objects and a has_more bool. However, in case where
+            # more data is returned, we include it at the top level of the response dict
             if len(result) == 2:
                 objs, has_more = result
                 extra = {}
             elif len(result) == 3:
                 objs, has_more, extra = result
+            else:
+                raise ValueError('Unsupported value of resource.get_objects')
+
+            # Serialize the objects one by one
             ret = {
                 'data': [self._resource.serialize(obj, params=request.args) for obj in objs]
             }
+
             if has_more != None:
                 ret['has_more'] = has_more
+
             if extra:
                 ret.update(extra)
         else:
@@ -165,3 +176,4 @@ class ResourceView(View):
 
     def has_delete_permission(self, request, obj):
         return True
+

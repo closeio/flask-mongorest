@@ -17,6 +17,7 @@ from flask.ext.mongorest.exceptions import ValidationError, UnknownFieldError
 from flask.ext.mongorest.utils import cmp_fields, isbound, isint
 from flask.ext.mongorest.utils import MongoEncoder
 
+
 class ResourceMeta(type):
     def __init__(cls, name, bases, classdict):
         if classdict.get('__metaclass__') is not ResourceMeta:
@@ -322,7 +323,7 @@ class Resource(object):
             schema = self.schema(self.data, obj_data)
             try:
                 self.data = schema.full_clean()
-            except SchemaValidationError, e:
+            except SchemaValidationError:
                 raise ValidationError({'field-errors': schema.field_errors, 'errors': schema.errors })
 
         elif self.form:
@@ -506,6 +507,7 @@ class Resource(object):
         if qs is None:
             custom_qs = False
             qs = self.get_queryset()
+
         # If a queryset filter was provided, pass our current
         # queryset in and get a new one out
         if qfilter:
@@ -627,7 +629,6 @@ class Resource(object):
                 if isinstance(field_instance, ReferenceField):
                     instance = getattr(obj, field_name)
                     if instance:
-                        instance_data = instance.to_dict()
                         if related_resource:
                             related_resource().save_object(instance, parent_resources=parent_resources)
                         else:
@@ -637,7 +638,6 @@ class Resource(object):
                 if isinstance(field_instance, ListField) and isinstance(field_instance.field, ReferenceField):
                     instance_list = getattr(obj, field_name)
                     for instance in instance_list:
-                        instance_data = instance.to_dict()
                         if related_resource:
                             related_resource().save_object(instance, parent_resources=parent_resources)
                         else:
@@ -747,3 +747,4 @@ class Resource(object):
 
     def delete_object(self, obj, parent_resources=None):
         obj.delete()
+
