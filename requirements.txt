@@ -1,8 +1,9 @@
 -e git://github.com/elasticsales/mongoengine.git#egg=mongoengine-dev
 -e git://github.com/elasticsales/flask-mongoengine.git#egg=flask-mongoengine
-Flask-Views
 mimerender
 python-dateutil
 sphinx
 cleancat>=0.3
+Flask==0.9
+Flask-Views
 Flask-WTF==0.8.4
