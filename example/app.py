@@ -313,6 +313,21 @@ class DeleteOnlyView(ResourceView):
     resource = MethodTestResource
     methods = [Delete]
 
+class ViewMethodTestDoc(db.Document):
+    txt = db.StringField()
+
+class ViewMethodTestResource(Resource):
+    document = ViewMethodTestDoc
+
+@api.register(url='/test_view_method/')
+class TestViewMethodView(ResourceView):
+    resource = ViewMethodTestResource
+    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+
+    def _dispatch_request(self, *args, **kwargs):
+        super(TestViewMethodView, self)._dispatch_request(*args, **kwargs)
+        return { 'method': self._resource.view_method.__name__ }
+
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8000))

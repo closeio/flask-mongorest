@@ -22,6 +22,7 @@ def compare_req_resp(req_obj, resp_obj):
         assert k in resp_obj.keys(), 'Key %r not in response (keys are %r)' % (k, resp_obj.keys())
         assert resp_obj[k] == v, 'Value for key %r should be %r but is %r' % (k, v, resp_obj[k])
 
+
 class MongoRestTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -755,153 +756,40 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(dbref_obj['ref'], objectid_obj['ref'])
         self.assertEqual(dbref_obj['txt'], objectid_obj['txt'])
 
+    def test_view_methods(self):
+        doc = example.ViewMethodTestDoc.objects.create(txt='doc1')
 
-class MongoRestSchemaTestCase(unittest.TestCase):
+        resp = self.app.get('/test_view_method/%s/' % doc.pk)
+        response_success(resp)
+        self.assertEqual(json.loads(resp.data), {'method': 'Fetch'})
 
-    def setUp(self):
-        self.app = example.app.test_client()
-        example.documents.Language.drop_collection()
-        example.documents.Person.drop_collection()
+        resp = self.app.get('/test_view_method/')
+        response_success(resp)
+        self.assertEqual(json.loads(resp.data), {'method': 'List'})
 
-    def tearDown(self):
-        pass
-
-    def test_person(self):
-        resp = self.app.post('/person/', data=json.dumps({
-            'name': 'John',
-            'languages': [
-                { 'name': 'English' },
-                { 'name': 'German' },
-            ]
+        resp = self.app.post('/test_view_method/', data=json.dumps({
+            'txt': 'doc2'
         }))
         response_success(resp)
-        person = json.loads(resp.data)
+        self.assertEqual(json.loads(resp.data), {'method': 'Create'})
 
-        person_id = person['id']
-
-        self.assertEqual(len(person['languages']), 2)
-        self.assertEqual(person['name'], 'John')
-        self.assertEqual(person['languages'][0]['name'], 'English')
-        self.assertEqual(person['languages'][1]['name'], 'German')
-
-        english_id = person['languages'][0]['id']
-        german_id = person['languages'][1]['id']
-
-        # No change (same data)
-        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
-            'name': 'John',
-            'languages': [
-                { 'id': english_id, 'name': 'English' },
-                { 'id': german_id, 'name': 'German' },
-            ]
+        resp = self.app.put('/test_view_method/%s/' % doc.pk, data=json.dumps({
+            'txt': 'doc1new'
         }))
         response_success(resp)
-        person = json.loads(resp.data)
-        self.assertEqual(len(person['languages']), 2)
-        self.assertEqual(person['name'], 'John')
-        self.assertEqual(person['languages'][0]['id'], english_id)
-        self.assertEqual(person['languages'][1]['id'], german_id)
-        self.assertEqual(person['languages'][0]['name'], 'English')
-        self.assertEqual(person['languages'][1]['name'], 'German')
+        self.assertEqual(json.loads(resp.data), {'method': 'Update'})
 
-        # No change (omitted fields of related document)
-        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
-            'name': 'John',
-            'languages': [
-                { 'id': english_id },
-                { 'id': german_id },
-            ]
+        resp = self.app.put('/test_view_method/', data=json.dumps({
+            'txt': 'doc'
         }))
         response_success(resp)
-        person = json.loads(resp.data)
-        self.assertEqual(len(person['languages']), 2)
-        self.assertEqual(person['name'], 'John')
-        self.assertEqual(person['languages'][0]['id'], english_id)
-        self.assertEqual(person['languages'][1]['id'], german_id)
-        self.assertEqual(person['languages'][0]['name'], 'English')
-        self.assertEqual(person['languages'][1]['name'], 'German')
+        self.assertEqual(json.loads(resp.data), {'method': 'BulkUpdate'})
 
-        # Also no change (empty data)
-        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({ }))
-        response_success(resp)
-        person = json.loads(resp.data)
-        self.assertEqual(len(person['languages']), 2)
-        self.assertEqual(person['name'], 'John')
-        self.assertEqual(person['languages'][0]['id'], english_id)
-        self.assertEqual(person['languages'][1]['id'], german_id)
-        self.assertEqual(person['languages'][0]['name'], 'English')
-        self.assertEqual(person['languages'][1]['name'], 'German')
-
-        # Change value
-        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
-            'languages': [
-                { 'id': english_id, 'name': 'English' },
-                { 'id': german_id, 'name': 'French' },
-            ]
+        resp = self.app.delete('/test_view_method/%s/' % doc.pk, data=json.dumps({
+            'txt': 'doc'
         }))
         response_success(resp)
-        person = json.loads(resp.data)
-        self.assertEqual(len(person['languages']), 2)
-        self.assertEqual(person['name'], 'John')
-        self.assertEqual(person['languages'][0]['id'], english_id)
-        self.assertEqual(person['languages'][1]['id'], german_id)
-        self.assertEqual(person['languages'][0]['name'], 'English')
-        self.assertEqual(person['languages'][1]['name'], 'French')
-
-        # Insert item / rename back
-        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
-            'languages': [
-                { 'id': english_id },
-                { 'name': 'Spanish' },
-                { 'id': german_id, 'name': 'German' },
-            ]
-        }))
-        response_success(resp)
-        person = json.loads(resp.data)
-        self.assertEqual(len(person['languages']), 3)
-        self.assertEqual(person['name'], 'John')
-        self.assertEqual(person['languages'][0]['id'], english_id)
-        self.assertEqual(person['languages'][2]['id'], german_id)
-        self.assertEqual(person['languages'][0]['name'], 'English')
-        self.assertEqual(person['languages'][1]['name'], 'Spanish')
-        self.assertEqual(person['languages'][2]['name'], 'German')
-
-        # Remove item
-        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
-            'languages': [
-                { 'id': german_id },
-            ]
-        }))
-        response_success(resp)
-        person = json.loads(resp.data)
-        self.assertEqual(len(person['languages']), 1)
-        self.assertEqual(person['name'], 'John')
-        self.assertEqual(person['languages'][0]['id'], german_id)
-        self.assertEqual(person['languages'][0]['name'], 'German')
-
-        # Assign back (item is still in the database)
-        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
-            'languages': [
-                { 'id': german_id },
-                { 'id': english_id },
-            ]
-        }))
-        response_success(resp)
-        person = json.loads(resp.data)
-        self.assertEqual(len(person['languages']), 2)
-        self.assertEqual(person['name'], 'John')
-        self.assertEqual(person['languages'][0]['id'], german_id)
-        self.assertEqual(person['languages'][0]['name'], 'German')
-        self.assertEqual(person['languages'][1]['id'], english_id)
-        self.assertEqual(person['languages'][1]['name'], 'English')
-
-        # Test invalid ID
-        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
-            'languages': [
-                { 'id': 'INVALID' },
-            ]
-        }))
-        response_error(resp)
+        self.assertEqual(json.loads(resp.data), {'method': 'Delete'})
 
     def test_methods_success(self):
         doc1 = example.MethodTestDoc.objects.create(txt='doc1')
@@ -1128,6 +1016,154 @@ class MongoRestSchemaTestCase(unittest.TestCase):
         # fetch
         resp = self.app.get('/delete_only/%s/' % doc1.pk)
         response_error(resp, code=405)
+
+
+class MongoRestSchemaTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.app = example.app.test_client()
+        example.documents.Language.drop_collection()
+        example.documents.Person.drop_collection()
+
+    def tearDown(self):
+        pass
+
+    def test_person(self):
+        resp = self.app.post('/person/', data=json.dumps({
+            'name': 'John',
+            'languages': [
+                { 'name': 'English' },
+                { 'name': 'German' },
+            ]
+        }))
+        response_success(resp)
+        person = json.loads(resp.data)
+
+        person_id = person['id']
+
+        self.assertEqual(len(person['languages']), 2)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['name'], 'English')
+        self.assertEqual(person['languages'][1]['name'], 'German')
+
+        english_id = person['languages'][0]['id']
+        german_id = person['languages'][1]['id']
+
+        # No change (same data)
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
+            'name': 'John',
+            'languages': [
+                { 'id': english_id, 'name': 'English' },
+                { 'id': german_id, 'name': 'German' },
+            ]
+        }))
+        response_success(resp)
+        person = json.loads(resp.data)
+        self.assertEqual(len(person['languages']), 2)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['id'], english_id)
+        self.assertEqual(person['languages'][1]['id'], german_id)
+        self.assertEqual(person['languages'][0]['name'], 'English')
+        self.assertEqual(person['languages'][1]['name'], 'German')
+
+        # No change (omitted fields of related document)
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
+            'name': 'John',
+            'languages': [
+                { 'id': english_id },
+                { 'id': german_id },
+            ]
+        }))
+        response_success(resp)
+        person = json.loads(resp.data)
+        self.assertEqual(len(person['languages']), 2)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['id'], english_id)
+        self.assertEqual(person['languages'][1]['id'], german_id)
+        self.assertEqual(person['languages'][0]['name'], 'English')
+        self.assertEqual(person['languages'][1]['name'], 'German')
+
+        # Also no change (empty data)
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({ }))
+        response_success(resp)
+        person = json.loads(resp.data)
+        self.assertEqual(len(person['languages']), 2)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['id'], english_id)
+        self.assertEqual(person['languages'][1]['id'], german_id)
+        self.assertEqual(person['languages'][0]['name'], 'English')
+        self.assertEqual(person['languages'][1]['name'], 'German')
+
+        # Change value
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
+            'languages': [
+                { 'id': english_id, 'name': 'English' },
+                { 'id': german_id, 'name': 'French' },
+            ]
+        }))
+        response_success(resp)
+        person = json.loads(resp.data)
+        self.assertEqual(len(person['languages']), 2)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['id'], english_id)
+        self.assertEqual(person['languages'][1]['id'], german_id)
+        self.assertEqual(person['languages'][0]['name'], 'English')
+        self.assertEqual(person['languages'][1]['name'], 'French')
+
+        # Insert item / rename back
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
+            'languages': [
+                { 'id': english_id },
+                { 'name': 'Spanish' },
+                { 'id': german_id, 'name': 'German' },
+            ]
+        }))
+        response_success(resp)
+        person = json.loads(resp.data)
+        self.assertEqual(len(person['languages']), 3)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['id'], english_id)
+        self.assertEqual(person['languages'][2]['id'], german_id)
+        self.assertEqual(person['languages'][0]['name'], 'English')
+        self.assertEqual(person['languages'][1]['name'], 'Spanish')
+        self.assertEqual(person['languages'][2]['name'], 'German')
+
+        # Remove item
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
+            'languages': [
+                { 'id': german_id },
+            ]
+        }))
+        response_success(resp)
+        person = json.loads(resp.data)
+        self.assertEqual(len(person['languages']), 1)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['id'], german_id)
+        self.assertEqual(person['languages'][0]['name'], 'German')
+
+        # Assign back (item is still in the database)
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
+            'languages': [
+                { 'id': german_id },
+                { 'id': english_id },
+            ]
+        }))
+        response_success(resp)
+        person = json.loads(resp.data)
+        self.assertEqual(len(person['languages']), 2)
+        self.assertEqual(person['name'], 'John')
+        self.assertEqual(person['languages'][0]['id'], german_id)
+        self.assertEqual(person['languages'][0]['name'], 'German')
+        self.assertEqual(person['languages'][1]['id'], english_id)
+        self.assertEqual(person['languages'][1]['name'], 'English')
+
+        # Test invalid ID
+        resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
+            'languages': [
+                { 'id': 'INVALID' },
+            ]
+        }))
+        response_error(resp)
 
 
 if __name__ == '__main__':
