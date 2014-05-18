@@ -22,6 +22,7 @@ def compare_req_resp(req_obj, resp_obj):
         assert k in resp_obj.keys(), 'Key %r not in response (keys are %r)' % (k, resp_obj.keys())
         assert resp_obj[k] == v, 'Value for key %r should be %r but is %r' % (k, v, resp_obj[k])
 
+
 class MongoRestTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -72,6 +73,7 @@ class MongoRestTestCase(unittest.TestCase):
         example.A.drop_collection()
         example.B.drop_collection()
         example.C.drop_collection()
+        example.MethodTestDoc.drop_collection()
 
         # create user 1
         resp = self.app.post('/user/', data=json.dumps(self.user_1))
@@ -753,6 +755,267 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(dbref_obj['ref'], a2['id'])
         self.assertEqual(dbref_obj['ref'], objectid_obj['ref'])
         self.assertEqual(dbref_obj['txt'], objectid_obj['txt'])
+
+    def test_view_methods(self):
+        doc = example.ViewMethodTestDoc.objects.create(txt='doc1')
+
+        resp = self.app.get('/test_view_method/%s/' % doc.pk)
+        response_success(resp)
+        self.assertEqual(json.loads(resp.data), {'method': 'Fetch'})
+
+        resp = self.app.get('/test_view_method/')
+        response_success(resp)
+        self.assertEqual(json.loads(resp.data), {'method': 'List'})
+
+        resp = self.app.post('/test_view_method/', data=json.dumps({
+            'txt': 'doc2'
+        }))
+        response_success(resp)
+        self.assertEqual(json.loads(resp.data), {'method': 'Create'})
+
+        resp = self.app.put('/test_view_method/%s/' % doc.pk, data=json.dumps({
+            'txt': 'doc1new'
+        }))
+        response_success(resp)
+        self.assertEqual(json.loads(resp.data), {'method': 'Update'})
+
+        resp = self.app.put('/test_view_method/', data=json.dumps({
+            'txt': 'doc'
+        }))
+        response_success(resp)
+        self.assertEqual(json.loads(resp.data), {'method': 'BulkUpdate'})
+
+        resp = self.app.delete('/test_view_method/%s/' % doc.pk, data=json.dumps({
+            'txt': 'doc'
+        }))
+        response_success(resp)
+        self.assertEqual(json.loads(resp.data), {'method': 'Delete'})
+
+    def test_methods_success(self):
+        doc1 = example.MethodTestDoc.objects.create(txt='doc1')
+        doc2 = example.MethodTestDoc.objects.create(txt='doc2')
+
+        resp = self.app.get('/fetch_only/%s/' % doc1.pk)
+        response_success(resp)
+
+        resp = self.app.get('/list_only/')
+        response_success(resp)
+
+        resp = self.app.post('/create_only/', data=json.dumps({
+            'txt': 'created'
+        }))
+        response_success(resp)
+
+        resp = self.app.put('/update_only/%s/' % doc2.pk, data=json.dumps({
+            'txt': 'works'
+        }))
+        response_success(resp)
+
+        resp = self.app.put('/bulk_update_only/', data=json.dumps({
+            'txt': 'both work'
+        }))
+        response_success(resp)
+
+        resp = self.app.delete('/delete_only/%s/' % doc1.pk)
+        response_success(resp)
+
+    def test_fetch_method_permissions(self):
+        doc1 = example.MethodTestDoc.objects.create(txt='doc1')
+
+        # fetch
+        resp = self.app.get('/fetch_only/%s/' % doc1.pk)
+        response_success(resp)
+
+        # list
+        resp = self.app.get('/fetch_only/')
+        response_error(resp, code=404)
+
+        # create
+        resp = self.app.post('/fetch_only/', data=json.dumps({
+            'txt': 'doesnt work'
+        }))
+        response_error(resp, code=404)
+
+        # put
+        resp = self.app.put('/fetch_only/%s/' % doc1.pk, data=json.dumps({
+            'txt': 'doesnt work'
+        }))
+        response_error(resp, code=405)
+
+        # bulk put
+        resp = self.app.put('/fetch_only/', data=json.dumps({
+            'txt': 'doesnt work'
+        }))
+        response_error(resp, code=404)
+
+        # delete
+        resp = self.app.delete('/fetch_only/%s/' % doc1.pk)
+        response_error(resp, code=405)
+
+    def test_list_method_permissions(self):
+        doc1 = example.MethodTestDoc.objects.create(txt='doc1')
+
+        # list
+        resp = self.app.get('/list_only/')
+        response_success(resp)
+
+        # fetch
+        resp = self.app.get('/list_only/%s/' % doc1.pk)
+        response_error(resp, code=405)
+
+        # create
+        resp = self.app.post('/list_only/', data=json.dumps({
+            'txt': 'doesnt work'
+        }))
+        response_error(resp, code=405)
+
+        # put
+        resp = self.app.put('/list_only/%s/' % doc1.pk, data=json.dumps({
+            'txt': 'doesnt work'
+        }))
+        response_error(resp, code=405)
+
+        # bulk put
+        resp = self.app.put('/list_only/', data=json.dumps({
+            'txt': 'doesnt work'
+        }))
+        response_error(resp, code=405)
+
+        # delete
+        resp = self.app.delete('/list_only/%s/' % doc1.pk)
+        response_error(resp, code=405)
+
+    def test_create_method_permissions(self):
+        doc1 = example.MethodTestDoc.objects.create(txt='doc1')
+
+        # create
+        resp = self.app.post('/create_only/', data=json.dumps({
+            'txt': 'works'
+        }))
+        response_success(resp)
+
+        # list
+        resp = self.app.get('/create_only/')
+        response_error(resp, code=405)
+
+        # fetch
+        resp = self.app.get('/create_only/%s/' % doc1.pk)
+        response_error(resp, code=405)
+
+        # put
+        resp = self.app.put('/create_only/%s/' % doc1.pk, data=json.dumps({
+            'txt': 'doesnt work'
+        }))
+        response_error(resp, code=405)
+
+        # bulk put
+        resp = self.app.put('/create_only/', data=json.dumps({
+            'txt': 'doesnt work'
+        }))
+        response_error(resp, code=405)
+
+        # delete
+        resp = self.app.delete('/create_only/%s/' % doc1.pk)
+        response_error(resp, code=405)
+
+    def test_update_method_permissions(self):
+        doc1 = example.MethodTestDoc.objects.create(txt='doc1')
+
+        # put
+        resp = self.app.put('/update_only/%s/' % doc1.pk, data=json.dumps({
+            'txt': 'doesnt work'
+        }))
+        response_success(resp)
+
+        # create
+        resp = self.app.post('/update_only/', data=json.dumps({
+            'txt': 'works'
+        }))
+        response_error(resp, code=404)
+
+        # list
+        resp = self.app.get('/update_only/')
+        response_error(resp, code=404)
+
+        # fetch
+        resp = self.app.get('/update_only/%s/' % doc1.pk)
+        response_error(resp, code=405)
+
+        # bulk put
+        resp = self.app.put('/update_only/', data=json.dumps({
+            'txt': 'doesnt work'
+        }))
+        response_error(resp, code=404)
+
+        # delete
+        resp = self.app.delete('/update_only/%s/' % doc1.pk)
+        response_error(resp, code=405)
+
+    def test_bulk_update_method_permissions(self):
+        doc1 = example.MethodTestDoc.objects.create(txt='doc1')
+
+        # bulk put
+        resp = self.app.put('/bulk_update_only/', data=json.dumps({
+            'txt': 'works'
+        }))
+        response_success(resp)
+
+        # put
+        resp = self.app.put('/bulk_update_only/%s/' % doc1.pk, data=json.dumps({
+            'txt': 'doesnt work'
+        }))
+        response_error(resp, code=405)
+
+        # create
+        resp = self.app.post('/bulk_update_only/', data=json.dumps({
+            'txt': 'works'
+        }))
+        response_error(resp, code=405)
+
+        # list
+        resp = self.app.get('/bulk_update_only/')
+        response_error(resp, code=405)
+
+        # fetch
+        resp = self.app.get('/bulk_update_only/%s/' % doc1.pk)
+        response_error(resp, code=405)
+
+        # delete
+        resp = self.app.delete('/bulk_update_only/%s/' % doc1.pk)
+        response_error(resp, code=405)
+
+    def test_delete_method_permissions(self):
+        doc1 = example.MethodTestDoc.objects.create(txt='doc1')
+
+        # delete
+        resp = self.app.delete('/delete_only/%s/' % doc1.pk)
+        response_success(resp)
+
+        # bulk put
+        resp = self.app.put('/delete_only/', data=json.dumps({
+            'txt': 'works'
+        }))
+        response_error(resp, code=404)
+
+        # put
+        resp = self.app.put('/delete_only/%s/' % doc1.pk, data=json.dumps({
+            'txt': 'doesnt work'
+        }))
+        response_error(resp, code=405)
+
+        # create
+        resp = self.app.post('/delete_only/', data=json.dumps({
+            'txt': 'works'
+        }))
+        response_error(resp, code=404)
+
+        # list
+        resp = self.app.get('/delete_only/')
+        response_error(resp, code=404)
+
+        # fetch
+        resp = self.app.get('/delete_only/%s/' % doc1.pk)
+        response_error(resp, code=405)
 
 
 class MongoRestSchemaTestCase(unittest.TestCase):

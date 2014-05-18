@@ -7,12 +7,14 @@ from werkzeug.exceptions import NotFound, Unauthorized
 
 from flask.ext.mongorest.exceptions import ValidationError
 from flask.ext.mongorest.utils import MongoEncoder
+from flask.ext.mongorest import methods
 from flask.ext.views.base import View
 
 mimerender = mimerender.FlaskMimeRender()
 
 render_json = lambda **payload: json.dumps(payload, cls=MongoEncoder)
 render_html = lambda **payload: render_template('mongorest/debug.html', data=json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4))
+
 
 class ResourceView(View):
     resource = None
@@ -62,21 +64,38 @@ class ResourceView(View):
 
     def get(self, **kwargs):
         pk = kwargs.pop('pk', None)
+
+        # Set the view_method on a resource instance
+        if pk:
+            self._resource.view_method = methods.Fetch
+        else:
+            self._resource.view_method = methods.List
+
+
         # Create a queryset filter to control read access to the
         # underlying objects
         qfilter = lambda qs: self.has_read_permission(request, qs.clone())
         if pk is None:
             result = self._resource.get_objects(qfilter=qfilter)
+
+            # Result usually contains objects and a has_more bool. However, in case where
+            # more data is returned, we include it at the top level of the response dict
             if len(result) == 2:
                 objs, has_more = result
                 extra = {}
             elif len(result) == 3:
                 objs, has_more, extra = result
+            else:
+                raise ValueError('Unsupported value of resource.get_objects')
+
+            # Serialize the objects one by one
             ret = {
                 'data': [self._resource.serialize(obj, params=request.args) for obj in objs]
             }
+
             if has_more != None:
                 ret['has_more'] = has_more
+
             if extra:
                 ret.update(extra)
         else:
@@ -87,11 +106,17 @@ class ResourceView(View):
     def post(self, **kwargs):
         if 'pk' in kwargs:
             raise NotFound("Did you mean to use PUT?")
+
+        # Set the view_method on a resource instance
+        self._resource.view_method = methods.Create
+
         self._resource.validate_request()
         obj = self._resource.create_object()
+
         # Check if we have permission to create this object
         if not self.has_add_permission(request, obj):
             raise Unauthorized
+
         ret = self._resource.serialize(obj, params=request.args)
         if isinstance(obj, mongoengine.Document) and self._resource.uri_prefix:
             return ret, "201 Created", {"Location": self._resource._url(str(obj.id))}
@@ -100,6 +125,13 @@ class ResourceView(View):
 
     def put(self, **kwargs):
         pk = kwargs.pop('pk', None)
+
+        # Set the view_method on a resource instance
+        if pk:
+            self._resource.view_method = methods.Update
+        else:
+            self._resource.view_method = methods.BulkUpdate
+
         if pk is None:
             # Bulk update where the body contains the new values for certain
             # fields.
@@ -145,10 +177,16 @@ class ResourceView(View):
 
     def delete(self, **kwargs):
         pk = kwargs.pop('pk', None)
+
+        # Set the view_method on a resource instance
+        self._resource.view_method = methods.Delete
+
         obj = self._resource.get_object(pk)
+
         # Check if we have permission to delete this object
         if not self.has_delete_permission(request, obj):
             raise Unauthorized
+
         self._resource.delete_object(obj)
         return {}
 
@@ -165,3 +203,4 @@ class ResourceView(View):
 
     def has_delete_permission(self, request, obj):
         return True
+

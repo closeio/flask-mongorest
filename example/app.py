@@ -276,6 +276,59 @@ class AView(ResourceView):
     methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
 
 
+# Documents, resources, and views for testing method permissions
+class MethodTestDoc(db.Document):
+    txt = db.StringField()
+
+class MethodTestResource(Resource):
+    document = MethodTestDoc
+
+@api.register(url='/create_only/')
+class CreateOnlyView(ResourceView):
+    resource = MethodTestResource
+    methods = [Create]
+
+@api.register(url='/update_only/')
+class UpdateOnlyView(ResourceView):
+    resource = MethodTestResource
+    methods = [Update]
+
+@api.register(url='/bulk_update_only/')
+class BulkUpdateOnlyView(ResourceView):
+    resource = MethodTestResource
+    methods = [BulkUpdate]
+
+@api.register(url='/fetch_only/')
+class FetchOnlyView(ResourceView):
+    resource = MethodTestResource
+    methods = [Fetch]
+
+@api.register(url='/list_only/')
+class ListOnlyView(ResourceView):
+    resource = MethodTestResource
+    methods = [List]
+
+@api.register(url='/delete_only/')
+class DeleteOnlyView(ResourceView):
+    resource = MethodTestResource
+    methods = [Delete]
+
+class ViewMethodTestDoc(db.Document):
+    txt = db.StringField()
+
+class ViewMethodTestResource(Resource):
+    document = ViewMethodTestDoc
+
+@api.register(url='/test_view_method/')
+class TestViewMethodView(ResourceView):
+    resource = ViewMethodTestResource
+    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+
+    def _dispatch_request(self, *args, **kwargs):
+        super(TestViewMethodView, self)._dispatch_request(*args, **kwargs)
+        return { 'method': self._resource.view_method.__name__ }
+
+
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8000))
     app.run(host='0.0.0.0', port=port)
