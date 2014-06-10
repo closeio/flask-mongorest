@@ -22,6 +22,9 @@ class Operator(object):
         kwargs = self.prepare_queryset_kwargs(field, value, negate)
         return queryset.filter(**kwargs)
 
+class Exists(Operator):
+    op = 'exists'
+
 class Ne(Operator):
     op = 'ne'
 
