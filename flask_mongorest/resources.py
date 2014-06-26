@@ -457,6 +457,7 @@ class Resource(object):
             qs = qfilter(qs)
 
         qs = self.apply_filters(qs, params)
+        total = qs.count()
         qs = self.apply_ordering(qs, params)
 
         limit = None
@@ -485,7 +486,7 @@ class Resource(object):
                 only_fields = None
             self.fetch_related_resources(qs, only_fields)
 
-        return qs, has_more
+        return qs, has_more, total
 
     def _get(self, method, data, field_name, field_instance=None, parent_resources=None):
         """
