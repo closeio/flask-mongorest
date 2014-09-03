@@ -439,6 +439,14 @@ class Resource(object):
                 url = urlparse(value)
                 uri = url.path
                 value = uri.lstrip(self.uri_prefix)
+
+            # special handling of empty / null params
+            # http://werkzeug.pocoo.org/docs/0.9/utils/ url_decode returns '' for empty params
+            if value == '':
+                value = None
+            elif value in ['""', "''"]:
+                value = ''
+
             negate = False
             op_name = ''
             parts = key.split('__')
