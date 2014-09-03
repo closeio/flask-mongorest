@@ -46,7 +46,7 @@ class ResourceView(View):
         except mongoengine.queryset.DoesNotExist as e:
             return {'error': 'Empty query: ' + str(e)}, '404 Not Found'
         except mongoengine.ValidationError as e:
-            return e.message, '400 Bad Request'
+            return {'field-errors': e.errors}, '400 Bad Request'
         except ValidationError as e:
             return e.message, '400 Bad Request'
         except Unauthorized as e:
