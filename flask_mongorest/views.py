@@ -88,9 +88,16 @@ class ResourceView(View):
             else:
                 raise ValueError('Unsupported value of resource.get_objects')
 
+            data = []
+            for obj in objs:
+                try:
+                    data.append(self._resource.serialize(obj, params=request.args))
+                except Exception as e:
+                    self.handle_serialization_error(e, obj)
+
             # Serialize the objects one by one
             ret = {
-                'data': [self._resource.serialize(obj, params=request.args) for obj in objs]
+                'data': data
             }
 
             if has_more != None:
@@ -102,6 +109,9 @@ class ResourceView(View):
             obj = self._resource.get_object(pk, qfilter=qfilter)
             ret = self._resource.serialize(obj, params=request.args)
         return ret
+
+    def handle_serialization_error(self, exc, obj):
+        pass
 
     def post(self, **kwargs):
         if 'pk' in kwargs:
