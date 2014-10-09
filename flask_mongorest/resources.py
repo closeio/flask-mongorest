@@ -277,6 +277,9 @@ class Resource(object):
 
         return data
 
+    def handle_serialization_error(self, exc, obj):
+        pass
+
     def value_for_field(self, obj, field):
         # If we specify a field which doesn't exist on the resource or on the
         # object, this method lets us return a custom value.
