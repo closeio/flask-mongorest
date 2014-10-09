@@ -94,7 +94,7 @@ class ResourceView(View):
                     data.append(self._resource.serialize(obj, params=request.args))
                 except Exception as e:
                     fixed_obj = self._resource.handle_serialization_error(e, obj)
-                    if fixed_obj:
+                    if fixed_obj is not None:
                         data.append(fixed_obj)
 
             # Serialize the objects one by one
