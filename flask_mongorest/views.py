@@ -93,7 +93,9 @@ class ResourceView(View):
                 try:
                     data.append(self._resource.serialize(obj, params=request.args))
                 except Exception as e:
-                    self.handle_serialization_error(e, obj)
+                    fixed_obj = self._resource.handle_serialization_error(e, obj)
+                    if fixed_obj:
+                        data.append(fixed_obj)
 
             # Serialize the objects one by one
             ret = {
@@ -109,9 +111,6 @@ class ResourceView(View):
             obj = self._resource.get_object(pk, qfilter=qfilter)
             ret = self._resource.serialize(obj, params=request.args)
         return ret
-
-    def handle_serialization_error(self, exc, obj):
-        pass
 
     def post(self, **kwargs):
         if 'pk' in kwargs:
