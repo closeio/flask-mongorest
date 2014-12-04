@@ -160,7 +160,7 @@ class Resource(object):
                     if isinstance(field_value, DBRef):
                         return field_value
                     return field_value and field_value.to_dbref()
-            elif isinstance(field_instance, DateTimeField) and field_value:
+            elif isinstance(field_instance, DateTimeField) and field_value and isinstance(field_value, datetime.datetime):
                 field_value = field_value.isoformat() + 'Z'
             elif isinstance(field_instance, ListField):
                 return [val for val in [get(elem, field_name, field_instance=field_instance.field) for elem in field_value] if val]
