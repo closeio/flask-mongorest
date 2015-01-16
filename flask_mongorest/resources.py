@@ -675,7 +675,8 @@ class Resource(object):
     def create_object(self, data=None, save=True, parent_resources=None):
         kwargs = {}
         data = data or self.data
-        self._dirty_fields = []
+        if self.schema:
+            self._dirty_fields = []
         for field in self.get_fields():
             if field in self.document._fields.keys() and field not in self.readonly_fields and (type(data) is list or (type(data) is dict and data.has_key(field))):
                 if self.schema:
