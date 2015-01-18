@@ -30,8 +30,8 @@ app.config.update(
     },
 )
 
-db = MongoEngine(app)
-api = MongoRest(app)
+db = MongoEngine()
+api = MongoRest()
 
 class User(db.Document):
     email = db.EmailField(unique=True, required=True)
@@ -328,6 +328,8 @@ class TestViewMethodView(ResourceView):
         super(TestViewMethodView, self)._dispatch_request(*args, **kwargs)
         return { 'method': self._resource.view_method.__name__ }
 
+db.init_app(app)
+api.init_app(app)
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8000))
