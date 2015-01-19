@@ -697,8 +697,9 @@ class Resource(object):
             # doesn't look into mongoengine documents which are nested within
             # mongoengine documents.
             def cmp(a, b):
-                # When comparing dicts we may encounter datetime instances
-                # in the values, so compare them item by item.
+                # When comparing dicts (we serialize documents using to_dict)
+                # we may encounter datetime instances in the values, so compare
+                # them item by item.
                 if isinstance(a, dict) and isinstance(b, dict):
                     if a.keys() != b.keys():
                         return False
@@ -707,6 +708,10 @@ class Resource(object):
                             return False
                     return True
 
+                # Since comparing an aware and unaware datetime results in an
+                # exception and we may assign unaware datetimes to objects that
+                # previously had an aware datetime, we convert aware datetimes
+                # to their unaware equivalent before comparing.
                 if isinstance(a, datetime.datetime) and isinstance(b, datetime.datetime):
                     # This doesn't cover all the cases, but it covers the most
                     # important case where the utcoffset is 0.
