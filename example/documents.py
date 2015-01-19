@@ -1,5 +1,8 @@
 from mongoengine import *
 
+class DateTime(Document):
+    datetime = DateTimeField()
+
 class Language(Document):
     name = StringField()
 

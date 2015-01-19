@@ -8,3 +8,6 @@ class Language(Schema):
 class Person(Schema):
     name = String()
     languages = List(MongoEmbeddedReference(documents.Language, Language), required=False)
+
+class DateTime(Schema):
+    datetime = DateTime()

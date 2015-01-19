@@ -3,7 +3,7 @@ import copy
 import datetime
 import unittest
 import example.app as example
-
+from mongoengine.context_managers import query_counter
 
 def response_success(response, code=None):
     if code is None:
@@ -1165,6 +1165,47 @@ class MongoRestSchemaTestCase(unittest.TestCase):
         }))
         response_error(resp)
 
+    def test_datetime(self):
+        resp = self.app.post('/datetime/', data=json.dumps({
+            'datetime': '2010-01-01T00:00:00',
+        }))
+        response_success(resp)
+        datetime = json.loads(resp.data)
+        self.assertEqual(datetime['datetime'], '2010-01-01T00:00:00+00:00')
+
+        with query_counter() as c:
+            resp = self.app.put('/datetime/%s/' % datetime['id'], data=json.dumps({
+                'datetime': '2010-01-02T00:00:00',
+            }))
+            response_success(resp)
+            datetime = json.loads(resp.data)
+            self.assertEqual(datetime['datetime'], '2010-01-02T00:00:00+00:00')
+
+            self.assertEqual(c, 3) # query, update, query (reload)
+
+        with query_counter() as c:
+            resp = self.app.put('/datetime/%s/' % datetime['id'], data=json.dumps({
+                'datetime': '2010-01-02T00:00:00',
+            }))
+            response_success(resp)
+            datetime = json.loads(resp.data)
+            self.assertEqual(datetime['datetime'], '2010-01-02T00:00:00+00:00')
+
+            # Ideally this would be one query since we're not modifying, but
+            # in the generic case the save method may have other side effects
+            # and we don't know if the object was modified, so we currently
+            # always reload.
+            self.assertEqual(c, 2) # 2x query (with reload)
+
+        # Same as above, with no body
+        with query_counter() as c:
+            resp = self.app.put('/datetime/%s/' % datetime['id'], data=json.dumps({
+            }))
+            response_success(resp)
+            datetime = json.loads(resp.data)
+            self.assertEqual(datetime['datetime'], '2010-01-02T00:00:00+00:00')
+
+            self.assertEqual(c, 2) # 2x query (with reload)
 
 if __name__ == '__main__':
     unittest.main()
