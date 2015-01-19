@@ -328,6 +328,14 @@ class TestViewMethodView(ResourceView):
         super(TestViewMethodView, self)._dispatch_request(*args, **kwargs)
         return { 'method': self._resource.view_method.__name__ }
 
+class DateTimeResource(Resource):
+    document = documents.DateTime
+    schema = schemas.DateTime
+
+@api.register(name='datetime', url='/datetime/')
+class DateTimeView(ResourceView):
+    resource = DateTimeResource
+    methods = [Create, Update, Fetch, List]
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8000))
