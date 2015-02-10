@@ -63,9 +63,21 @@ class Resource(object):
         self._dirty_fields = None
 
     @property
+    def params(self):
+        if not hasattr(self, '_params'):
+            if '_params' in self.raw_data:
+                self._params = self.raw_data['_params']
+            else:
+                try:
+                    self._params = request.args.to_dict()
+                except AttributeError: # mocked request with regular dict
+                    self._params = request.args
+        return self._params
+
+    @property
     def raw_data(self):
         if not hasattr(self, '_raw_data'):
-            if request.method in ('PUT', 'POST'):
+            if request.method in ('PUT', 'POST') or request.data:
                 if request.mimetype and 'json' not in request.mimetype:
                     raise ValidationError({'error': "Please send valid JSON with a 'Content-Type: application/json' header."})
 
@@ -439,7 +451,7 @@ class Resource(object):
 
     def apply_filters(self, qs, params=None):
         if params is None:
-            params = request.args
+            params = self.params
 
         for key, value in params.iteritems():
             # If this is a resource identified by a URI, we need
@@ -495,7 +507,7 @@ class Resource(object):
 
     def apply_ordering(self, qs, params=None):
         if params is None:
-            params = request.args
+            params = self.params
         if self.allowed_ordering and params.get('_order_by') in self.allowed_ordering:
             order_params = [self._reverse_rename_fields.get(p, p) for p in params['_order_by'].split(',')]
             qs = qs.order_by(*order_params)
@@ -503,7 +515,7 @@ class Resource(object):
 
     def get_skip_and_limit(self, params=None):
         if params is None:
-            params = request.args
+            params = self.params
         if self.paginate:
             # _limit and _skip validation
             if not isint(params.get('_limit', 1)):
@@ -520,7 +532,8 @@ class Resource(object):
             return 0, self.max_limit
 
     def get_objects(self, all=False, qs=None, qfilter=None):
-        params = request.args
+        params = self.params
+
         custom_qs = True
         if qs is None:
             custom_qs = False
@@ -554,7 +567,7 @@ class Resource(object):
 
         # bulk-fetch related resources for moar speed
         if self.related_resources_hints:
-            self.fetch_related_resources(qs, self.get_requested_fields(params=request.args))
+            self.fetch_related_resources(qs, self.get_requested_fields(params=params))
 
         return qs, has_more
 
