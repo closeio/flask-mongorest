@@ -46,7 +46,12 @@ class ResourceView(View):
         except mongoengine.queryset.DoesNotExist as e:
             return {'error': 'Empty query: ' + str(e)}, '404 Not Found'
         except mongoengine.ValidationError as e:
-            return {'field-errors': e.errors}, '400 Bad Request'
+            def serialize_errors(errors):
+                if hasattr(errors, 'iteritems'):
+                    return dict((k, serialize_errors(v)) for (k, v) in errors.iteritems())
+                else:
+                    return unicode(errors)
+            return {'field-errors': serialize_errors(e.errors)}, '400 Bad Request'
         except ValidationError as e:
             return e.message, '400 Bad Request'
         except Unauthorized as e:

@@ -632,17 +632,6 @@ class Resource(object):
 
         self._dirty_fields = None # No longer dirty.
 
-    def _save(self, obj):
-        try:
-            self.save_object(obj)
-        except mongoengine.ValidationError, e:
-            def serialize_errors(errors):
-                if hasattr(errors, 'iteritems'):
-                    return dict((k, serialize_errors(v)) for (k, v) in errors.iteritems())
-                else:
-                    return unicode(errors)
-            raise ValidationError({'field-errors': serialize_errors(e.errors)})
-
     def get_update_dict(self, data=None):
         data = self.data or data
         doc_fields = set(self.document._fields.keys())
@@ -655,7 +644,7 @@ class Resource(object):
         obj = self.document(**update_dict)
         self._dirty_fields = update_dict.keys()
         if save:
-            self._save(obj)
+            self.save_object(obj)
         return obj
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
@@ -685,7 +674,7 @@ class Resource(object):
                 self._dirty_fields.append(field)
 
         if save:
-            self._save(obj)
+            self.save_object(obj)
         return obj
 
     def delete_object(self, obj, parent_resources=None):
