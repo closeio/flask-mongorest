@@ -674,7 +674,7 @@ class Resource(object):
             if isinstance(obj._fields.get(field), ReferenceField):
                 db_val = obj._db_data.get(field)
                 id_from_obj = db_val and getattr(db_val, 'id', db_val)
-                id_from_data = value and value.pk
+                id_from_data = value and getattr(value, 'pk', value)
                 if id_from_obj != id_from_data:
                     update = True
             elif not equal(getattr(obj, field), value):
