@@ -51,7 +51,10 @@ class ResourceView(View):
                     return dict((k, serialize_errors(v)) for (k, v) in errors.iteritems())
                 else:
                     return unicode(errors)
-            return {'field-errors': serialize_errors(e.errors)}, '400 Bad Request'
+            if e.errors:
+                return {'field-errors': serialize_errors(e.errors)}, '400 Bad Request'
+            else:
+                return {'error': e.message}, '400 Bad Request'
         except ValidationError as e:
             return e.message, '400 Bad Request'
         except Unauthorized as e:

@@ -67,8 +67,8 @@ class MongoRestTestCase(unittest.TestCase):
         }
 
         self.app = example.app.test_client()
-        example.User.drop_collection()
-        example.Post.drop_collection()
+        example.documents.User.drop_collection()
+        example.documents.Post.drop_collection()
         example.TestDocument.drop_collection()
         example.A.drop_collection()
         example.B.drop_collection()

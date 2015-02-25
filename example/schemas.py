@@ -2,6 +2,30 @@ from cleancat import *
 
 from example import documents
 
+class User(Schema):
+    email = Email(required=False)
+    first_name = String(required=False)
+    last_name = String(required=False)
+    emails = List(Email(), required=False)
+    datetime = DateTime(required=False)
+    datetime_local = DateTime(required=False)
+    balance = Integer(required=False)
+
+class Content(Schema):
+    text = String()
+    lang = String()
+
+class Post(Schema):
+    title = String()
+    description = String(required=False)
+    author = MongoReference(documents.User, required=False)
+    editor = MongoReference(documents.User, required=False)
+    tags = List(String(), required=False)
+    user_lists = List(MongoReference(documents.User), required=False)
+    sections = List(MongoEmbeddedReference(documents.Content, Content), required=False)
+    content = MongoEmbeddedReference(documents.Content, Content)
+    is_published = Bool()
+
 class Language(Schema):
     name = String()
 

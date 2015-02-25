@@ -1,6 +1,5 @@
 import os
 
-from urlparse import urlparse
 from flask import Flask, request
 from flask.ext.mongoengine import MongoEngine
 from flask.ext.mongoengine.wtf.orm import model_form
@@ -33,17 +32,9 @@ app.config.update(
 db = MongoEngine(app)
 api = MongoRest(app)
 
-class User(db.Document):
-    email = db.EmailField(unique=True, required=True)
-    first_name = db.StringField(max_length=50)
-    last_name = db.StringField(max_length=50)
-    emails = db.ListField(db.EmailField())
-    datetime = db.DateTimeField()
-    datetime_local = db.DateTimeField()
-    balance = db.IntField() # in cents
-
 class UserResource(Resource):
-    document = User
+    document = documents.User
+    schema = schemas.User
     filters = {
         'datetime': [ops.Exact]
     }
@@ -54,29 +45,12 @@ class UserView(ResourceView):
     resource = UserResource
     methods = [Create, Update, Fetch, List, Delete]
 
-class Content(db.EmbeddedDocument):
-    text = db.StringField()
-    lang = db.StringField(max_length=3)
-
 class ContentResource(Resource):
-    document = Content
-
-class Post(db.Document):
-    title = db.StringField(max_length=120, required=True)
-    description = db.StringField(max_length=120, required=False)
-    author = db.ReferenceField(User)
-    editor = db.ReferenceField(User)
-    tags = db.ListField(db.StringField(max_length=30))
-    user_lists = db.ListField(db.SafeReferenceField(User))
-    sections = db.ListField(db.EmbeddedDocumentField(Content))
-    content = db.EmbeddedDocumentField(Content)
-    is_published = db.BooleanField()
-
-    def primary_user(self):
-        return self.user_lists[0] if self.user_lists else None
+    document = documents.Content
 
 class PostResource(Resource):
-    document = Post
+    document = documents.Post
+    schema = schemas.Post
     related_resources = {
         'content': ContentResource,
         'sections': ContentResource, #nested complex objects
@@ -107,9 +81,7 @@ class PostResource(Resource):
     def update_object(self, obj, data=None, save=True, parent_resources=None):
         data = data or self.data
         if data.get('author'):
-            author_uri = urlparse(data['author']).path
-            author_id = author_uri.lstrip(UserResource.uri_prefix)
-            author = User.objects.get(pk=author_id)
+            author = data['author']
             if author.email == 'vincent@vangogh.com':
                 obj.tags.append('art')
         return super(PostResource, self).update_object(obj, data, save, parent_resources)
@@ -120,7 +92,7 @@ class PostView(ResourceView):
     methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
 
 class LimitedPostResource(Resource):
-    document = Post
+    document = documents.Post
     related_resources = {
         'content': ContentResource,
     }
