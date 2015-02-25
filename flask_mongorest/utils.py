@@ -3,6 +3,7 @@ import decimal
 import datetime
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
+import mongoengine
 
 isbound = lambda m: getattr(m, 'im_self', None) is not None
 
@@ -39,3 +40,62 @@ def cmp_fields(ordering):
                 return result
         return 0
     return _cmp
+
+def equal(a, b):
+    """
+    Compares two objects. In addition to the "==" operator, This function
+    ensures that the data of two mongoengine objects is the same. Also, it
+    assumes that a UTC-TZ-aware datetime is equal to an unaware datetime if
+    the date and time components match.
+    """
+
+    # Two mongoengine objects are equal if their ID is equal. However,
+    # in this case we want to check if the data is equal. Note this
+    # doesn't look into mongoengine documents which are nested within
+    # mongoengine documents.
+    def cmp(a, b):
+        # When comparing dicts (we serialize documents using to_dict)
+        # we may encounter datetime instances in the values, so compare
+        # them item by item.
+        if isinstance(a, dict) and isinstance(b, dict):
+            if a.keys() != b.keys():
+                return False
+            for k, v in a.iteritems():
+                if not cmp(b[k], v):
+                    return False
+            return True
+
+        # Since comparing an aware and unaware datetime results in an
+        # exception and we may assign unaware datetimes to objects that
+        # previously had an aware datetime, we convert aware datetimes
+        # to their unaware equivalent before comparing.
+        if isinstance(a, datetime.datetime) and isinstance(b, datetime.datetime):
+            # This doesn't cover all the cases, but it covers the most
+            # important case where the utcoffset is 0.
+            if (a.utcoffset() != None) and a.utcoffset() == datetime.timedelta(0):
+                a = a.replace(tzinfo=None)
+            if (b.utcoffset() != None) and b.utcoffset() == datetime.timedelta(0):
+                b = b.replace(tzinfo=None)
+            try:
+                return a == b
+            except:
+                return False
+        try:
+            return a == b
+        except: # Exception during comparison, mainly datetimes.
+            return False
+
+    if not cmp(a, b):
+        return False
+    else:
+        if isinstance(a, list):
+            return all([equal(m, n) for (m, n) in zip(a, b)])
+        elif isinstance(a, dict):
+            return all([equal(m, n) for (m, n) in zip(a.values(), b.values())])
+        elif isinstance(a, mongoengine.Document):
+            # Don't evaluate lazy documents
+            if getattr(a, '_lazy', False) and getattr(b, '_lazy', False):
+                return True
+            return cmp(a.to_dict(), b.to_dict())
+        else:
+            return True
