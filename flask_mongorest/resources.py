@@ -632,19 +632,20 @@ class Resource(object):
 
         self._dirty_fields = None # No longer dirty.
 
-    def get_update_dict(self, data=None, fields=None):
+    def get_object_dict(self, data=None, update=False):
         data = self.data or data
-        doc_fields = set(self.document._fields.keys())
-        if fields is None:
-            filter_fields = doc_fields
-        else:
-            filter_fields = fields & doc_fields
+        filter_fields = set(self.document._fields.keys())
+        if update:
+            # We want to update only the fields that appear in the request data
+            # rather than re-updating all the document's existing/other fields.
+            filter_fields &= set(self._reverse_rename_fields.get(field, field)
+                                 for field in self.raw_data.keys())
         update_dict = {field: value for field, value in data.items()
                                     if field in filter_fields}
         return update_dict
 
     def create_object(self, data=None, save=True, parent_resources=None):
-        update_dict = self.get_update_dict(data)
+        update_dict = self.get_object_dict(data)
         obj = self.document(**update_dict)
         self._dirty_fields = update_dict.keys()
         if save:
@@ -652,11 +653,7 @@ class Resource(object):
         return obj
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
-        # We want to update only the fields that appear in the request data
-        # rather than re-updating all the document's existing/other fields.
-        raw_fields = set(self._reverse_rename_fields.get(field, field)
-                         for field in self.raw_data.keys())
-        update_dict = self.get_update_dict(data, fields=raw_fields)
+        update_dict = self.get_object_dict(data, update=True)
 
         self._dirty_fields = []
 
