@@ -2,14 +2,12 @@ import os
 
 from flask import Flask, request
 from flask.ext.mongoengine import MongoEngine
-from flask.ext.mongoengine.wtf.orm import model_form
 from flask.ext.mongorest import MongoRest
 from flask.ext.mongorest.views import ResourceView
 from flask.ext.mongorest.resources import Resource
 from flask.ext.mongorest import operators as ops
 from flask.ext.mongorest.methods import *
 from flask.ext.mongorest.authentication import AuthenticationBase
-from flask.ext.wtf import TextField, length
 
 from example import schemas, documents
 
@@ -38,7 +36,6 @@ class UserResource(Resource):
     filters = {
         'datetime': [ops.Exact]
     }
-    uri_prefix = "/user/"
 
 @api.register()
 class UserView(ResourceView):
@@ -54,9 +51,9 @@ class PostResource(Resource):
     related_resources = {
         'content': ContentResource,
         'sections': ContentResource, #nested complex objects
-        'author': UserResource,
-        'editor': UserResource,
-        'user_lists': UserResource,
+        #'author': UserResource,
+        #'editor': UserResource,
+        #'user_lists': UserResource,
         'primary_user': UserResource,
     }
     filters = {
@@ -141,19 +138,8 @@ class TestDocument(db.Document):
     dictfield = db.DictField()
     is_new = db.BooleanField()
 
-TestBaseForm = model_form(TestDocument)
-
-class TestForm(TestBaseForm):
-    name = TextField(validators=[length(min=3, max=8)])
-
 class TestResource(Resource):
-    form = TestForm
     document = TestDocument
-
-class TestFormResource(Resource):
-    form = TestForm
-    document = TestDocument
-    uri_prefix = "/testform/"
 
 class TestFieldsResource(Resource):
     document = TestDocument
@@ -166,11 +152,6 @@ class TestFieldsResource(Resource):
 class TestView(ResourceView):
     resource = TestResource
     methods = [Create, Update, Fetch, List]
-
-@api.register(name='testform', url='/testform/')
-class TestFormView(ResourceView):
-    resource = TestFormResource
-    methods = [Create, Update, Fetch, List, BulkUpdate]
 
 
 @api.register(name='testfields', url='/testfields/')

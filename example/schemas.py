@@ -23,7 +23,7 @@ class Post(Schema):
     tags = List(String(), required=False)
     user_lists = List(MongoReference(documents.User), required=False)
     sections = List(MongoEmbeddedReference(documents.Content, Content), required=False)
-    content = MongoEmbeddedReference(documents.Content, Content)
+    content = MongoEmbeddedReference(documents.Content, Content, required=False)
     is_published = Bool()
 
 class Language(Schema):

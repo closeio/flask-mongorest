@@ -15,6 +15,17 @@ mimerender = mimerender.FlaskMimeRender()
 render_json = lambda **payload: json.dumps(payload, cls=MongoEncoder)
 render_html = lambda **payload: render_template('mongorest/debug.html', data=json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4))
 
+def serialize_mongoengine_validation_error(e):
+    def serialize_errors(errors):
+        if hasattr(errors, 'iteritems'):
+            return dict((k, serialize_errors(v)) for (k, v) in errors.iteritems())
+        else:
+            return unicode(errors)
+
+    if e.errors:
+        return {'field-errors': serialize_errors(e.errors)}
+    else:
+        return {'error': e.message}
 
 class ResourceView(View):
     resource = None
@@ -46,15 +57,7 @@ class ResourceView(View):
         except mongoengine.queryset.DoesNotExist as e:
             return {'error': 'Empty query: ' + str(e)}, '404 Not Found'
         except mongoengine.ValidationError as e:
-            def serialize_errors(errors):
-                if hasattr(errors, 'iteritems'):
-                    return dict((k, serialize_errors(v)) for (k, v) in errors.iteritems())
-                else:
-                    return unicode(errors)
-            if e.errors:
-                return {'field-errors': serialize_errors(e.errors)}, '400 Bad Request'
-            else:
-                return {'error': e.message}, '400 Bad Request'
+            return serialize_mongoengine_validation_error(e), '400 Bad Request'
         except ValidationError as e:
             return e.message, '400 Bad Request'
         except Unauthorized as e:
@@ -178,6 +181,10 @@ class ResourceView(View):
                     obj.save()
                     count += 1
             except ValidationError, e:
+                e.message['count'] = count
+                raise e
+            except mongoengine.ValidationError as e:
+                e = ValidationError(serialize_mongoengine_validation_error(e))
                 e.message['count'] = count
                 raise e
             else:

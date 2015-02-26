@@ -636,12 +636,8 @@ class Resource(object):
         data = self.data or data
         doc_fields = set(self.document._fields.keys())
 
-        # We want to update only the fields that appear in the request data
-        # rather than re-updating all the document's existing/other fields.
-        raw_fields = set(self._reverse_rename_fields.get(field, field) for field in self.raw_data.keys())
-
         update_dict = {field: value for field, value in data.items()
-                                    if field in (doc_fields & raw_fields)}
+                                    if field in doc_fields}
 
         return update_dict
 
@@ -655,6 +651,13 @@ class Resource(object):
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
         update_dict = self.get_update_dict(data)
+
+        # We want to update only the fields that appear in the request data
+        # rather than re-updating all the document's existing/other fields.
+        raw_fields = set(self._reverse_rename_fields.get(field, field)
+                         for field in self.raw_data.keys())
+        update_dict = {field: value for field, value in update_dict.items()
+                                    if field in raw_fields}
 
         self._dirty_fields = []
 
