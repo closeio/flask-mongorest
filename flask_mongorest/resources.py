@@ -13,9 +13,9 @@ from mongoengine.fields import DateTimeField, DictField
 from werkzeug.datastructures import MultiDict
 
 from cleancat import ValidationError as SchemaValidationError
-from flask.ext.mongorest.exceptions import ValidationError, UnknownFieldError
-from flask.ext.mongorest.utils import cmp_fields, isbound, isint
-from flask.ext.mongorest.utils import MongoEncoder
+from flask_mongorest.exceptions import ValidationError, UnknownFieldError
+from flask_mongorest.utils import cmp_fields, isbound, isint
+from flask_mongorest.utils import MongoEncoder
 
 
 class ResourceMeta(type):
