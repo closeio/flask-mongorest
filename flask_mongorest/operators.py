@@ -65,19 +65,19 @@ class In(Operator):
 
 class Contains(Operator):
     op = 'contains'
-    
+
 class IContains(Operator):
     op = 'icontains'
 
 class Startswith(Operator):
     op = 'startswith'
-    
+
 class IStartswith(Operator):
     op = 'istartswith'
 
 class Endswith(Operator):
     op = 'endswith'
-    
+
 class IEndswith(Operator):
     op = 'iendswith'
 
@@ -85,7 +85,7 @@ class Boolean(Operator):
     op = 'exact'
 
     def prepare_queryset_kwargs(self, field, value, negate):
-        if value == 'false':
+        if value in ('false', False):
             bool_value = False
         else:
             bool_value = True

@@ -517,6 +517,41 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(data['count'], 0)
         self.assertEqual(data['field-errors'].keys(), ['description'])
 
+    def test_boolean_filter(self):
+        resp = self.app.get('/filtered_user/?is_active=true')
+        response_success(resp)
+        self.assertEqual(set([d['is_active'] for d in json.loads(resp.data)['data']]), set([True]))
+
+        resp = self.app.get('/filtered_user/?is_active=false')
+        response_success(resp)
+        self.assertEqual(len(json.loads(resp.data)['data']), 0)
+
+    def test_invalid_datetime_filter(self):
+        resp = self.app.get('/filtered_user/?datetime__lt=not_a_valid_date')
+        response_error(resp, code=400)
+        self.assertEqual(json.loads(resp.data), {
+            'filter-errors': {
+                'datetime': 'cannot parse date "not_a_valid_date"'
+            }
+        })
+
+        resp = self.app.get('/filtered_user/?datetime__lt=2015-05-5476435468765405T00:00:00.000000 00:00')
+        response_error(resp, code=400)
+        self.assertEqual(json.loads(resp.data), {
+            'filter-errors': {
+                'datetime': 'cannot parse date "2015-05-5476435468765405T00:00:00.000000 00:00"'
+            }
+        })
+
+    def test_invalid_int_filter(self):
+        resp = self.app.get('/filtered_user/?balance__lt=not_a_valid_int')
+        response_error(resp, code=400)
+        self.assertEqual(json.loads(resp.data), {
+            'filter-errors': {
+                'balance': 'not_a_valid_int could not be converted to int'
+            }
+        })
+
     def test_post_auto_art_tag(self):
         # create a post by vangogh and an 'art' tag should be added automatically
 
