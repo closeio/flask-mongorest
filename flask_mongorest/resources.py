@@ -437,9 +437,28 @@ class Resource(object):
                     continue
                 setattr(obj, field, hint_index[obj_id])
 
-    def apply_filters(self, qs, params=None):
+    def get_qs_filters(self, params=None):
+        """
+        Given the params (either passed directly to this method or taken from
+        request.args), construct a list of (operator, field_name, field_value,
+        negate) tuples that can be later validated in `validate_qs_filters`
+        and applied to the queryset in `apply_filters`.
+
+        >>> resource.get_qs_filters({
+            'datetime_field__gte': '2014-10-12',
+            'int_field': '200',
+            'title__not__in': 'abc,def'
+        })
+        [
+            (ops.Gte, 'datetime_field', '2014-10-12', False),
+            (ops.Exact, 'int_field', '200', False),
+            (ops.In, 'title', 'abc,def', True),
+        ]
+        """
         if params is None:
             params = request.args
+
+        qs_filters = []
 
         for key, value in params.iteritems():
             # If this is a resource identified by a URI, we need
@@ -490,6 +509,48 @@ class Resource(object):
             if parts:
                 field = '%s__%s' % (field, '__'.join(parts))
             field = self._reverse_rename_fields.get(field, field)
+
+
+            if field in self.document._fields:
+                field_obj = self.document._fields[field]
+
+                # for boolean fields, transform 'true'/'false' to bool
+                if (
+                    isinstance(field_obj, mongoengine.BooleanField) and
+                    not isinstance(value, bool) and
+                    isinstance(value, basestring)
+                ):
+                    # we don't simply call "
+                    if value.strip().lower() == 'true':
+                        value = True
+                    elif value.strip().lower() == 'false':
+                        value = False
+            qs_filters.append((operator, field, value, negate))
+
+        return qs_filters
+
+    def validate_qs_filters(self, qs_filters):
+        """
+        Override this method to validate the filters requested in a querystring.
+        """
+        for operator, field, value, negate in qs_filters:
+            field_obj = self.document._fields.get(field)
+            if field_obj:
+                # no need to validate reference fields
+                if isinstance(field_obj, ReferenceField):
+                    continue
+
+                try:
+                    field_obj.validate(value)
+                except mongoengine.errors.ValidationError as e:
+                    raise ValidationError({
+                        'filter-errors': {
+                            field: unicode(e)
+                        }
+                    })
+
+    def apply_filters(self, qs, qs_filters):
+        for operator, field, value, negate in qs_filters:
             qs = operator().apply(qs, field, value, negate)
         return qs
 
@@ -531,7 +592,12 @@ class Resource(object):
         if qfilter:
             qs = qfilter(qs)
 
-        qs = self.apply_filters(qs, params)
+        # validate and apply the requested filters
+        qs_filters = self.get_qs_filters(params)
+        self.validate_qs_filters(qs_filters)
+        qs = self.apply_filters(qs, qs_filters)
+
+        # apply the requested ordering
         qs = self.apply_ordering(qs, params)
 
         limit = None

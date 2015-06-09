@@ -41,6 +41,7 @@ class User(db.Document):
     datetime = db.DateTimeField()
     datetime_local = db.DateTimeField()
     balance = db.IntField() # in cents
+    is_active = db.BooleanField(default=True)
 
 class UserResource(Resource):
     document = User
@@ -53,6 +54,19 @@ class UserResource(Resource):
 class UserView(ResourceView):
     resource = UserResource
     methods = [Create, Update, Fetch, List, Delete]
+
+class FilteredUserResource(Resource):
+    document = User
+    filters = {
+        'datetime': [ops.Gte, ops.Gt, ops.Lte, ops.Lt],
+        'balance': [ops.Gte, ops.Gt, ops.Lte, ops.Lt],
+        'is_active': [ops.Exact]
+    }
+
+@api.register(name='filtered_user', url='/filtered_user/')
+class FilteredUserView(ResourceView):
+    resource = FilteredUserResource
+    methods = [List]
 
 class Content(db.EmbeddedDocument):
     text = db.StringField()
