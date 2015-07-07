@@ -14,7 +14,7 @@ from werkzeug.datastructures import MultiDict
 
 from cleancat import ValidationError as SchemaValidationError
 from flask.ext.mongorest.exceptions import ValidationError, UnknownFieldError
-from flask.ext.mongorest.utils import cmp_fields, isbound, isint
+from flask.ext.mongorest.utils import cmp_fields, isbound, isint, equal
 from flask.ext.mongorest.utils import MongoEncoder
 
 
@@ -30,7 +30,6 @@ class Resource(object):
     document = None # required
     fields = None
     readonly_fields = ['id']
-    form = None
     schema = None
     related_resources = {}
     related_resources_hints = {} #@todo this should be integrated into the related_resources dict, possibly as a tuple
@@ -63,9 +62,21 @@ class Resource(object):
         self._dirty_fields = None
 
     @property
+    def params(self):
+        if not hasattr(self, '_params'):
+            if '_params' in self.raw_data:
+                self._params = self.raw_data['_params']
+            else:
+                try:
+                    self._params = request.args.to_dict()
+                except AttributeError: # mocked request with regular dict
+                    self._params = request.args
+        return self._params
+
+    @property
     def raw_data(self):
         if not hasattr(self, '_raw_data'):
-            if request.method in ('PUT', 'POST'):
+            if request.method in ('PUT', 'POST') or request.data:
                 if request.mimetype and 'json' not in request.mimetype:
                     raise ValidationError({'error': "Please send valid JSON with a 'Content-Type: application/json' header."})
 
@@ -289,21 +300,6 @@ class Resource(object):
         # Don't work on original raw data, we may reuse the resource for bulk updates.
         self.data = self.raw_data.copy()
 
-        if not self.schema and self.form:
-
-            if request.method == 'PUT' and obj != None:
-                # We treat 'PUT' like 'PATCH', i.e. when fields are not
-                # specified, existing values are used.
-
-                # TODO: This is not implemented properly for nested objects yet.
-
-                obj_data = self.serialize(obj)
-                obj_data.update(self.data)
-
-                self.data = obj_data
-
-        # @TODO this should rename form fields otherwise in a resource you could say "model_id" and in a form still have to use "model".
-
         # Do renaming in two passes to prevent potential multiple renames depending on dict traversal order.
         # E.g. if a -> b, b -> c, then a should never be renamed to c.
         fields_to_delete = []
@@ -328,39 +324,6 @@ class Resource(object):
                 self.data = schema.full_clean()
             except SchemaValidationError:
                 raise ValidationError({'field-errors': schema.field_errors, 'errors': schema.errors })
-
-        elif self.form:
-            # We need to convert JSON data into form data.
-            # e.g. { "people": [ { "name": "A" } ] } into { "people-0-name": "A" }
-            def json_to_form_data(prefix, json_data):
-                form_data = {}
-                for k, v in json_data.iteritems():
-                    if isinstance(v, list): # FieldList
-                        for n, el in enumerate(v):
-                            if isinstance(el, dict): # only dict type is supported
-                                form_data.update(json_to_form_data('%s%s-%d-' % (prefix, k, n), el))
-                    else:
-                        if isinstance(v, dict): # DictField
-                            v = json.dumps(v, cls=MongoEncoder)
-                        if isinstance(v, bool) and v == False: # BooleanField
-                            v = []
-                        if isinstance(v, datetime.datetime): # DateTimeField
-                            v = v.strftime('%Y-%m-%d %H:%M:%S')
-                        if isinstance(v, DBRef): # ReferenceField
-                            v = v.id
-                        if v is None:
-                            v = ''
-                        form_data['%s%s' % (prefix, k)] = v
-                return form_data
-
-            json_data = json_to_form_data('', self.data)
-            data = MultiDict(json_data)
-            form = self.form(data, csrf_enabled=False)
-
-            if not form.validate():
-                raise ValidationError({'field-errors': form.errors})
-
-            self.data = form.data
 
     def get_queryset(self):
         return self.document.objects
@@ -439,7 +402,7 @@ class Resource(object):
 
     def apply_filters(self, qs, params=None):
         if params is None:
-            params = request.args
+            params = self.params
 
         for key, value in params.iteritems():
             # If this is a resource identified by a URI, we need
@@ -495,7 +458,7 @@ class Resource(object):
 
     def apply_ordering(self, qs, params=None):
         if params is None:
-            params = request.args
+            params = self.params
         if self.allowed_ordering and params.get('_order_by') in self.allowed_ordering:
             order_params = [self._reverse_rename_fields.get(p, p) for p in params['_order_by'].split(',')]
             qs = qs.order_by(*order_params)
@@ -503,7 +466,7 @@ class Resource(object):
 
     def get_skip_and_limit(self, params=None):
         if params is None:
-            params = request.args
+            params = self.params
         if self.paginate:
             # _limit and _skip validation
             if not isint(params.get('_limit', 1)):
@@ -520,7 +483,8 @@ class Resource(object):
             return 0, self.max_limit
 
     def get_objects(self, all=False, qs=None, qfilter=None):
-        params = request.args
+        params = self.params
+
         custom_qs = True
         if qs is None:
             custom_qs = False
@@ -554,79 +518,9 @@ class Resource(object):
 
         # bulk-fetch related resources for moar speed
         if self.related_resources_hints:
-            self.fetch_related_resources(qs, self.get_requested_fields(params=request.args))
+            self.fetch_related_resources(qs, self.get_requested_fields(params=params))
 
         return qs, has_more
-
-    def _get(self, method, data, field_name, field_instance=None, parent_resources=None):
-        """
-        @TODO needs significant cleanup
-        """
-        if not parent_resources:
-            parent_resources = []
-
-        field_data_value = data if field_instance else data[field_name]
-        field_instance = field_instance or getattr(self.document, field_name)
-
-        if isinstance(field_instance, ReferenceField):
-            if field_name in self._related_resources:
-                restype = self.get_related_resources()[field_name]
-                if restype.uri_prefix:
-                    url = urlparse(field_data_value)
-                    uri = url.path
-                    objid = uri.lstrip(restype.uri_prefix)
-                    qobj = field_instance.document_type.objects.get(pk=objid)
-                    retobj = qobj.to_dbref()
-                    return retobj
-                return restype().create_object(data=field_data_value, save=True, parent_resources=parent_resources+[self])
-            else:
-                if isinstance(field_data_value, mongoengine.Document):
-                    return field_data_value
-                return field_data_value and field_instance.document_type.objects.get(pk=field_data_value).to_dbref()
-
-        elif isinstance(field_instance, DateTimeField):
-            if isinstance(field_data_value, datetime.datetime):
-                return field_data_value
-            else:
-                return field_data_value and dateutil.parser.parse(field_data_value)
-
-        elif isinstance(field_instance, EmbeddedDocumentField):
-            if field_data_value == None:
-                return # no embedded document
-            if field_name in self._related_resources:
-                if isinstance(field_data_value, self.get_related_resources()[field_name].document):
-                    return field_data_value
-                return self.get_related_resources()[field_name]().create_object(data=field_data_value, save=False, parent_resources=parent_resources+[self])
-            else:
-                return {} # dummy embedded document
-
-        elif isinstance(field_instance, ListField):
-            def expand_list(inner_field, inner_data):
-                if isinstance(inner_field, ListField):
-                    return [expand_list(inner_field.field, elem) for elem in inner_data]
-                elif isinstance(inner_field, EmbeddedDocumentField):
-                    if isinstance(inner_data, self.get_related_resources()[field_name].document):
-                        return inner_data
-                    return self.get_related_resources()[field_name]().create_object(data=inner_data, save=False, parent_resources=parent_resources+[self])
-                else:
-                    return self._get(method, inner_data, field_name, field_instance=inner_field, parent_resources=parent_resources)
-            return [expand_list(field_instance.field, elem) for elem in field_data_value]
-
-        elif isinstance(field_instance, DictField) and field_instance.field:
-            def expand_map(inner_field, inner_data):
-                if isinstance(inner_field, DictField) and inner_field.field:
-                    return dict(
-                        (key, expand_map(inner_field.field, elem))
-                        for key, elem in inner_data.items())
-                elif isinstance(inner_field, EmbeddedDocumentField):
-                    return self.related_resources[field_name]().create_object(data=inner_data, save=False, parent_resources=parent_resources+[self])
-                else:
-                    return self._get(method, inner_data, field_name, field_instance=inner_field, parent_resources=parent_resources)
-            return dict(
-                (key, expand_map(field_instance.field, elem))
-                for key, elem in field_data_value.items())
-        else:
-            return field_data_value
 
     def save_related_objects(self, obj, parent_resources=None):
         if not parent_resources:
@@ -668,127 +562,51 @@ class Resource(object):
 
         self._dirty_fields = None # No longer dirty.
 
-    def _save(self, obj):
-        try:
-            self.save_object(obj)
-        except mongoengine.ValidationError, e:
-            def serialize_errors(errors):
-                if hasattr(errors, 'iteritems'):
-                    return dict((k, serialize_errors(v)) for (k, v) in errors.iteritems())
-                else:
-                    return unicode(errors)
-            raise ValidationError({'field-errors': serialize_errors(e.errors)})
+    def get_object_dict(self, data=None, update=False):
+        data = self.data or data
+        filter_fields = set(self.document._fields.keys())
+        if update:
+            # We want to update only the fields that appear in the request data
+            # rather than re-updating all the document's existing/other fields.
+            filter_fields &= set(self._reverse_rename_fields.get(field, field)
+                                 for field in self.raw_data.keys())
+        update_dict = {field: value for field, value in data.items()
+                                    if field in filter_fields}
+        return update_dict
 
     def create_object(self, data=None, save=True, parent_resources=None):
-        kwargs = {}
-        data = data or self.data
-        if self.schema:
-            self._dirty_fields = []
-        for field in self.get_fields():
-            if field in self.document._fields.keys() and field not in self.readonly_fields and (type(data) is list or (type(data) is dict and data.has_key(field))):
-                if self.schema:
-                    kwargs[field] = data[field]
-                    self._dirty_fields.append(field)
-                else:
-                    # TODO: remove old code
-                    kwargs[field] = self._get('create_object', data, field, parent_resources=parent_resources)
-        obj = self.document(**kwargs)
+        update_dict = self.get_object_dict(data)
+        obj = self.document(**update_dict)
+        self._dirty_fields = update_dict.keys()
         if save:
-            self._save(obj)
+            self.save_object(obj)
         return obj
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
-        def equal(a, b):
-            # Two mongoengine objects are equal if their ID is equal. However,
-            # in this case we want to check if the data is equal. Note this
-            # doesn't look into mongoengine documents which are nested within
-            # mongoengine documents.
-            def cmp(a, b):
-                # When comparing dicts (we serialize documents using to_dict)
-                # we may encounter datetime instances in the values, so compare
-                # them item by item.
-                if isinstance(a, dict) and isinstance(b, dict):
-                    if a.keys() != b.keys():
-                        return False
-                    for k, v in a.iteritems():
-                        if not cmp(b[k], v):
-                            return False
-                    return True
-
-                # Since comparing an aware and unaware datetime results in an
-                # exception and we may assign unaware datetimes to objects that
-                # previously had an aware datetime, we convert aware datetimes
-                # to their unaware equivalent before comparing.
-                if isinstance(a, datetime.datetime) and isinstance(b, datetime.datetime):
-                    # This doesn't cover all the cases, but it covers the most
-                    # important case where the utcoffset is 0.
-                    if (a.utcoffset() != None) and a.utcoffset() == datetime.timedelta(0):
-                        a = a.replace(tzinfo=None)
-                    if (b.utcoffset() != None) and b.utcoffset() == datetime.timedelta(0):
-                        b = b.replace(tzinfo=None)
-                    try:
-                        return a == b
-                    except:
-                        return False
-                try:
-                    return a == b
-                except: # Exception during comparison, mainly datetimes.
-                    return False
-
-            if not cmp(a, b):
-                return False
-            else:
-                if isinstance(a, list):
-                    return all([equal(m, n) for (m, n) in zip(a, b)])
-                elif isinstance(a, dict):
-                    return all([equal(m, n) for (m, n) in zip(a.values(), b.values())])
-                elif isinstance(a, mongoengine.Document):
-                    # Don't evaluate lazy documents
-                    if getattr(a, '_lazy', False) and getattr(b, '_lazy', False):
-                        return True
-                    return cmp(a.to_dict(), b.to_dict())
-                else:
-                    return True
+        update_dict = self.get_object_dict(data, update=True)
 
         self._dirty_fields = []
-        data = data or self.data
 
-        # For updates, we want to update only the fields that appear in the request data rather than
-        # re-updating all the document's existing/other fields.
-        raw_fields = [self._reverse_rename_fields.get(field, field) for field in self.raw_data.keys()]
-        fields = self.get_fields() if not obj.pk else list(set(self.get_fields()) & set(raw_fields))
-        for field in fields:
-            if self.schema:
-                if (field in self.document._fields.keys() and
-                    field not in self.readonly_fields and
-                    (type(data) is list or (type(data) is dict and field in data))
-                   ):
-                    update = False
+        for field, value in update_dict.items():
+            update = False
 
-                    # If we're comparing reference fields, only compare ids without hitting the database
-                    if isinstance(obj._fields.get(field), ReferenceField):
-                        db_val = obj._db_data.get(field)
-                        id_from_obj = db_val and getattr(db_val, 'id', db_val)
-                        id_from_data = data.get(field) and data[field].pk
-                        if id_from_obj != id_from_data:
-                            update = True
-                    elif not equal(getattr(obj, field), data[field]):
-                        update = True
+            # If we're comparing reference fields, only compare ids without
+            # hitting the database
+            if isinstance(obj._fields.get(field), ReferenceField):
+                db_val = obj._db_data.get(field)
+                id_from_obj = db_val and getattr(db_val, 'id', db_val)
+                id_from_data = value and getattr(value, 'pk', value)
+                if id_from_obj != id_from_data:
+                    update = True
+            elif not equal(getattr(obj, field), value):
+                update = True
 
-                    if update:
-                        setattr(obj, field, data[field])
-                        self._dirty_fields.append(field)
-            else:
-                # TODO: remove old code
-                if field in self.document._fields.keys() and field not in self.readonly_fields and field in data:
-                    if field in self._related_resources and not hasattr(self._related_resources[field], 'uri_prefix'):
-                        field_instance = getattr(self.document, field)
-                        if isinstance(field_instance, ReferenceField) or (isinstance(field_instance, ListField) and isinstance(field_instance.field, ReferenceField)):
-                            continue # Not implemented.
-                    setattr(obj, field, self._get('update_object', data, field, parent_resources=parent_resources))
+            if update:
+                setattr(obj, field, value)
+                self._dirty_fields.append(field)
+
         if save:
-            self._save(obj)
-
+            self.save_object(obj)
         return obj
 
     def delete_object(self, obj, parent_resources=None):

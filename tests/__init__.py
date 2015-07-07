@@ -67,8 +67,8 @@ class MongoRestTestCase(unittest.TestCase):
         }
 
         self.app = example.app.test_client()
-        example.User.drop_collection()
-        example.Post.drop_collection()
+        example.documents.User.drop_collection()
+        example.documents.Post.drop_collection()
         example.TestDocument.drop_collection()
         example.A.drop_collection()
         example.B.drop_collection()
@@ -77,23 +77,14 @@ class MongoRestTestCase(unittest.TestCase):
 
         # create user 1
         resp = self.app.post('/user/', data=json.dumps(self.user_1))
-        assert "Location" in resp.headers
-        loc1 = resp.headers["Location"]
-        assert "/user/" in loc1
-        assert loc1.startswith("http")
         response_success(resp)
         self.user_1_obj = json.loads(resp.data)
-        self.user_1_loc = loc1
         compare_req_resp(self.user_1, self.user_1_obj)
 
         # create user 2
         resp = self.app.post('/user/', data=json.dumps(self.user_2))
-        loc2 = resp.headers["Location"]
-        assert "/user/" in loc2
-        assert loc2.startswith("http")
         response_success(resp)
         self.user_2_obj = json.loads(resp.data)
-        self.user_2_loc = loc2
         compare_req_resp(self.user_2, self.user_2_obj)
 
     def tearDown(self):
@@ -136,7 +127,7 @@ class MongoRestTestCase(unittest.TestCase):
         }))
         response_error(resp)
         errors = json.loads(resp.data)
-        self.assertEqual(errors.keys(), ['field-errors'])
+        self.assertTrue('field-errors' in errors)
         self.assertEqual(errors['field-errors'].keys(), ['email'])
 
         resp = self.app.put('/user/%s/' % self.user_1_obj['id'], data=json.dumps({
@@ -146,7 +137,7 @@ class MongoRestTestCase(unittest.TestCase):
         }))
         response_error(resp)
         errors = json.loads(resp.data)
-        self.assertEqual(errors.keys(), ['field-errors'])
+        self.assertTrue('field-errors' in errors)
         self.assertEqual(errors['field-errors'].keys(), ['email'])
 
         resp = self.app.put('/user/%s/' % self.user_1_obj['id'], data=json.dumps({
@@ -155,62 +146,9 @@ class MongoRestTestCase(unittest.TestCase):
 
         response_error(resp)
         errors = json.loads(resp.data)
-        self.assertEqual(errors.keys(), ['field-errors'])
+        self.assertTrue('field-errors' in errors)
         self.assertEqual(errors['field-errors'].keys(), ['emails'])
-        self.assertEqual(errors['field-errors']['emails'].keys(), ['1', '3'])
-
-    def test_form_validation(self):
-        resp = self.app.post('/testform/', data=json.dumps({
-            'name': 'x',
-        }))
-        response_error(resp)
-        errors = json.loads(resp.data)
-        self.assertEqual(errors.keys(), ['field-errors'])
-        self.assertEqual(errors['field-errors'].keys(), ['name'])
-
-        resp = self.app.post('/testform/', data=json.dumps({
-            'name': 'okay',
-        }))
-        assert "Location" in resp.headers
-        loc = resp.headers["Location"]
-        assert "/testform/" in loc
-        response_success(resp)
-        data = json.loads(resp.data)
-        self.assertEqual(data['name'], 'okay')
-
-        resp = self.app.post('/testform/', data=json.dumps({
-            'name': 'okay',
-            'dictfield': {
-                'field1': 'value1',
-                'field2': ['one', 'two', 'three'],
-                'field3': 123,
-            }
-        }))
-        response_success(resp)
-        data = json.loads(resp.data)
-        self.assertEqual(data['name'], 'okay')
-        self.assertEqual(data['dictfield'], {
-            'field1': 'value1',
-            'field2': ['one', 'two', 'three'],
-            'field3': 123,
-        })
-
-        # Test boolean fields
-        resp = self.app.post('/testform/', data=json.dumps({
-            'name': 'okay',
-            'is_new': True
-        }))
-        response_success(resp)
-        data = json.loads(resp.data)
-        self.assertEqual(data['is_new'], True)
-
-        resp = self.app.post('/testform/', data=json.dumps({
-            'name': 'okay',
-            'is_new': False
-        }))
-        response_success(resp)
-        data = json.loads(resp.data)
-        self.assertEqual(data['is_new'], False)
+        self.assertEqual(errors['field-errors']['emails']['errors'].keys(), ['1', '3'])
 
     def test_resource_fields(self):
         resp = self.app.post('/testfields/', data=json.dumps({
@@ -230,7 +168,8 @@ class MongoRestTestCase(unittest.TestCase):
         obj = json.loads(resp.data)
 
         self.assertEqual(obj['name'], 'thename')
-        self.assertEqual(obj['other'], None)
+        # We can edit all the fields since we don't have a schema
+        #self.assertEqual(obj['other'], None)
 
         resp = self.app.put('/test/%s/' % obj['id'], data=json.dumps({
             'other': 'new othervalue',
@@ -248,36 +187,6 @@ class MongoRestTestCase(unittest.TestCase):
         obj = json.loads(resp.data)
         self.assertEqual(obj['name'], 'namevalue2')
         self.assertEqual(obj['upper_name'], 'NAMEVALUE2')
-
-    def test_form(self):
-        resp = self.app.post('/testform/', data=json.dumps({
-            'name': 'name1',
-            'other': 'other1',
-        }))
-        response_success(resp)
-        test_1 = json.loads(resp.data)
-
-        resp = self.app.post('/testform/', data=json.dumps({
-            'name': 'name2',
-            'other': 'other2',
-        }))
-        response_success(resp)
-        test_2 = json.loads(resp.data)
-
-        resp = self.app.put('/testform/', data=json.dumps({
-            'other': 'new',
-        }))
-        response_success(resp)
-
-        resp = self.app.get('/testform/%s/' % test_1['id'])
-        test_1 = json.loads(resp.data)
-        self.assertEqual(test_1['name'], 'name1')
-        self.assertEqual(test_1['other'], 'new')
-
-        resp = self.app.get('/testform/%s/' % test_2['id'])
-        test_2 = json.loads(resp.data)
-        self.assertEqual(test_2['name'], 'name2')
-        self.assertEqual(test_2['other'], 'new')
 
     def test_restricted_auth(self):
         self.post_1['author_id'] = self.user_1_obj['id']
@@ -368,14 +277,14 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp, code=200)
 
     def test_get(self):
-        resp = self.app.get(example.UserResource.uri_prefix) # /users/
+        resp = self.app.get('/user/')
         objs = json.loads(resp.data)['data']
         self.assertEqual(len(objs), 2)
 
     def test_get_primary_user(self):
-        self.post_1['author_id'] = self.user_1_loc
-        self.post_1['editor'] = self.user_2_loc
-        self.post_1['user_lists'] = [self.user_1_loc, self.user_2_loc]
+        self.post_1['author_id'] = self.user_1_obj['id']
+        self.post_1['editor'] = self.user_2_obj['id']
+        self.post_1['user_lists'] = [self.user_1_obj['id'], self.user_2_obj['id']]
         resp = self.app.post('/posts/', data=json.dumps(self.post_1))
         resp = self.app.get('/posts/?_include_primary_user=1')
         objs = json.loads(resp.data)['data']
@@ -392,9 +301,9 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(objs[0]['primary_user'], None)
 
     def test_post(self):
-        self.post_1['author_id'] = self.user_1_loc
-        self.post_1['editor'] = self.user_2_loc
-        self.post_1['user_lists'] = [self.user_1_loc, self.user_2_loc]
+        self.post_1['author_id'] = self.user_1_obj['id']
+        self.post_1['editor'] = self.user_2_obj['id']
+        self.post_1['user_lists'] = [self.user_1_obj['id'], self.user_2_obj['id']]
         resp = self.app.post('/posts/', data=json.dumps(self.post_1))
         response_success(resp)
         compare_req_resp(self.post_1, json.loads(resp.data))
@@ -403,7 +312,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
         compare_req_resp(self.post_1_obj, json.loads(resp.data))
 
-        self.post_1_obj['author_id'] = self.user_2_loc
+        self.post_1_obj['author_id'] = self.user_2_obj['id']
         resp = self.app.put('/posts/%s/' % self.post_1_obj['id'], data=json.dumps(self.post_1_obj))
         response_success(resp)
         jd = json.loads(resp.data)
@@ -527,7 +436,7 @@ class MongoRestTestCase(unittest.TestCase):
             'last_name': 'Vangogh',
         }))
         response_success(resp)
-        author = resp.headers["Location"]
+        author = json.loads(resp.data)['id']
 
         # create a post
         resp = self.app.post('/posts/', data=json.dumps(self.post_1))
@@ -539,7 +448,7 @@ class MongoRestTestCase(unittest.TestCase):
         }))
         response_success(resp)
         post = json.loads(resp.data)
-        post_obj = example.Post.objects.get(pk=post['id'])
+        post_obj = example.documents.Post.objects.get(pk=post['id'])
         self.assertTrue('art' in post_obj.tags)
         self.assertTrue('art' in post['tags'])
 
@@ -553,12 +462,11 @@ class MongoRestTestCase(unittest.TestCase):
         }))
         response_success(resp)
         user_3 = json.loads(resp.data)
-        user_3_loc = resp.headers["Location"]
 
         post = self.post_1.copy()
-        post['author_id'] = self.user_1_loc
-        post['editor'] = self.user_2_loc
-        post['user_lists'] = [user_3_loc]
+        post['author_id'] = self.user_1_obj['id']
+        post['editor'] = self.user_2_obj['id']
+        post['user_lists'] = [user_3['id']]
         resp = self.app.post('/posts/', data=json.dumps(post))
         response_success(resp)
         compare_req_resp(post, json.loads(resp.data))
@@ -696,11 +604,6 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
         user = json.loads(resp.data)
         self.assertEqual(user.keys(), ['id'])
-
-        resp = self.app.get(example.UserResource.uri(user['id'])) # /user/:id
-        response_success(resp)
-        user = json.loads(resp.data)
-        compare_req_resp(test_user_data, user)
 
     def test_invalid_json(self):
         resp = self.app.post('/user/', data='{\"}')

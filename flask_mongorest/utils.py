@@ -3,6 +3,7 @@ import decimal
 import datetime
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
+import mongoengine
 
 isbound = lambda m: getattr(m, 'im_self', None) is not None
 
@@ -39,3 +40,54 @@ def cmp_fields(ordering):
                 return result
         return 0
     return _cmp
+
+def equal(a, b):
+    """
+    Compares two objects. In addition to the "==" operator, this function
+    ensures that the data of two mongoengine objects is the same. Also, it
+    assumes that a UTC-TZ-aware datetime is equal to an unaware datetime if
+    the date and time components match.
+    """
+
+    # When comparing dicts (we serialize documents using to_dict) or lists
+    # we may encounter datetime instances in the values, so compare them item
+    # by item.
+    if isinstance(a, dict) and isinstance(b, dict):
+        if sorted(a.keys()) != sorted(b.keys()):
+            return False
+        for k, v in a.iteritems():
+            if not equal(b[k], v):
+                return False
+        return True
+
+    if isinstance(a, list) and isinstance(b, list):
+        if len(a) != len(b):
+            return False
+        return all([equal(m, n) for (m, n) in zip(a, b)])
+
+    # Two mongoengine objects are equal if their ID is equal. However,
+    # in this case we want to check if the data is equal. Note this
+    # doesn't look into mongoengine documents which are nested within
+    # mongoengine documents.
+    if isinstance(a, mongoengine.Document) and isinstance(b, mongoengine.Document):
+        # Don't evaluate lazy documents
+        if getattr(a, '_lazy', False) and getattr(b, '_lazy', False):
+            return True
+        return equal(a.to_dict(), b.to_dict())
+
+    # Since comparing an aware and unaware datetime results in an
+    # exception and we may assign unaware datetimes to objects that
+    # previously had an aware datetime, we convert aware datetimes
+    # to their unaware equivalent before comparing.
+    if isinstance(a, datetime.datetime) and isinstance(b, datetime.datetime):
+        # This doesn't cover all the cases, but it covers the most
+        # important case where the utcoffset is 0.
+        if (a.utcoffset() != None) and a.utcoffset() == datetime.timedelta(0):
+            a = a.replace(tzinfo=None)
+        if (b.utcoffset() != None) and b.utcoffset() == datetime.timedelta(0):
+            b = b.replace(tzinfo=None)
+
+    try:
+        return a == b
+    except: # Exception during comparison, mainly datetimes.
+        return False

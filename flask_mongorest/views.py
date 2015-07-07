@@ -15,6 +15,17 @@ mimerender = mimerender.FlaskMimeRender()
 render_json = lambda **payload: json.dumps(payload, cls=MongoEncoder)
 render_html = lambda **payload: render_template('mongorest/debug.html', data=json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4))
 
+def serialize_mongoengine_validation_error(e):
+    def serialize_errors(errors):
+        if hasattr(errors, 'iteritems'):
+            return dict((k, serialize_errors(v)) for (k, v) in errors.iteritems())
+        else:
+            return unicode(errors)
+
+    if e.errors:
+        return {'field-errors': serialize_errors(e.errors)}
+    else:
+        return {'error': e.message}
 
 class ResourceView(View):
     resource = None
@@ -45,14 +56,20 @@ class ResourceView(View):
             return super(ResourceView, self).dispatch_request(*args, **kwargs)
         except mongoengine.queryset.DoesNotExist as e:
             return {'error': 'Empty query: ' + str(e)}, '404 Not Found'
-        except mongoengine.ValidationError as e:
-            return {'field-errors': e.errors}, '400 Bad Request'
         except ValidationError as e:
             return e.message, '400 Bad Request'
         except Unauthorized as e:
             return {'error': 'Unauthorized'}, '401 Unauthorized'
         except NotFound as e:
             return {'error': unicode(e)}, '404 Not Found'
+
+    def handle_validation_error(self, e):
+        if isinstance(e, ValidationError):
+            raise
+        elif isinstance(e, mongoengine.ValidationError):
+            raise ValidationError(serialize_mongoengine_validation_error(e))
+        else:
+            raise
 
     def requested_resource(self, request):
         """In the case where the Resource that this view is associated with points to a Document class
@@ -120,7 +137,10 @@ class ResourceView(View):
         self._resource.view_method = methods.Create
 
         self._resource.validate_request()
-        obj = self._resource.create_object()
+        try:
+            obj = self._resource.create_object()
+        except Exception, e:
+            self.handle_validation_error(e)
 
         # Check if we have permission to create this object
         if not self.has_add_permission(request, obj):
@@ -163,7 +183,10 @@ class ResourceView(View):
             try:
                 for obj in objs:
                     self._resource.validate_request(obj)
-                    obj = self._resource.update_object(obj)
+                    try:
+                        obj = self._resource.update_object(obj)
+                    except Exception, e:
+                        self.handle_validation_error(e)
                     # Raise or skip?
                     if not self.has_change_permission(request, obj):
                         raise Unauthorized
@@ -180,7 +203,10 @@ class ResourceView(View):
             if not self.has_change_permission(request, obj):
                 raise Unauthorized
             self._resource.validate_request(obj)
-            obj = self._resource.update_object(obj)
+            try:
+                obj = self._resource.update_object(obj)
+            except Exception, e:
+                self.handle_validation_error(e)
             ret = self._resource.serialize(obj, params=request.args)
             return ret
 
