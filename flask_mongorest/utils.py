@@ -11,7 +11,7 @@ def isint(int_str):
     try:
         int(int_str)
         return True
-    except ValueError:
+    except (TypeError, ValueError):
         return False
 
 class MongoEncoder(json.JSONEncoder):
