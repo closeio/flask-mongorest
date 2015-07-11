@@ -1,4 +1,4 @@
-# http://travis-ci.org/#!/elasticsales/flask-mongorest
+# http://travis-ci.org/#!/closeio/flask-mongorest
 language: python
 services: mongodb
 python:
