@@ -79,6 +79,8 @@ class Resource(object):
             if request.method in ('PUT', 'POST') or request.data:
                 if request.mimetype and 'json' not in request.mimetype:
                     raise ValidationError({'error': "Please send valid JSON with a 'Content-Type: application/json' header."})
+                if request.headers.get('Transfer-Encoding') == 'chunked':
+                    raise ValidationError({'error': "Chunked Transfer-Encoding is not supported."})
 
                 try:
                     self._raw_data = json.loads(request.data)
