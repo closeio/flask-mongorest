@@ -584,7 +584,7 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.get('/posts/?_skip=-1')
         response_error(resp, code=400)
         self.assertEqual(json.loads(resp.data)['error'],
-                        '_skip cannot be a negative number (got -1).')
+                        '_skip must be a non-negative integer (got "-1" instead).')
 
     def test_fields(self):
         resp = self.app.get('/user/%s/?_fields=email' % self.user_1_obj['id'])
