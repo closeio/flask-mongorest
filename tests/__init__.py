@@ -616,6 +616,11 @@ class MongoRestTestCase(unittest.TestCase):
         resp = json.loads(resp.data)
         self.assertEqual(resp['error'], 'The request contains invalid JSON.')
 
+    def test_chunked_request(self):
+        resp = self.app.post('/a/', data=json.dumps({ 'txt': 'test' }), headers={'Transfer-Encoding': 'chunked'})
+        response_error(resp, code=400)
+        self.assertEqual(json.loads(resp.data), { 'error': 'Chunked Transfer-Encoding is not supported.' })
+
     def test_dbref_vs_objectid(self):
         resp = self.app.post('/a/', data=json.dumps({ "txt": "some text 1" }))
         response_success(resp)
