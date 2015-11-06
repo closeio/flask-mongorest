@@ -475,6 +475,8 @@ class Resource(object):
                 raise ValidationError({'error': '_skip must be an integer (got "%s" instead).' % params['_skip']})
             if params.get('_limit') and int(params['_limit']) > self.max_limit:
                 raise ValidationError({'error': "The limit you set is larger than the maximum limit for this resource (max_limit = %d)." % self.max_limit})
+            if params.get('_skip') and int(params['_skip']) < 0:
+                raise ValidationError({'error': "_skip cannot be a negative number (got %s)." % params['_skip']})
 
             limit = min(int(params.get('_limit', self.default_limit)), self.max_limit)
             # Fetch one more so we know if there are more results.
