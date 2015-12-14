@@ -1,4 +1,4 @@
-Flask-MongoRest [![Build Status](https://secure.travis-ci.org/closeio/flask-mongorest.png?branch=master)](http://travis-ci.org/closeio/flask-mongorest)
+Flask-MongoRest [![Build Status](https://circleci.com/gh/closeio/flask-mongorest.png?branch=master&style=shield)](https://circleci.com/gh/closeio/flask-mongorest)
 ===============
 A Restful API framework wrapped around MongoEngine.
 
