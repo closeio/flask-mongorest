@@ -18,7 +18,7 @@ class MongoEncoder(json.JSONEncoder):
     def default(self, value, **kwargs):
         if isinstance(value, ObjectId):
             return unicode(value)
-        elif isinstance(value, DBRef):
+        if isinstance(value, DBRef):
             return value.id
         if isinstance(value, datetime.datetime):
             return value.isoformat()

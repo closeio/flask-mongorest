@@ -1120,6 +1120,22 @@ class MongoRestSchemaTestCase(unittest.TestCase):
 
             self.assertEqual(c, 2) # 2x query (with reload)
 
+    def test_bad_json(self):
+        """
+        Python is stupid and by default lets us send an invalid JSON. Test
+        that flask-mongorest handles it correctly.
+        """
+        resp = self.app.post('/dict_doc/', data=json.dumps({
+            'dict': {
+                'nan': float('NaN'),
+                'inf': float('inf'),
+                '-inf': float('-inf'),
+            }
+        }))
+        response_error(resp, code=400)
+        self.assertEqual(json.loads(resp.data), { 'error': 'The request contains invalid JSON.' });
+
+
 if __name__ == '__main__':
     unittest.main()
 

@@ -73,6 +73,19 @@ class Resource(object):
                     self._params = request.args
         return self._params
 
+    def _enforce_strict_json(self, val):
+        """
+        Helper method used to raise a ValueError if NaN, Infinity, or
+        -Infinity were posted. By default, json.loads accepts these values,
+        but it allows us to perform extra validation via a parse_constant
+        kwarg.
+        """
+        # according to the `json.loads` docs: "parse_constant, if specified,
+        # will be called with one of the following strings: '-Infinity',
+        # 'Infinity', 'NaN'". Since none of them are valid JSON, we can simply
+        # raise an exception here.
+        raise ValueError
+
     @property
     def raw_data(self):
         if not hasattr(self, '_raw_data'):
@@ -83,7 +96,7 @@ class Resource(object):
                     raise ValidationError({'error': "Chunked Transfer-Encoding is not supported."})
 
                 try:
-                    self._raw_data = json.loads(request.data)
+                    self._raw_data = json.loads(request.data, parse_constant=self._enforce_strict_json)
                 except ValueError:
                     raise ValidationError({'error': 'The request contains invalid JSON.'})
                 if not isinstance(self._raw_data, dict):
