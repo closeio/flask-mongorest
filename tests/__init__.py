@@ -74,6 +74,7 @@ class MongoRestTestCase(unittest.TestCase):
         example.B.drop_collection()
         example.C.drop_collection()
         example.MethodTestDoc.drop_collection()
+        example.DictDoc.drop_collection()
 
         # create user 1
         resp = self.app.post('/user/', data=json.dumps(self.user_1))
@@ -1120,11 +1121,13 @@ class MongoRestSchemaTestCase(unittest.TestCase):
 
             self.assertEqual(c, 2) # 2x query (with reload)
 
-    def test_bad_json(self):
+    def test_receive_bad_json(self):
         """
-        Python is stupid and by default lets us send an invalid JSON. Test
+        Python is stupid and by default lets us accept an invalid JSON. Test
         that flask-mongorest handles it correctly.
         """
+
+        # test create
         resp = self.app.post('/dict_doc/', data=json.dumps({
             'dict': {
                 'nan': float('NaN'),
@@ -1134,6 +1137,38 @@ class MongoRestSchemaTestCase(unittest.TestCase):
         }))
         response_error(resp, code=400)
         self.assertEqual(json.loads(resp.data), { 'error': 'The request contains invalid JSON.' });
+
+        # test update
+        resp = self.app.post('/dict_doc/', data=json.dumps({
+            'dict': { 'aaa': 'bbb' }
+        }))
+        response_success(resp)
+        resp = self.app.put('/dict_doc/%s/' % json.loads(resp.data)['id'], data=json.dumps({
+            'dict': {
+                'nan': float('NaN'),
+                'inf': float('inf'),
+                '-inf': float('-inf'),
+            }
+        }))
+        response_error(resp, code=400)
+        self.assertEqual(json.loads(resp.data), { 'error': 'The request contains invalid JSON.' });
+
+    def test_send_bad_json(self):
+        """
+        Make sure that - even if we store invalid JSON in databse, we error out
+        instead of sending invalid data to the user.
+        """
+        doc = example.DictDoc.objects.create(dict={
+            'NaN': float('NaN'),
+            'inf': float('inf'),
+            '-inf': float('-inf'),
+        })
+
+        # test fetch
+        self.assertRaises(ValueError, self.app.get, '/dict_doc/%s/' % doc.id)
+
+        # test list
+        self.assertRaises(ValueError, self.app.get, '/dict_doc/')
 
 
 if __name__ == '__main__':

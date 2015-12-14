@@ -301,7 +301,7 @@ class DictDocResource(Resource):
 @api.register(url='/dict_doc/')
 class DictDocView(ResourceView):
     resource = DictDocResource
-    methods = [Create, Update]
+    methods = [Fetch, List, Create, Update]
 
 
 if __name__ == "__main__":

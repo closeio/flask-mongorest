@@ -26,7 +26,7 @@ class MongoEncoder(json.JSONEncoder):
             return value.strftime("%Y-%m-%d")
         if isinstance(value, decimal.Decimal):
             return str(value)
-        return super(MongoEncoder, self).default(value, **kwargs)
+        return super(MongoEncoder, self).default(value, allow_nan=False, **kwargs)
 
 def cmp_fields(ordering):
     # Takes a list of fields and directions and returns a
