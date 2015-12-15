@@ -12,7 +12,7 @@ from flask.ext.views.base import View
 
 mimerender = mimerender.FlaskMimeRender()
 
-render_json = lambda **payload: json.dumps(payload, cls=MongoEncoder)
+render_json = lambda **payload: json.dumps(payload, allow_nan=False, cls=MongoEncoder)
 render_html = lambda **payload: render_template('mongorest/debug.html', data=json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4))
 
 def serialize_mongoengine_validation_error(e):

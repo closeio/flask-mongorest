@@ -73,6 +73,19 @@ class Resource(object):
                     self._params = request.args
         return self._params
 
+    def _enforce_strict_json(self, val):
+        """
+        Helper method used to raise a ValueError if NaN, Infinity, or
+        -Infinity were posted. By default, json.loads accepts these values,
+        but it allows us to perform extra validation via a parse_constant
+        kwarg.
+        """
+        # according to the `json.loads` docs: "parse_constant, if specified,
+        # will be called with one of the following strings: '-Infinity',
+        # 'Infinity', 'NaN'". Since none of them are valid JSON, we can simply
+        # raise an exception here.
+        raise ValueError
+
     @property
     def raw_data(self):
         if not hasattr(self, '_raw_data'):
@@ -83,7 +96,7 @@ class Resource(object):
                     raise ValidationError({'error': "Chunked Transfer-Encoding is not supported."})
 
                 try:
-                    self._raw_data = json.loads(request.data)
+                    self._raw_data = json.loads(request.data, parse_constant=self._enforce_strict_json)
                 except ValueError:
                     raise ValidationError({'error': 'The request contains invalid JSON.'})
                 if not isinstance(self._raw_data, dict):
@@ -202,8 +215,11 @@ class Resource(object):
             """
 
             has_field_instance = bool(field_instance)
-            field_instance = field_instance or self.document._fields.get(field_name, None) or getattr(self.document, field_name, None)
+            field_instance = field_instance or \
+                             self.document._fields.get(field_name, None) or \
+                             getattr(self.document, field_name, None)
 
+            # Determine the field value
             if has_field_instance:
                 field_value = obj
             elif isinstance(obj, dict):
@@ -214,9 +230,14 @@ class Resource(object):
                 except AttributeError:
                     raise UnknownFieldError
 
+            # If this field is a reference or an embedded document, either
+            # return a DBRef or serialize it using a resource found in
+            # `related_resources`.
             if isinstance(field_instance, (ReferenceField, GenericReferenceField, EmbeddedDocumentField)):
                 if field_name in self._related_resources:
-                    return field_value and not isinstance(field_value, DBRef) and self._related_resources[field_name]().serialize_field(field_value, **kwargs)
+                    return field_value and \
+                           not isinstance(field_value, DBRef) and \
+                           self._related_resources[field_name]().serialize_field(field_value, **kwargs)
                 else:
                     if isinstance(field_value, DocumentProxy):
                         # Don't perform a DBRef isinstance check below since
@@ -225,16 +246,29 @@ class Resource(object):
                     if isinstance(field_value, DBRef):
                         return field_value
                     return field_value and field_value.to_dbref()
+
+            # If this field is a list, serialize each item in the list separately.
             elif isinstance(field_instance, ListField):
                 return [val for val in [get(elem, field_name, field_instance=field_instance.field) for elem in field_value] if val]
+
+            # If this field is a dict...
             elif isinstance(field_instance, DictField):
+                # ... serialize each value based on an explicit field type
+                # (e.g. if the schema defines a DictField(IntField), where all
+                # the values in the dict should be ints).
                 if field_instance.field:
-                    return dict(
-                        (key, get(elem, field_name,
-                                  field_instance=field_instance.field))
-                        for (key, elem) in field_value.iteritems())
+                    return {
+                        key: get(elem, field_name, field_instance=field_instance.field)
+                        for (key, elem) in field_value.iteritems()
+                    }
+                # ... or simply return the dict intact, if the field type
+                # wasn't specified
                 else:
                     return field_value
+
+            # If this field is callable, execute it and return it or serialize
+            # it based on its related resource defined in the
+            # `related_resources` map.
             elif callable(field_instance):
                 if isinstance(field_value, list):
                     value = field_value
@@ -256,18 +290,29 @@ class Resource(object):
                 return value
             return field_value
 
+        # Get the requested fields
         requested_fields = self.get_requested_fields(**kwargs)
 
-        # We're passing kwargs to child resources so we don't want the fields.
+        # Drop the kwargs we don't need any more (we're passing `kwargs` to
+        # child resources so we don't want to pass `fields` and `params` that
+        # pertain to the parent resource).
         kwargs.pop('fields', None)
         kwargs.pop('params', None)
 
+        # Fill in the `data` dict by serializing each of the requested fields
+        # one by one.
         data = {}
         for field in requested_fields:
+
+            # resolve the user-facing name of the field
             renamed_field = self._rename_fields.get(field, field)
 
+            # if the field is callable, execute it with `obj` as the param
             if hasattr(self, field) and callable(getattr(self, field)):
                 value = getattr(self, field)(obj)
+
+                # if the field is associated with a specific resource (via the
+                # `related_resources` map), use that resource to serialize it
                 if field in self._related_resources and value is not None:
                     related_resource = self._related_resources[field]()
                     if isinstance(value, mongoengine.document.Document):

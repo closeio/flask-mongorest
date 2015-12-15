@@ -290,6 +290,20 @@ class DateTimeView(ResourceView):
     resource = DateTimeResource
     methods = [Create, Update, Fetch, List]
 
+
+# Document, resource, and view for testing invalid JSON
+class DictDoc(db.Document):
+    dict = db.DictField()
+
+class DictDocResource(Resource):
+    document = DictDoc
+
+@api.register(url='/dict_doc/')
+class DictDocView(ResourceView):
+    resource = DictDocResource
+    methods = [Fetch, List, Create, Update]
+
+
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8000))
     app.run(host='0.0.0.0', port=port)

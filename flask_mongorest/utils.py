@@ -18,7 +18,7 @@ class MongoEncoder(json.JSONEncoder):
     def default(self, value, **kwargs):
         if isinstance(value, ObjectId):
             return unicode(value)
-        elif isinstance(value, DBRef):
+        if isinstance(value, DBRef):
             return value.id
         if isinstance(value, datetime.datetime):
             return value.isoformat()
@@ -26,7 +26,7 @@ class MongoEncoder(json.JSONEncoder):
             return value.strftime("%Y-%m-%d")
         if isinstance(value, decimal.Decimal):
             return str(value)
-        return super(MongoEncoder, self).default(value, **kwargs)
+        return super(MongoEncoder, self).default(value, allow_nan=False, **kwargs)
 
 def cmp_fields(ordering):
     # Takes a list of fields and directions and returns a
