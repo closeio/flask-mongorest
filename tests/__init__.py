@@ -931,6 +931,12 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.get('/delete_only/%s/' % doc1.pk)
         response_error(resp, code=405)
 
+    def test_request_bad_accept(self):
+        """Make sure we gracefully handle requests where an invalid Accept header is sent."""
+        resp = self.app.get('/user/%s/' % self.user_1_obj['id'], headers={ 'Accept': 'whatever' })
+        response_error(resp)
+        self.assertEqual(resp.data, 'Invalid Accept header requested')
+
 
 class MongoRestSchemaTestCase(unittest.TestCase):
 
