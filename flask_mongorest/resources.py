@@ -205,7 +205,9 @@ class Resource(object):
         and self._child_document_resources[obj.__class__] != self.__class__
 
     def _create_subresource(self, obj):
-        return self._child_document_resources[obj.__class__]()
+        r = self._child_document_resources[obj.__class__]()
+        r.data = self.data
+        return r
 
     def serialize(self, obj, **kwargs):
         if not obj:
@@ -646,9 +648,7 @@ class Resource(object):
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
         if obj and self._needs_delegation(obj):
-            r = self._create_subresource(obj)
-            r.data = self.data
-            return r.update_object(obj, data=data, save=save, parent_resources=parent_resources)
+            return self._create_subresource(obj).update_object(obj, data=data, save=save, parent_resources=parent_resources)
 
         update_dict = self.get_object_dict(data, update=True)
 
