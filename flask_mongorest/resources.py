@@ -36,6 +36,7 @@ class Resource(object):
     save_related_fields = []
     rename_fields = {}
     child_document_resources = {}
+    default_child_resource_document = None
     paginate = True
     select_related = False
     allowed_ordering = []
@@ -199,13 +200,13 @@ class Resource(object):
         else:
             return self.serialize(obj, **kwargs)
 
-    def _needs_delegation(self, obj):
-        # If a subclass of an obj has been called with a base class' resource,
-        return obj.__class__ in self._child_document_resources \
-        and self._child_document_resources[obj.__class__] != self.__class__
+    def _subresource_class(self, obj):
+        default_s_class = self._child_document_resources[self.default_child_resource_document] if self.default_child_resource_document else None
+        s_class = self._child_document_resources.get(obj.__class__, default_s_class)
+        return s_class if s_class != self.__class__ else None
 
     def _create_subresource(self, obj):
-        r = self._child_document_resources[obj.__class__]()
+        r = self._subresource_class(obj)()
         r.data = self.data
         return r
 
@@ -215,7 +216,7 @@ class Resource(object):
 
         # If a subclass of an obj has been called with a base class' resource,
         # use the subclass-specific serialization
-        if self._needs_delegation(obj):
+        if self._subresource_class(obj):
             return self._create_subresource(obj).serialize(obj, **kwargs)
 
         def get(obj, field_name, field_instance=None):
@@ -353,9 +354,10 @@ class Resource(object):
         raise UnknownFieldError
 
     def validate_request(self, obj=None):
-        if obj and self._needs_delegation(obj):
+        if self._subresource_class(obj) and ((request.method == 'PUT' and obj) or request.method == 'POST'):
             r = self._create_subresource(obj)
-            r.validate_request(obj)
+            r._raw_data = self._raw_data
+            r.validate_request(obj=obj)
             self.data = r.data
             return
 
@@ -647,7 +649,7 @@ class Resource(object):
         return obj
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
-        if obj and self._needs_delegation(obj):
+        if self._subresource_class(obj):
             return self._create_subresource(obj).update_object(obj, data=data, save=save, parent_resources=parent_resources)
 
         update_dict = self.get_object_dict(data, update=True)
