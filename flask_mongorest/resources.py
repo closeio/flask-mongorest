@@ -199,15 +199,22 @@ class Resource(object):
         else:
             return self.serialize(obj, **kwargs)
 
+    def _needs_delegation(self, obj):
+        # If a subclass of an obj has been called with a base class' resource,
+        return obj.__class__ in self._child_document_resources \
+        and self._child_document_resources[obj.__class__] != self.__class__
+
+    def _create_subresource(self, obj):
+        return self._child_document_resources[obj.__class__]()
+
     def serialize(self, obj, **kwargs):
         if not obj:
             return {}
 
         # If a subclass of an obj has been called with a base class' resource,
         # use the subclass-specific serialization
-        if obj.__class__ in self._child_document_resources \
-        and self._child_document_resources[obj.__class__] != self.__class__:
-            return obj and self._child_document_resources[obj.__class__]().serialize_field(obj, **kwargs)
+        if self._needs_delegation(obj):
+            return self._create_subresource(obj).serialize(obj, **kwargs)
 
         def get(obj, field_name, field_instance=None):
             """
@@ -344,6 +351,12 @@ class Resource(object):
         raise UnknownFieldError
 
     def validate_request(self, obj=None):
+        if obj and self._needs_delegation(obj):
+            r = self._create_subresource(obj)
+            r.validate_request(obj)
+            self.data = r.data
+            return
+
         # Don't work on original raw data, we may reuse the resource for bulk updates.
         self.data = self.raw_data.copy()
 
@@ -632,6 +645,11 @@ class Resource(object):
         return obj
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
+        if obj and self._needs_delegation(obj):
+            r = self._create_subresource(obj)
+            r.data = self.data
+            return r.update_object(obj, data=data, save=save, parent_resources=parent_resources)
+
         update_dict = self.get_object_dict(data, update=True)
 
         self._dirty_fields = []
