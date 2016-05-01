@@ -166,6 +166,9 @@ class Resource(object):
 
         return requested_fields
 
+    def get_max_limit(self):
+        return self.max_limit
+
     def get_related_resources(self):
         return self.related_resources
 
@@ -191,7 +194,6 @@ class Resource(object):
                 field_filters[op.op] = op
             filters[field] = field_filters
         return filters
-
 
     def serialize_field(self, obj, **kwargs):
         if self.uri_prefix and hasattr(obj, "id"):
@@ -512,6 +514,7 @@ class Resource(object):
         return qs
 
     def get_skip_and_limit(self, params=None):
+        max_limit = self.get_max_limit()
         if params is None:
             params = self.params
         if self.paginate:
@@ -520,16 +523,16 @@ class Resource(object):
                 raise ValidationError({'error': '_limit must be an integer (got "%s" instead).' % params['_limit']})
             if not isint(params.get('_skip', 1)):
                 raise ValidationError({'error': '_skip must be an integer (got "%s" instead).' % params['_skip']})
-            if params.get('_limit') and int(params['_limit']) > self.max_limit:
-                raise ValidationError({'error': "The limit you set is larger than the maximum limit for this resource (max_limit = %d)." % self.max_limit})
+            if params.get('_limit') and int(params['_limit']) > max_limit:
+                raise ValidationError({'error': "The limit you set is larger than the maximum limit for this resource (max_limit = %d)." % max_limit})
             if params.get('_skip') and int(params['_skip']) < 0:
                 raise ValidationError({'error': '_skip must be a non-negative integer (got "%s" instead).' % params['_skip']})
 
-            limit = min(int(params.get('_limit', self.default_limit)), self.max_limit)
+            limit = min(int(params.get('_limit', self.default_limit)), max_limit)
             # Fetch one more so we know if there are more results.
             return int(params.get('_skip', 0)), limit
         else:
-            return 0, self.max_limit
+            return 0, max_limit
 
     def get_objects(self, all=False, qs=None, qfilter=None):
         params = self.params
