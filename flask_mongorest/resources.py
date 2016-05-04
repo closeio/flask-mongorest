@@ -399,6 +399,9 @@ class Resource(object):
     def get_queryset(self):
         return self.document.objects
 
+    def optimize_query(self, mongo_query):
+        return mongo_query
+
     def get_object(self, pk, qfilter=None):
         qs = self.get_queryset()
         # If a queryset filter was provided, pass our current
@@ -576,6 +579,8 @@ class Resource(object):
         if not custom_qs and not all:
             skip, limit = self.get_skip_and_limit(params)
             qs = qs.skip(skip).limit(limit+1)
+
+        qs._mongo_query = self.optimize_query(qs._query)
 
         # Needs to be at the end as it returns a list.
         if self.select_related:
