@@ -203,8 +203,9 @@ class Resource(object):
 
     def _subresource(self, obj):
         """Selects and creates an appropriate sub-resource class for delegation or return None if there isn't one"""
-        default_s_class = self._child_document_resources[self.default_child_resource_document] if self.default_child_resource_document else None
-        s_class = self._child_document_resources.get(obj.__class__, default_s_class)
+        s_class = self._child_document_resources.get(obj.__class__)
+        if not s_class and self.default_child_resource_document:
+            s_class = self._child_document_resources[self.default_child_resource_document]
         if s_class and s_class != self.__class__:
             r = s_class()
             r.data = self.data
