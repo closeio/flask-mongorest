@@ -36,6 +36,8 @@ class Resource(object):
     save_related_fields = []
     rename_fields = {}
     child_document_resources = {}
+    # Whenever a new document is posted and the system doesn't know the type yet, it will choose a sub-resource for this document type
+    default_child_resource_document = None
     paginate = True
     select_related = False
     allowed_ordering = []
@@ -201,15 +203,27 @@ class Resource(object):
         else:
             return self.serialize(obj, **kwargs)
 
+    def _subresource(self, obj):
+        """Selects and creates an appropriate sub-resource class for delegation or return None if there isn't one"""
+        s_class = self._child_document_resources.get(obj.__class__)
+        if not s_class and self.default_child_resource_document:
+            s_class = self._child_document_resources[self.default_child_resource_document]
+        if s_class and s_class != self.__class__:
+            r = s_class()
+            r.data = self.data
+            return r
+        else:
+            return None
+
     def serialize(self, obj, **kwargs):
         if not obj:
             return {}
 
         # If a subclass of an obj has been called with a base class' resource,
         # use the subclass-specific serialization
-        if obj.__class__ in self._child_document_resources \
-        and self._child_document_resources[obj.__class__] != self.__class__:
-            return obj and self._child_document_resources[obj.__class__]().serialize_field(obj, **kwargs)
+        subresource = self._subresource(obj)
+        if subresource:
+            return subresource.serialize(obj, **kwargs)
 
         def get(obj, field_name, field_instance=None):
             """
@@ -346,6 +360,14 @@ class Resource(object):
         raise UnknownFieldError
 
     def validate_request(self, obj=None):
+        if (request.method == 'PUT' and obj) or request.method == 'POST':
+            subresource = self._subresource(obj)
+            if subresource:
+                subresource._raw_data = self._raw_data
+                subresource.validate_request(obj=obj)
+                self.data = subresource.data
+                return
+
         # Don't work on original raw data, we may reuse the resource for bulk updates.
         self.data = self.raw_data.copy()
 
@@ -635,6 +657,10 @@ class Resource(object):
         return obj
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
+        subresource = self._subresource(obj)
+        if subresource:
+            return subresource.update_object(obj, data=data, save=save, parent_resources=parent_resources)
+
         update_dict = self.get_object_dict(data, update=True)
 
         self._dirty_fields = []
