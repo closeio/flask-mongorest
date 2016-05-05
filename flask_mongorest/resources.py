@@ -509,6 +509,28 @@ class Resource(object):
         """
         raise UnknownFieldError
 
+    def _rename_dict(self, data):
+        self._rename_dict_with_mapping(data, self._rename_fields)
+
+    def _reverse_rename_dict(self, data):
+        self._rename_dict_with_mapping(data, self._reverse_rename_fields)
+
+    @staticmethod
+    def _rename_dict_with_mapping(data, mapping):
+        # Do renaming in two passes to prevent potential multiple renames
+        # depending on dict traversal order.
+        # E.g. if a -> b, b -> c, then a should never be renamed to c.
+        fields_to_delete = []
+        fields_to_update = {}
+        for to_name, from_name in mapping.items():
+            if from_name in data:
+                fields_to_update[to_name] = data[from_name]
+                fields_to_delete.append(from_name)
+        for k in fields_to_delete:
+            del data[k]
+        for k, v in fields_to_update.items():
+            data[k] = v
+
     def validate_request(self, obj=None):
         """
         Validate the request that's currently being processed and fill in
@@ -531,19 +553,7 @@ class Resource(object):
         # updates.
         self.data = self.raw_data.copy()
 
-        # Do renaming in two passes to prevent potential multiple renames
-        # depending on dict traversal order.
-        # E.g. if a -> b, b -> c, then a should never be renamed to c.
-        fields_to_delete = []
-        fields_to_update = {}
-        for k, v in self._rename_fields.items():
-            if v in self.data:
-                fields_to_update[k] = self.data[v]
-                fields_to_delete.append(v)
-        for k in fields_to_delete:
-            del self.data[k]
-        for k, v in fields_to_update.items():
-            self.data[k] = v
+        self._rename_dict(self.data)
 
         # If CleanCat schema exists on this resource, use it to perform the
         # validation
@@ -557,6 +567,7 @@ class Resource(object):
             try:
                 self.data = schema.full_clean()
             except SchemaValidationError:
+                self._reverse_rename_dict(schema.field_errors)
                 raise ValidationError({'field-errors': schema.field_errors, 'errors': schema.errors })
 
     def get_queryset(self):

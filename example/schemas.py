@@ -37,3 +37,9 @@ class Person(Schema):
 
 class DateTime(Schema):
     datetime = DateTime()
+
+class NoneString(String):
+    blank_value = None
+
+class ReqTitlePost(Schema):
+    title_str = NoneString(required=False, max_length=10)

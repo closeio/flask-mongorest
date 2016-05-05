@@ -79,7 +79,10 @@ class ResourceView(View):
         if isinstance(e, ValidationError):
             raise
         elif isinstance(e, mongoengine.ValidationError):
-            raise ValidationError(serialize_mongoengine_validation_error(e))
+            msg = serialize_mongoengine_validation_error(e)
+            if 'field-errors' in msg:
+                self._resource._reverse_rename_dict(msg['field-errors'])
+            raise ValidationError(msg)
         else:
             raise
 

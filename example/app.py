@@ -305,6 +305,22 @@ class DictDocView(ResourceView):
     resource = DictDocResource
     methods = [Fetch, List, Create, Update]
 
+# Document, resource, and view for testing renamed fields
+class ReqTitlePost(db.Document):
+    title_str = db.StringField(required=True)
+
+class ReqTitlePostResource(Resource):
+    document = ReqTitlePost
+    schema = schemas.ReqTitlePost
+    rename_fields = {
+        'title_str': 'title',
+    }
+
+@api.register(url='/title_post/')
+class ReqTitlePostView(ResourceView):
+    resource = ReqTitlePostResource
+    methods = [Fetch, List, Create, Update]
+
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8000))
