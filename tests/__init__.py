@@ -1142,7 +1142,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
             }
         }))
         response_error(resp, code=400)
-        self.assertEqual(json.loads(resp.data), { 'error': 'The request contains invalid JSON.' });
+        self.assertEqual(json.loads(resp.data), { 'error': 'The request contains invalid JSON.' })
 
         # test update
         resp = self.app.post('/dict_doc/', data=json.dumps({
@@ -1157,7 +1157,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
             }
         }))
         response_error(resp, code=400)
-        self.assertEqual(json.loads(resp.data), { 'error': 'The request contains invalid JSON.' });
+        self.assertEqual(json.loads(resp.data), { 'error': 'The request contains invalid JSON.' })
 
     def test_send_bad_json(self):
         """

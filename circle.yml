@@ -1,0 +1,7 @@
+dependencies:
+    pre:
+        - pip install flake8
+
+test:
+    override:
+        - flake8 ./
