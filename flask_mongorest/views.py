@@ -119,7 +119,7 @@ class ResourceView(View):
                 'data': data
             }
 
-            if has_more != None:
+            if has_more is not None:
                 ret['has_more'] = has_more
 
             if extra:
