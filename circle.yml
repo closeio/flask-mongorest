@@ -3,5 +3,5 @@ dependencies:
         - pip install flake8
 
 test:
-    override:
+    pre:
         - flake8 ./

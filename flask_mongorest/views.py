@@ -88,7 +88,6 @@ class ResourceView(View):
         else:
             self._resource.view_method = methods.List
 
-
         # Create a queryset filter to control read access to the
         # underlying objects
         qfilter = lambda qs: self.has_read_permission(request, qs.clone())

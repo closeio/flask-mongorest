@@ -48,11 +48,11 @@ class MongoRestTestCase(unittest.TestCase):
             #user_lists
             'sections': [
                 {'text': 'this is the first section of the first post.',
-                'lang': 'en'},
+                 'lang': 'en'},
                 {'text': 'this is the second section of the first post.',
-                'lang': 'de'},
+                 'lang': 'de'},
                 {'text': 'this is the third section of the first post.',
-                'lang': 'fr'},
+                 'lang': 'fr'},
             ],
             'content': {
                 'text': 'this is the content for my first post.',
@@ -575,17 +575,17 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.get('/posts/?_limit=garbage')
         response_error(resp, code=400)
         self.assertEqual(json.loads(resp.data)['error'],
-                        '_limit must be an integer (got "garbage" instead).')
+                         '_limit must be an integer (got "garbage" instead).')
 
         resp = self.app.get('/posts/?_skip=garbage')
         response_error(resp, code=400)
         self.assertEqual(json.loads(resp.data)['error'],
-                        '_skip must be an integer (got "garbage" instead).')
+                         '_skip must be an integer (got "garbage" instead).')
 
         resp = self.app.get('/posts/?_skip=-1')
         response_error(resp, code=400)
         self.assertEqual(json.loads(resp.data)['error'],
-                        '_skip must be a non-negative integer (got "-1" instead).')
+                         '_skip must be a non-negative integer (got "-1" instead).')
 
     def test_fields(self):
         resp = self.app.get('/user/%s/?_fields=email' % self.user_1_obj['id'])

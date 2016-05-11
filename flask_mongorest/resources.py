@@ -1,6 +1,4 @@
 import json
-import datetime
-import dateutil.parser
 import mongoengine
 
 from bson.dbref import DBRef
@@ -9,8 +7,7 @@ from flask import request, url_for
 from urlparse import urlparse
 from mongoengine.base.proxy import DocumentProxy
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, GenericReferenceField, SafeReferenceField
-from mongoengine.fields import DateTimeField, DictField
-from werkzeug.datastructures import MultiDict
+from mongoengine.fields import DictField
 
 from cleancat import ValidationError as SchemaValidationError
 from flask.ext.mongorest.exceptions import ValidationError, UnknownFieldError
@@ -230,9 +227,9 @@ class Resource(object):
             """
 
             has_field_instance = bool(field_instance)
-            field_instance = field_instance or \
-                             self.document._fields.get(field_name, None) or \
-                             getattr(self.document, field_name, None)
+            field_instance = (field_instance or
+                              self.document._fields.get(field_name, None) or
+                              getattr(self.document, field_name, None))
 
             # Determine the field value
             if has_field_instance:
@@ -250,9 +247,11 @@ class Resource(object):
             # `related_resources`.
             if isinstance(field_instance, (ReferenceField, GenericReferenceField, EmbeddedDocumentField)):
                 if field_name in self._related_resources:
-                    return field_value and \
-                           not isinstance(field_value, DBRef) and \
-                           self._related_resources[field_name]().serialize_field(field_value, **kwargs)
+                    return (
+                        field_value and
+                        not isinstance(field_value, DBRef) and
+                        self._related_resources[field_name]().serialize_field(field_value, **kwargs)
+                    )
                 else:
                     if isinstance(field_value, DocumentProxy):
                         # Don't perform a DBRef isinstance check below since
@@ -412,11 +411,10 @@ class Resource(object):
             for field_name in self.related_resources_hints.keys():
                 if only_fields is not None and field_name not in only_fields:
                     continue
-                resource = self.get_related_resources()[field_name]
                 method = getattr(obj, field_name)
                 if callable(method):
                     q = method()
-                    if field_name in document_queryset.keys():
+                    if field_name in document_queryset:
                         document_queryset[field_name] = (document_queryset[field_name] | q._query_obj)
                     else:
                         document_queryset[field_name] = q._query_obj
@@ -644,7 +642,7 @@ class Resource(object):
             filter_fields &= set(self._reverse_rename_fields.get(field, field)
                                  for field in self.raw_data.keys())
         update_dict = {field: value for field, value in data.items()
-                                    if field in filter_fields}
+                       if field in filter_fields}
         return update_dict
 
     def create_object(self, data=None, save=True, parent_resources=None):
