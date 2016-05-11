@@ -65,19 +65,19 @@ class In(Operator):
 
 class Contains(Operator):
     op = 'contains'
-
+    
 class IContains(Operator):
     op = 'icontains'
 
 class Startswith(Operator):
     op = 'startswith'
-
+    
 class IStartswith(Operator):
     op = 'istartswith'
 
 class Endswith(Operator):
     op = 'endswith'
-
+    
 class IEndswith(Operator):
     op = 'iendswith'
 

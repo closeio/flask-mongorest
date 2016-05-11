@@ -15,6 +15,7 @@ from werkzeug.datastructures import MultiDict
 from cleancat import ValidationError as SchemaValidationError
 from flask.ext.mongorest.exceptions import ValidationError, UnknownFieldError
 from flask.ext.mongorest.utils import cmp_fields, isbound, isint, equal
+from flask.ext.mongorest.utils import MongoEncoder
 
 
 class ResourceMeta(type):
@@ -48,7 +49,7 @@ class Resource(object):
 
     def __init__(self):
         doc_fields = self.document._fields.keys()
-        if self.fields is None:
+        if self.fields == None:
             self.fields = doc_fields
         self._related_resources = self.get_related_resources()
         self._rename_fields = self.get_rename_fields()
@@ -152,7 +153,7 @@ class Resource(object):
             only_fields = None
 
         requested_fields = []
-        if include_all or only_fields is None:
+        if include_all or only_fields == None:
             if include_all:
                 field_selection = all_fields_set
             else:
@@ -375,7 +376,7 @@ class Resource(object):
         fields_to_delete = []
         fields_to_update = {}
         for k, v in self._rename_fields.iteritems():
-            if v in self.data:
+            if self.data.has_key(v):
                 fields_to_update[k] = self.data[v]
                 fields_to_delete.append(v)
         for k in fields_to_delete:
@@ -384,7 +385,7 @@ class Resource(object):
             self.data[k] = v
 
         if self.schema:
-            if request.method == 'PUT' and obj is not None:
+            if request.method == 'PUT' and obj != None:
                 obj_data = dict([(key, getattr(obj, key)) for key in obj._fields.keys()])
             else:
                 obj_data = None
@@ -410,7 +411,7 @@ class Resource(object):
         document_queryset = {}
         for obj in objs:
             for field_name in self.related_resources_hints.keys():
-                if only_fields is not None and field_name not in only_fields:
+                if only_fields != None and field_name not in only_fields:
                     continue
                 resource = self.get_related_resources()[field_name]
                 method = getattr(obj, field_name)

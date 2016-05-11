@@ -219,12 +219,12 @@ class AView(ResourceView):
     methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
 
 @api.register(url='/b/')
-class BView(ResourceView):
+class AView(ResourceView):
     resource = BResource
     methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
 
 @api.register(url='/c/')
-class CView(ResourceView):
+class AView(ResourceView):
     resource = CResource
     methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
 

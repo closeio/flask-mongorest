@@ -8,4 +8,3 @@ Flask==0.9
 Flask-Views
 Flask-WTF==0.8.4
 pymongo<3.0
-flake8

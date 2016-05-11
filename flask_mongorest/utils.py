@@ -82,9 +82,9 @@ def equal(a, b):
     if isinstance(a, datetime.datetime) and isinstance(b, datetime.datetime):
         # This doesn't cover all the cases, but it covers the most
         # important case where the utcoffset is 0.
-        if a.utcoffset() is not None and a.utcoffset() == datetime.timedelta(0):
+        if (a.utcoffset() != None) and a.utcoffset() == datetime.timedelta(0):
             a = a.replace(tzinfo=None)
-        if b.utcoffset() is not None and b.utcoffset() == datetime.timedelta(0):
+        if (b.utcoffset() != None) and b.utcoffset() == datetime.timedelta(0):
             b = b.replace(tzinfo=None)
 
     try:

@@ -4,7 +4,7 @@ from setuptools import setup
 try:
     import multiprocessing
 except:
-    pass
+   pass
 
 setup(
     name='Flask-MongoRest',
