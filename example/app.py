@@ -27,8 +27,8 @@ app.config.update(
     },
 )
 
-db = MongoEngine(app)
-api = MongoRest(app)
+db = MongoEngine()
+api = MongoRest()
 
 class UserResource(Resource):
     document = documents.User
@@ -303,6 +303,8 @@ class DictDocView(ResourceView):
     resource = DictDocResource
     methods = [Fetch, List, Create, Update]
 
+db.init_app(app)
+api.init_app(app)
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8000))
