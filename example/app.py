@@ -6,7 +6,7 @@ from flask.ext.mongorest import MongoRest
 from flask.ext.mongorest.views import ResourceView
 from flask.ext.mongorest.resources import Resource
 from flask.ext.mongorest import operators as ops
-from flask.ext.mongorest.methods import *
+from flask.ext.mongorest.methods import Create, Update, Fetch, List, Delete, BulkUpdate
 from flask.ext.mongorest.authentication import AuthenticationBase
 
 from example import schemas, documents
