@@ -180,7 +180,13 @@ class Resource(object):
         return self.rename_fields
 
     def get_child_document_resources(self):
-        return self.child_document_resources
+        # By default, don't inherit child_document_resources. This lets us have
+        # multiple resources for a child document without having to reset the
+        # child_document_resources property in the subclass.
+        if 'child_document_resources' in self.__class__.__dict__:
+            return self.child_document_resources
+        else:
+            return {}
 
     def get_filters(self):
         filters = {}
