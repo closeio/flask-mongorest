@@ -56,6 +56,7 @@ class Resource(object):
             'Cannot rename multiple fields to the same name'
         self._filters = self.get_filters()
         self._child_document_resources = self.get_child_document_resources()
+        self._default_child_resource_document = self.get_default_child_resource_document()
         self.data = None
         self._dirty_fields = None
 
@@ -188,6 +189,13 @@ class Resource(object):
         else:
             return {}
 
+    def get_default_child_resource_document(self):
+        # See comment on get_child_document_resources.
+        if 'default_child_resource_document' in self.__class__.__dict__:
+            return self.default_child_resource_document
+        else:
+            return None
+
     def get_filters(self):
         filters = {}
         for field, operators in getattr(self, 'filters', {}).iteritems():
@@ -208,8 +216,8 @@ class Resource(object):
     def _subresource(self, obj):
         """Selects and creates an appropriate sub-resource class for delegation or return None if there isn't one"""
         s_class = self._child_document_resources.get(obj.__class__)
-        if not s_class and self.default_child_resource_document:
-            s_class = self._child_document_resources[self.default_child_resource_document]
+        if not s_class and self._default_child_resource_document:
+            s_class = self._child_document_resources[self._default_child_resource_document]
         if s_class and s_class != self.__class__:
             r = s_class()
             r.data = self.data
