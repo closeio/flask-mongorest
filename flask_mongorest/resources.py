@@ -44,6 +44,12 @@ class Resource(object):
     __metaclass__ = ResourceMeta
 
     def __init__(self, view_method=None):
+        """
+        Initializes a resource. Optionally, a method class can be given to
+        view_method (see methods.py) so the resource can behave differently
+        depending on the method.
+        """
+
         doc_fields = self.document._fields.keys()
         if self.fields is None:
             self.fields = doc_fields
