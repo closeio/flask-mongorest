@@ -3,7 +3,7 @@ from setuptools import setup
 # Stops exit traceback on tests
 # TODO this makes flake8's F401 fail - maybe there's a better way
 try:
-    import multiprocessing
+    import multiprocessing # noqa
 except:
     pass
 
