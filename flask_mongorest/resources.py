@@ -43,7 +43,7 @@ class Resource(object):
 
     __metaclass__ = ResourceMeta
 
-    def __init__(self):
+    def __init__(self, view_method=None):
         doc_fields = self.document._fields.keys()
         if self.fields is None:
             self.fields = doc_fields
@@ -59,6 +59,7 @@ class Resource(object):
         self._default_child_resource_document = self.get_default_child_resource_document()
         self.data = None
         self._dirty_fields = None
+        self.view_method = view_method
 
     @property
     def params(self):
@@ -219,7 +220,7 @@ class Resource(object):
         if not s_class and self._default_child_resource_document:
             s_class = self._child_document_resources[self._default_child_resource_document]
         if s_class and s_class != self.__class__:
-            r = s_class()
+            r = s_class(view_method=self.view_method)
             r.data = self.data
             return r
         else:

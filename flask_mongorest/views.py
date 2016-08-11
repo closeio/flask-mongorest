@@ -151,6 +151,28 @@ class ResourceView(View):
         else:
             return ret
 
+    def update_object(self, obj):
+        # Check if we have permission to change this object
+        if not self.has_change_permission(request, obj):
+            raise Unauthorized
+        self._resource.validate_request(obj)
+        try:
+            obj = self._resource.update_object(obj)
+        except Exception, e:
+            self.handle_validation_error(e)
+
+    def update_objects(self, objs):
+        count = 0
+        try:
+            for obj in objs:
+                self.update_object(obj)
+                count += 1
+        except ValidationError, e:
+            e.message['count'] = count
+            raise e
+        else:
+            return {'count': count}
+
     def put(self, **kwargs):
         pk = kwargs.pop('pk', None)
 
@@ -178,34 +200,10 @@ class ResourceView(View):
                 objs, has_more = result
             elif len(result) == 3:
                 objs, has_more, extra = result
-            count = 0
-            try:
-                for obj in objs:
-                    self._resource.validate_request(obj)
-                    try:
-                        obj = self._resource.update_object(obj)
-                    except Exception, e:
-                        self.handle_validation_error(e)
-                    # Raise or skip?
-                    if not self.has_change_permission(request, obj):
-                        raise Unauthorized
-                    obj.save()
-                    count += 1
-            except ValidationError, e:
-                e.message['count'] = count
-                raise e
-            else:
-                return {'count': count}
+            return self.update_objects(objs)
         else:
             obj = self._resource.get_object(pk)
-            # Check if we have permission to change this object
-            if not self.has_change_permission(request, obj):
-                raise Unauthorized
-            self._resource.validate_request(obj)
-            try:
-                obj = self._resource.update_object(obj)
-            except Exception, e:
-                self.handle_validation_error(e)
+            self.update_object(obj)
             ret = self._resource.serialize(obj, params=request.args)
             return ret
 
