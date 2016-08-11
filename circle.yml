@@ -4,4 +4,4 @@ dependencies:
 
 test:
     pre:
-        - flake8 --ignore=E2,E302,W391,F403,F405,E501,E731,F999 --exclude=.eggs,docs ./
+        - flake8 ./
