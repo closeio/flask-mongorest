@@ -22,24 +22,25 @@ class ResourceMeta(type):
                     cls.child_document_resources[document] = cls
         type.__init__(cls, name, bases, classdict)
 
+
 class Resource(object):
-    document = None # required
-    fields = None
-    readonly_fields = ['id']
-    schema = None
+    document = None  # MongoEngine Document class related to this resource (required)
+    fields = None  # list of fields that can (and should by default) be included in the response
+    rename_fields = {}  # dict of original field names (as seen in `fields`) and what they should be renamed to in the API response
+    schema = None  # CleanCat Schema class (used for validation)
+    allowed_ordering = []  # list of fields that the objects can be ordered by
+    paginate = True  # whether or not this resource supports pagination
     related_resources = {}
     related_resources_hints = {} #@todo this should be integrated into the related_resources dict, possibly as a tuple
     save_related_fields = []
-    rename_fields = {}
     child_document_resources = {}
-    # Whenever a new document is posted and the system doesn't know the type yet, it will choose a sub-resource for this document type
+    # Whenever a new document is posted and the system doesn't know the type yet, it will choose a default sub-resource for this document type
     default_child_resource_document = None
-    paginate = True
+
     select_related = False
-    allowed_ordering = []
-    uri_prefix = None # Must start and end with a "/"
-    max_limit = 100 # cap the number of records in the _limit param to avoid DDoS'ing the API.
-    default_limit = 100 # default limit if no _limit is specified
+    uri_prefix = None  # Must start and end with a "/"
+    default_limit = 100  # default limit if no _limit is specified
+    max_limit = 100  # maximum value of _limit that can be requested (avoids DDoS'ing the API).
 
     __metaclass__ = ResourceMeta
 
