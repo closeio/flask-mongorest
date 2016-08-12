@@ -152,16 +152,24 @@ class ResourceView(View):
             return ret
 
     def update_object(self, obj):
+        """Validate and update an object"""
+
         # Check if we have permission to change this object
         if not self.has_change_permission(request, obj):
             raise Unauthorized
+
         self._resource.validate_request(obj)
+
         try:
             obj = self._resource.update_object(obj)
         except Exception, e:
             self.handle_validation_error(e)
 
     def update_objects(self, objs):
+        """
+        Update each object in the list one by one, and return the total count
+        of updated objects.
+        """
         count = 0
         try:
             for obj in objs:
@@ -186,20 +194,18 @@ class ResourceView(View):
             # Bulk update where the body contains the new values for certain
             # fields.
 
-            # Currently, fetches all the objects and validates them separately.
-            # If one of them fails, a ValidationError for this object will be
-            # triggered.
-            # Ideally, this would be translated into an update statement for
-            # performance reasons and would perform the update either for all
-            # objects, or for none, if (generic) validation fails. Since this
-            # is a bulk update, only the count of objects which were updated is
-            # returned.
+            # Validate the bulk update request before any data is fetched/updated
+            self._resource.validate_bulk_update()
 
+            # Get a list of all objects matching the filters, capped at this
+            # resource's `bulk_update_limit`
             result = self._resource.get_objects()
             if len(result) == 2:
                 objs, has_more = result
             elif len(result) == 3:
                 objs, has_more, extra = result
+
+            # Update all the objects and return their count
             return self.update_objects(objs)
         else:
             obj = self._resource.get_object(pk)
