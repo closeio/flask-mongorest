@@ -10,6 +10,7 @@ from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField,
 from mongoengine.fields import DictField
 
 from cleancat import ValidationError as SchemaValidationError
+from flask.ext.mongorest import methods
 from flask.ext.mongorest.exceptions import ValidationError, UnknownFieldError
 from flask.ext.mongorest.utils import cmp_fields, isbound, isint, equal
 
@@ -41,6 +42,7 @@ class Resource(object):
     uri_prefix = None  # Must start and end with a "/"
     default_limit = 100  # default limit if no _limit is specified
     max_limit = 100  # maximum value of _limit that can be requested (avoids DDoS'ing the API).
+    bulk_update_limit = 1000  # maximum number of objects which can be bulk-updated at a time
 
     __metaclass__ = ResourceMeta
 
@@ -679,14 +681,12 @@ class Resource(object):
         else:
             return 0, max_limit
 
-    def get_objects(self, all=False, qs=None, qfilter=None):
+    def get_objects(self, qs=None, qfilter=None):
         """
         Return objects fetched from the database based on all the parameters
         of the request that's currently being processed.
 
         Params:
-        - If `all` is true, _skip and _limit params are ignored and all the
-          objects matching the filters are returned.
         - Custom queryset can be passed via `qs`. Otherwise `self.get_queryset`
           is used.
         - Pass `qfilter` function to modify the queryset.
@@ -706,8 +706,13 @@ class Resource(object):
         qs = self.apply_filters(qs, params)
         qs = self.apply_ordering(qs, params)
 
+        # Apply limit and skip to the queryset
         limit = None
-        if not custom_qs and not all:
+        if self.view_method == methods.BulkUpdate:
+            # limit the number of objects that can be bulk-updated at a time
+            qs = qs.limit(self.bulk_update_limit)
+        elif not custom_qs:
+            # no need to skip/limit if a custom `qs` was provided
             skip, limit = self.get_skip_and_limit(params)
             qs = qs.skip(skip).limit(limit+1)
 

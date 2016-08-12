@@ -195,7 +195,7 @@ class ResourceView(View):
             # is a bulk update, only the count of objects which were updated is
             # returned.
 
-            result = self._resource.get_objects(all=True)
+            result = self._resource.get_objects()
             if len(result) == 2:
                 objs, has_more = result
             elif len(result) == 3:
