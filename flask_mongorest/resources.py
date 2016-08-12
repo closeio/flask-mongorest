@@ -438,6 +438,9 @@ class Resource(object):
         """
         Validate the request that's currently being processed and fill in
         the self.data dict that'll later be used to save/update an object.
+
+        `obj` points to the object that's being updated, or is empty if a new
+        object is being created.
         """
         # When creating or updating a single object, delegate the validation
         # to a more specific subresource, if it exists
