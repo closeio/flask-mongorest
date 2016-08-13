@@ -186,7 +186,7 @@ class ResourceView(View):
             # Bulk update where the body contains the new values for certain
             # fields.
 
-            # Currently, fetches all the objects and validate them separately.
+            # Currently, fetches all the objects and validates them separately.
             # If one of them fails, a ValidationError for this object will be
             # triggered.
             # Ideally, this would be translated into an update statement for

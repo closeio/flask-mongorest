@@ -22,24 +22,69 @@ class ResourceMeta(type):
                     cls.child_document_resources[document] = cls
         type.__init__(cls, name, bases, classdict)
 
+
 class Resource(object):
-    document = None # required
+
+    # MongoEngine Document class related to this resource (required)
+    document = None
+
+    # List of fields that can (and should by default) be included in the
+    # response
     fields = None
-    readonly_fields = ['id']
-    schema = None
-    related_resources = {}
-    related_resources_hints = {} #@todo this should be integrated into the related_resources dict, possibly as a tuple
-    save_related_fields = []
+
+    # Dict of original field names (as seen in `fields`) and what they should
+    # be renamed to in the API response
     rename_fields = {}
-    child_document_resources = {}
-    # Whenever a new document is posted and the system doesn't know the type yet, it will choose a sub-resource for this document type
-    default_child_resource_document = None
-    paginate = True
-    select_related = False
+
+    # CleanCat Schema class (used for validation)
+    schema = None
+
+    # List of fields that the objects can be ordered by
     allowed_ordering = []
-    uri_prefix = None # Must start and end with a "/"
-    max_limit = 100 # cap the number of records in the _limit param to avoid DDoS'ing the API.
-    default_limit = 100 # default limit if no _limit is specified
+
+    # Define whether or not this resource supports pagination
+    paginate = True
+
+    # Default limit if no _limit is specified in the request. Only relevant
+    # if pagination is enabled.
+    default_limit = 100
+
+    # Maximum value of _limit that can be requested (avoids DDoS'ing the API).
+    # Only relevant if pagination is enabled.
+    max_limit = 100
+
+    # Map of field names and Resource classes that should be used to handle
+    # these fields (for serialization, saving, etc.).
+    related_resources = {}
+
+    # Map of field names on this resource's document to field names on the
+    # related resource's document, used as a helper in the process of
+    # turning a field value from a queryset to a list of objects
+    #
+    # TODO Behavior of this is *very* unintuitive and should be changed or
+    # dropped, or at least refactored
+    related_resources_hints = {}
+
+    # List of field names corresponding to related resources. If a field is
+    # mentioned here and in `related_resources`, it can be created/updated
+    # from within this resource.
+    save_related_fields = []
+
+    # Map of MongoEngine Document classes to Resource class names. Defines
+    # which sub-resource should be used for handling a particular subclass of
+    # this resource's document.
+    child_document_resources = {}
+
+    # Whenever a new document is posted and the system doesn't know the type
+    # of it yet, it will choose a default sub-resource for this document type
+    default_child_resource_document = None
+
+    # Defines whether MongoEngine's select_related should be used on a
+    # filtered query set, pulling all the references efficiently.
+    select_related = False
+
+    # Must start and end with a "/"
+    uri_prefix = None
 
     __metaclass__ = ResourceMeta
 
@@ -49,7 +94,6 @@ class Resource(object):
         view_method (see methods.py) so the resource can behave differently
         depending on the method.
         """
-
         doc_fields = self.document._fields.keys()
         if self.fields is None:
             self.fields = doc_fields
@@ -69,6 +113,14 @@ class Resource(object):
 
     @property
     def params(self):
+        """
+        Return parameters of the request which is currently being processed.
+        Params can be passed in two different ways:
+
+        1. As a querystring (e.g. '/resource/?status=active&_limit=10').
+        2. As a _params property in the JSON payload. For example:
+             { '_params': { 'status': 'active', '_limit': '10' } }
+        """
         if not hasattr(self, '_params'):
             if '_params' in self.raw_data:
                 self._params = self.raw_data['_params']
@@ -94,6 +146,7 @@ class Resource(object):
 
     @property
     def raw_data(self):
+        """Validate and return parsed JSON payload."""
         if not hasattr(self, '_raw_data'):
             if request.method in ('PUT', 'POST') or request.data:
                 if request.mimetype and 'json' not in request.mimetype:
@@ -114,7 +167,7 @@ class Resource(object):
 
     @classmethod
     def uri(self, path):
-        """This generates a URI reference for the given path"""
+        """Generate a URI reference for the given path"""
         if self.uri_prefix:
             ret = self.uri_prefix+path
             return ret
@@ -123,7 +176,7 @@ class Resource(object):
 
     @classmethod
     def _url(self, path):
-        """This generates a complete URL for the given path.  Requires application context."""
+        """Generate a complete URL for the given path. Requires application context."""
         if self.uri_prefix:
             url = url_for(self.uri_prefix.lstrip("/").rstrip("/"),_external=True)
             ret = url+path
@@ -132,12 +185,27 @@ class Resource(object):
             raise ValueError("Cannot generate URL for resources that do not specify a uri_prefix")
 
     def get_fields(self):
+        """
+        Return a list of fields that should be included in the response
+        (unless a `_fields` param didn't include them).
+        """
         return self.fields
 
     def get_optional_fields(self):
+        """
+        Return a list of fields that can optionally be included in the
+        response (but only if a `_fields` param mentioned them explicitly).
+        """
         return []
 
     def get_requested_fields(self, **kwargs):
+        """
+        Process a list of fields requested by the client and return only the
+        ones which are allowed by get_fields and get_optional_fields.
+
+        If `_fields` param is set to '_all', return a list of all the fields
+        from get_fields and get_optional_fields combined.
+        """
         params = kwargs.get('params', None)
 
         include_all = False
@@ -204,6 +272,25 @@ class Resource(object):
             return None
 
     def get_filters(self):
+        """
+        Given the filters declared on this resource, return a mapping
+        of all allowed filters along with their individual mappings of
+        suffixes and operators.
+
+        For example, if self.filters declares:
+            { 'date': [operators.Exact, operators.Gte] }
+        then this method will return:
+            {
+                'date': {
+                    '': operators.Exact,
+                    'exact': operators.Exact,
+                    'gte': operators.Gte
+                }
+            }
+        Then, when a request comes in, Flask-MongoRest will match
+        `?date__gte=value` to the 'date' field and the 'gte' suffix: 'gte',
+        and hence use the Gte operator to filter the data.
+        """
         filters = {}
         for field, operators in getattr(self, 'filters', {}).iteritems():
             field_filters = {}
@@ -221,7 +308,10 @@ class Resource(object):
             return self.serialize(obj, **kwargs)
 
     def _subresource(self, obj):
-        """Selects and creates an appropriate sub-resource class for delegation or return None if there isn't one"""
+        """
+        Select and create an appropriate sub-resource class for delegation or
+        return None if there isn't one.
+        """
         s_class = self._child_document_resources.get(obj.__class__)
         if not s_class and self._default_child_resource_document:
             s_class = self._child_document_resources[self._default_child_resource_document]
@@ -233,6 +323,10 @@ class Resource(object):
             return None
 
     def serialize(self, obj, **kwargs):
+        """
+        Given an object, serialize it, turning it into its JSON
+        respresentation.
+        """
         if not obj:
             return {}
 
@@ -371,14 +465,29 @@ class Resource(object):
         return data
 
     def handle_serialization_error(self, exc, obj):
+        """
+        Override this to implement custom behavior whenever serializing an
+        object fails.
+        """
         pass
 
     def value_for_field(self, obj, field):
-        # If we specify a field which doesn't exist on the resource or on the
-        # object, this method lets us return a custom value.
+        """
+        If we specify a field which doesn't exist on the resource or on the
+        object, this method lets us return a custom value.
+        """
         raise UnknownFieldError
 
     def validate_request(self, obj=None):
+        """
+        Validate the request that's currently being processed and fill in
+        the self.data dict that'll later be used to save/update an object.
+
+        `obj` points to the object that's being updated, or is empty if a new
+        object is being created.
+        """
+        # When creating or updating a single object, delegate the validation
+        # to a more specific subresource, if it exists
         if (request.method == 'PUT' and obj) or request.method == 'POST':
             subresource = self._subresource(obj)
             if subresource:
@@ -387,10 +496,12 @@ class Resource(object):
                 self.data = subresource.data
                 return
 
-        # Don't work on original raw data, we may reuse the resource for bulk updates.
+        # Don't work on original raw data, we may reuse the resource for bulk
+        # updates.
         self.data = self.raw_data.copy()
 
-        # Do renaming in two passes to prevent potential multiple renames depending on dict traversal order.
+        # Do renaming in two passes to prevent potential multiple renames
+        # depending on dict traversal order.
         # E.g. if a -> b, b -> c, then a should never be renamed to c.
         fields_to_delete = []
         fields_to_update = {}
@@ -403,6 +514,8 @@ class Resource(object):
         for k, v in fields_to_update.iteritems():
             self.data[k] = v
 
+        # If CleanCat schema exists on this resource, use it to perform the
+        # validation
         if self.schema:
             if request.method == 'PUT' and obj is not None:
                 obj_data = dict([(key, getattr(obj, key)) for key in obj._fields.keys()])
@@ -416,17 +529,34 @@ class Resource(object):
                 raise ValidationError({'field-errors': schema.field_errors, 'errors': schema.errors })
 
     def get_queryset(self):
+        """
+        Return a MongoEngine queryset that will later be used to return
+        matching documents.
+        """
         return self.document.objects
 
     def get_object(self, pk, qfilter=None):
+        """
+        Given a PK and an optional queryset filter function, find a matching
+        document in the queryset.
+        """
         qs = self.get_queryset()
-        # If a queryset filter was provided, pass our current
-        # queryset in and get a new one out
+        # If a queryset filter was provided, pass our current queryset in and
+        # get a new one out
         if qfilter:
             qs = qfilter(qs)
         return qs.get(pk=pk)
 
     def fetch_related_resources(self, objs, only_fields=None):
+        """
+        Given a list of objects and an optional list of the only fields we
+        should care about, fetch these objects' related resources.
+        """
+
+        # Create a map of field names to MongoEngine Q objects that will
+        # later be used to fetch the related resources from MongoDB
+        # Queries for the same document/collection are combined to improve
+        # efficiency.
         document_queryset = {}
         for obj in objs:
             for field_name in self.related_resources_hints.keys():
@@ -440,28 +570,36 @@ class Resource(object):
                     else:
                         document_queryset[field_name] = q._query_obj
 
+        # For each field name, execute the queries we generated in the block
+        # above, and map the results to each object that references them.
+        # TODO This is in dire need of refactoring, or a complete overhaul
         hints = {}
-        for k,v in document_queryset.iteritems():
-            doc = self.get_related_resources()[k].document
+        for field_name, q_obj in document_queryset.iteritems():
+            doc = self.get_related_resources()[field_name].document
 
-            query = doc.objects.filter(v)
+            # Create a QuerySet based on the query object
+            query = doc.objects.filter(q_obj)
 
             # Don't let MongoDB do the sorting as it won't use the index.
             # Store the ordering so we can do client sorting afterwards.
             ordering = query._ordering or query._get_order_by(query._document._meta['ordering'])
             query = query.order_by()
 
-            results = [o for o in query] # don't use list() because mongoengine will do a count query
+            # Fetch the results
+            results = list(query)
 
+            # Reapply the ordering and add results to the mapping
             if ordering:
-                document_queryset[k] = sorted(results, cmp_fields(ordering))
+                document_queryset[field_name] = sorted(results, cmp_fields(ordering))
             else:
-                document_queryset[k] = results
+                document_queryset[field_name] = results
 
+            # For each field name, create a map of obj PKs to a list of
+            # results they referenced.
             hint_index = {}
-            if k in self.related_resources_hints.keys():
-                hint_field = self.related_resources_hints[k]
-                for obj in document_queryset[k]:
+            if field_name in self.related_resources_hints.keys():
+                hint_field = self.related_resources_hints[field_name]
+                for obj in document_queryset[field_name]:
                     hint_field_instance = obj._fields[hint_field]
                     # Don't trigger a query for SafeReferenceFields
                     if isinstance(hint_field_instance, SafeReferenceField):
@@ -475,21 +613,28 @@ class Resource(object):
                     else:
                         hint_index[hinted].append(obj)
 
-                hints[k] = hint_index
+                hints[field_name] = hint_index
 
+        # Assign the results to each object
+        # TODO This is in dire need of refactoring, or a complete overhaul
         for obj in objs:
-            for field, hint_index in hints.iteritems():
+            for field_name, hint_index in hints.iteritems():
                 obj_id = obj.id
                 if isinstance(obj_id, DBRef):
                     obj_id = obj_id.id
                 elif isinstance(obj_id, ObjectId):
                     obj_id = str(obj_id)
-                if obj_id not in hint_index.keys():
-                    setattr(obj, field, [])
-                    continue
-                setattr(obj, field, hint_index[obj_id])
+                if obj_id not in hint_index:
+                    setattr(obj, field_name, [])
+                else:
+                    setattr(obj, field_name, hint_index[obj_id])
 
     def apply_filters(self, qs, params=None):
+        """
+        Given this resource's filters, and the params of the request that's
+        currently being processed, apply additional filtering to the queryset
+        and return it.
+        """
         if params is None:
             params = self.params
 
@@ -546,6 +691,11 @@ class Resource(object):
         return qs
 
     def apply_ordering(self, qs, params=None):
+        """
+        Given this resource's allowed_ordering, and the params of the request
+        that's currently being processed, apply ordering to the queryset
+        and return it.
+        """
         if params is None:
             params = self.params
         if self.allowed_ordering and params.get('_order_by') in self.allowed_ordering:
@@ -554,6 +704,10 @@ class Resource(object):
         return qs
 
     def get_skip_and_limit(self, params=None):
+        """
+        Perform validation and return sanitized values for _skip and _limit
+        params of the request that's currently being processed.
+        """
         max_limit = self.get_max_limit()
         if params is None:
             params = self.params
@@ -575,6 +729,17 @@ class Resource(object):
             return 0, max_limit
 
     def get_objects(self, all=False, qs=None, qfilter=None):
+        """
+        Return objects fetched from the database based on all the parameters
+        of the request that's currently being processed.
+
+        Params:
+        - If `all` is true, _skip and _limit params are ignored and all the
+          objects matching the filters are returned.
+        - Custom queryset can be passed via `qs`. Otherwise `self.get_queryset`
+          is used.
+        - Pass `qfilter` function to modify the queryset.
+        """
         params = self.params
 
         custom_qs = True
@@ -582,8 +747,8 @@ class Resource(object):
             custom_qs = False
             qs = self.get_queryset()
 
-        # If a queryset filter was provided, pass our current
-        # queryset in and get a new one out
+        # If a queryset filter was provided, pass our current queryset in and
+        # get a new one out
         if qfilter:
             qs = qfilter(qs)
 
@@ -595,7 +760,7 @@ class Resource(object):
             skip, limit = self.get_skip_and_limit(params)
             qs = qs.skip(skip).limit(limit+1)
 
-        # Needs to be at the end as it returns a list.
+        # Needs to be at the end as it returns a list, not a queryset
         if self.select_related:
             qs = qs.select_related()
 
