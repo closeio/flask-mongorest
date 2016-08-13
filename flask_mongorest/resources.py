@@ -309,8 +309,8 @@ class Resource(object):
 
     def _subresource(self, obj):
         """
-        Selects and creates an appropriate sub-resource class for delegation
-        or return None if there isn't one.
+        Select and create an appropriate sub-resource class for delegation or
+        return None if there isn't one.
         """
         s_class = self._child_document_resources.get(obj.__class__)
         if not s_class and self._default_child_resource_document:
