@@ -560,7 +560,6 @@ class Resource(object):
         document_queryset = {}
         for obj in objs:
             for field_name in self.related_resources_hints.keys():
-                'opportunities'
                 if only_fields is not None and field_name not in only_fields:
                     continue
                 method = getattr(obj, field_name)
