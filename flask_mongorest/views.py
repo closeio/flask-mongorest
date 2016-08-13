@@ -151,7 +151,7 @@ class ResourceView(View):
         else:
             return ret
 
-    def update_object(self, obj):
+    def process_object(self, obj):
         # Check if we have permission to change this object
         if not self.has_change_permission(request, obj):
             raise Unauthorized
@@ -161,11 +161,11 @@ class ResourceView(View):
         except Exception, e:
             self.handle_validation_error(e)
 
-    def update_objects(self, objs):
+    def process_objects(self, objs):
         count = 0
         try:
             for obj in objs:
-                self.update_object(obj)
+                self.process_object(obj)
                 count += 1
         except ValidationError, e:
             e.message['count'] = count
@@ -200,10 +200,10 @@ class ResourceView(View):
                 objs, has_more = result
             elif len(result) == 3:
                 objs, has_more, extra = result
-            return self.update_objects(objs)
+            return self.process_objects(objs)
         else:
             obj = self._resource.get_object(pk)
-            self.update_object(obj)
+            self.process_object(obj)
             ret = self._resource.serialize(obj, params=request.args)
             return ret
 
