@@ -955,9 +955,13 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.put('/posts/', data=json.dumps({
             'title': 'Title'
         }))
-        response_success(resp)
-        self.assertEqual(json.loads(resp.data), { 'count': limit })
-        self.assertEqual(1, example.documents.Post.objects.filter(title__ne='Title').count())
+        response_error(resp, code=400)
+        self.assertEqual(json.loads(resp.data), {
+            'errors': [
+                "It's not allowed to update more than 10 objects at once"
+            ]
+        })
+        self.assertEqual(11, example.documents.Post.objects.filter(title__ne='Title').count())
 
 
 class MongoRestSchemaTestCase(unittest.TestCase):

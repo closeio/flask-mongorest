@@ -762,6 +762,8 @@ class Resource(object):
         if qfilter:
             qs = qfilter(qs)
 
+        # Apply filters and ordering, based on the params supplied by the
+        # request
         qs = self.apply_filters(qs, params)
         qs = self.apply_ordering(qs, params)
 
@@ -779,20 +781,29 @@ class Resource(object):
         if self.select_related:
             qs = qs.select_related()
 
-        if limit is not None and self.paginate:
-            # It is OK to evaluate the queryset as we will do so anyway.
-            qs = [o for o in qs] # don't use list() because mongoengine will do a count query
-            has_more = len(qs) == limit+1
+        # Evaluate the queryset
+        objs = list(qs)
+
+        # Raise a validation error if bulk update would result in more than
+        # bulk_update_limit updates
+        if self.view_method == methods.BulkUpdate and len(objs) >= self.bulk_update_limit:
+            raise ValidationError({
+                'errors': ["It's not allowed to update more than %d objects at once" % self.bulk_update_limit]
+            })
+
+        # Determine the value of has_more
+        if self.view_method != methods.BulkUpdate and self.paginate:
+            has_more = len(objs) > limit
             if has_more:
-                qs = qs[:-1]
+                objs = objs[:-1]
         else:
             has_more = None
 
         # bulk-fetch related resources for moar speed
         if self.related_resources_hints:
-            self.fetch_related_resources(qs, self.get_requested_fields(params=params))
+            self.fetch_related_resources(objs, self.get_requested_fields(params=params))
 
-        return qs, has_more
+        return objs, has_more
 
     def save_related_objects(self, obj, parent_resources=None):
         if not parent_resources:
