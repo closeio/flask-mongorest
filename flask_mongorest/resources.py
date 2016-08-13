@@ -24,23 +24,67 @@ class ResourceMeta(type):
 
 
 class Resource(object):
-    document = None  # MongoEngine Document class related to this resource (required)
-    fields = None  # list of fields that can (and should by default) be included in the response
-    rename_fields = {}  # dict of original field names (as seen in `fields`) and what they should be renamed to in the API response
-    schema = None  # CleanCat Schema class (used for validation)
-    allowed_ordering = []  # list of fields that the objects can be ordered by
-    paginate = True  # whether or not this resource supports pagination
+
+    # MongoEngine Document class related to this resource (required)
+    document = None
+
+    # List of fields that can (and should by default) be included in the
+    # response
+    fields = None
+
+    # Dict of original field names (as seen in `fields`) and what they should
+    # be renamed to in the API response
+    rename_fields = {}
+
+    # CleanCat Schema class (used for validation)
+    schema = None
+
+    # List of fields that the objects can be ordered by
+    allowed_ordering = []
+
+    # Define whether or not this resource supports pagination
+    paginate = True
+
+    # Default limit if no _limit is specified in the request. Only relevant
+    # if pagination is enabled.
+    default_limit = 100
+
+    # Maximum value of _limit that can be requested (avoids DDoS'ing the API).
+    # Only relevant if pagination is enabled.
+    max_limit = 100
+
+    # Map of field names and Resource classes that should be used to handle
+    # these fields (for serialization, saving, etc.).
     related_resources = {}
-    related_resources_hints = {} #@todo this should be integrated into the related_resources dict, possibly as a tuple
+
+    # Map of field names on this resource's document to field names on the
+    # related resource's document, used as a helper in the process of
+    # turning a field value from a queryset to a list of objects
+    #
+    # TODO Behavior of this is *very* unintuitive and should be changed or
+    # dropped, or at least refactored
+    related_resources_hints = {}
+
+    # List of field names corresponding to related resources. If a field is
+    # mentioned here and in `related_resources`, it can be created/updated
+    # from within this resource.
     save_related_fields = []
+
+    # Map of MongoEngine Document classes to Resource class names. Defines
+    # which sub-resource should be used for handling a particular subclass of
+    # this resource's document.
     child_document_resources = {}
-    # Whenever a new document is posted and the system doesn't know the type yet, it will choose a default sub-resource for this document type
+
+    # Whenever a new document is posted and the system doesn't know the type
+    # of it yet, it will choose a default sub-resource for this document type
     default_child_resource_document = None
 
+    # Defines whether MongoEngine's select_related should be used on a
+    # filtered query set, pulling all the references efficiently.
     select_related = False
-    uri_prefix = None  # Must start and end with a "/"
-    default_limit = 100  # default limit if no _limit is specified
-    max_limit = 100  # maximum value of _limit that can be requested (avoids DDoS'ing the API).
+
+    # Must start and end with a "/"
+    uri_prefix = None
 
     __metaclass__ = ResourceMeta
 
@@ -50,7 +94,6 @@ class Resource(object):
         view_method (see methods.py) so the resource can behave differently
         depending on the method.
         """
-
         doc_fields = self.document._fields.keys()
         if self.fields is None:
             self.fields = doc_fields
@@ -512,9 +555,12 @@ class Resource(object):
 
         # Create a map of field names to MongoEngine Q objects that will
         # later be used to fetch the related resources from MongoDB
+        # Queries for the same document/collection are combined to improve
+        # efficiency.
         document_queryset = {}
         for obj in objs:
             for field_name in self.related_resources_hints.keys():
+                'opportunities'
                 if only_fields is not None and field_name not in only_fields:
                     continue
                 method = getattr(obj, field_name)
@@ -525,7 +571,9 @@ class Resource(object):
                     else:
                         document_queryset[field_name] = q._query_obj
 
-        # Create a map of field names and indexes to hint on
+        # For each field name, execute the queries we generated in the block
+        # above, and map the results to each object that references them.
+        # TODO This is in dire need of refactoring, or a complete overhaul
         hints = {}
         for field_name, q_obj in document_queryset.iteritems():
             doc = self.get_related_resources()[field_name].document
@@ -547,7 +595,8 @@ class Resource(object):
             else:
                 document_queryset[field_name] = results
 
-            # TODO document this block
+            # For each field name, create a map of obj PKs to a list of
+            # results they referenced.
             hint_index = {}
             if field_name in self.related_resources_hints.keys():
                 hint_field = self.related_resources_hints[field_name]
@@ -567,7 +616,8 @@ class Resource(object):
 
                 hints[field_name] = hint_index
 
-        # TODO document this block
+        # Assign the results to each object
+        # TODO This is in dire need of refactoring, or a complete overhaul
         for obj in objs:
             for field_name, hint_index in hints.iteritems():
                 obj_id = obj.id
@@ -575,10 +625,10 @@ class Resource(object):
                     obj_id = obj_id.id
                 elif isinstance(obj_id, ObjectId):
                     obj_id = str(obj_id)
-                if obj_id not in hint_index.keys():
+                if obj_id not in hint_index:
                     setattr(obj, field_name, [])
-                    continue
-                setattr(obj, field_name, hint_index[obj_id])
+                else:
+                    setattr(obj, field_name, hint_index[obj_id])
 
     def apply_filters(self, qs, params=None):
         """
