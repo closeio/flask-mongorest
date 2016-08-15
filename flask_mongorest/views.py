@@ -193,8 +193,14 @@ class ResourceView(View):
             # Bulk update where the body contains the new values for certain
             # fields.
 
-            # Validate the bulk update request before any data is fetched/updated
-            self._resource.validate_bulk_update()
+            # Currently, fetches all the objects and validates them separately.
+            # If one of them fails, a ValidationError for this object will be
+            # triggered.
+            # Ideally, this would be translated into an update statement for
+            # performance reasons and would perform the update either for all
+            # objects, or for none, if (generic) validation fails. Since this
+            # is a bulk update, only the count of objects which were updated is
+            # returned.
 
             # Get a list of all objects matching the filters, capped at this
             # resource's `bulk_update_limit`

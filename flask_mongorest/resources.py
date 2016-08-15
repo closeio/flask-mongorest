@@ -532,14 +532,6 @@ class Resource(object):
             except SchemaValidationError:
                 raise ValidationError({'field-errors': schema.field_errors, 'errors': schema.errors })
 
-    def validate_bulk_update(self):
-        """
-        Override this to implement custom behavior whenever a bulk update
-        request is processed. Throw ValidationError if the request is not
-        valid.
-        """
-        pass
-
     def get_queryset(self):
         """
         Return a MongoEngine queryset that will later be used to return
