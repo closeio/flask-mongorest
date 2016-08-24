@@ -64,6 +64,7 @@ class PostResource(Resource):
     rename_fields = {
         'author': 'author_id',
     }
+    bulk_update_limit = 10
 
     def get_objects(self, **kwargs):
         qs, has_more = super(PostResource, self).get_objects(**kwargs)

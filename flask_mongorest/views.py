@@ -151,6 +151,35 @@ class ResourceView(View):
         else:
             return ret
 
+    def process_object(self, obj):
+        """Validate and update an object"""
+        # Check if we have permission to change this object
+        if not self.has_change_permission(request, obj):
+            raise Unauthorized
+
+        self._resource.validate_request(obj)
+
+        try:
+            obj = self._resource.update_object(obj)
+        except Exception, e:
+            self.handle_validation_error(e)
+
+    def process_objects(self, objs):
+        """
+        Update each object in the list one by one, and return the total count
+        of updated objects.
+        """
+        count = 0
+        try:
+            for obj in objs:
+                self.process_object(obj)
+                count += 1
+        except ValidationError, e:
+            e.message['count'] = count
+            raise e
+        else:
+            return {'count': count}
+
     def put(self, **kwargs):
         pk = kwargs.pop('pk', None)
 
@@ -164,7 +193,7 @@ class ResourceView(View):
             # Bulk update where the body contains the new values for certain
             # fields.
 
-            # Currently, fetches all the objects and validate them separately.
+            # Currently, fetches all the objects and validates them separately.
             # If one of them fails, a ValidationError for this object will be
             # triggered.
             # Ideally, this would be translated into an update statement for
@@ -173,39 +202,19 @@ class ResourceView(View):
             # is a bulk update, only the count of objects which were updated is
             # returned.
 
-            result = self._resource.get_objects(all=True)
+            # Get a list of all objects matching the filters, capped at this
+            # resource's `bulk_update_limit`
+            result = self._resource.get_objects()
             if len(result) == 2:
                 objs, has_more = result
             elif len(result) == 3:
                 objs, has_more, extra = result
-            count = 0
-            try:
-                for obj in objs:
-                    self._resource.validate_request(obj)
-                    try:
-                        obj = self._resource.update_object(obj)
-                    except Exception, e:
-                        self.handle_validation_error(e)
-                    # Raise or skip?
-                    if not self.has_change_permission(request, obj):
-                        raise Unauthorized
-                    obj.save()
-                    count += 1
-            except ValidationError, e:
-                e.message['count'] = count
-                raise e
-            else:
-                return {'count': count}
+
+            # Update all the objects and return their count
+            return self.process_objects(objs)
         else:
             obj = self._resource.get_object(pk)
-            # Check if we have permission to change this object
-            if not self.has_change_permission(request, obj):
-                raise Unauthorized
-            self._resource.validate_request(obj)
-            try:
-                obj = self._resource.update_object(obj)
-            except Exception, e:
-                self.handle_validation_error(e)
+            self.process_object(obj)
             ret = self._resource.serialize(obj, params=request.args)
             return ret
 

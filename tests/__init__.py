@@ -937,6 +937,32 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp)
         self.assertEqual(resp.data, 'Invalid Accept header requested')
 
+    def test_bulk_update_limit(self):
+        """
+        Make sure that the limit on the number of objects that can be
+        bulk-updated at once works.
+        """
+        limit = example.PostResource.bulk_update_limit
+
+        for i in range(limit+1):
+            resp = self.app.post('/posts/', data=json.dumps({
+                'title': 'Title %d' % i,
+                'is_published': False
+            }))
+            response_success(resp)
+
+        # bulk update all posts
+        resp = self.app.put('/posts/', data=json.dumps({
+            'title': 'Title'
+        }))
+        response_error(resp, code=400)
+        self.assertEqual(json.loads(resp.data), {
+            'errors': [
+                "It's not allowed to update more than 10 objects at once"
+            ]
+        })
+        self.assertEqual(11, example.documents.Post.objects.filter(title__ne='Title').count())
+
 
 class MongoRestSchemaTestCase(unittest.TestCase):
 
