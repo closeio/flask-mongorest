@@ -79,14 +79,12 @@ class MongoRestTestCase(unittest.TestCase):
         # create user 1
         resp = self.app.post('/user/', data=json.dumps(self.user_1))
         response_success(resp)
-        print(resp.data.decode('utf-8'))
         self.user_1_obj = json.loads(resp.data.decode('utf-8'))
         compare_req_resp(self.user_1, self.user_1_obj)
 
         # create user 2
         resp = self.app.post('/user/', data=json.dumps(self.user_2))
         response_success(resp)
-        print(resp.data.decode('utf-8'))
         self.user_2_obj = json.loads(resp.data.decode('utf-8'))
         compare_req_resp(self.user_2, self.user_2_obj)
 
