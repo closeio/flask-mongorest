@@ -17,7 +17,7 @@ def isint(int_str):
 class MongoEncoder(json.JSONEncoder):
     def default(self, value, **kwargs):
         if isinstance(value, ObjectId):
-            return unicode(value)
+            return str(value)
         if isinstance(value, DBRef):
             return value.id
         if isinstance(value, datetime.datetime):
@@ -26,6 +26,8 @@ class MongoEncoder(json.JSONEncoder):
             return value.strftime("%Y-%m-%d")
         if isinstance(value, decimal.Decimal):
             return str(value)
+        if isinstance(value, Exception):
+            return value.args
         return super(MongoEncoder, self).default(value, **kwargs)
 
 def cmp_fields(ordering):
@@ -55,7 +57,7 @@ def equal(a, b):
     if isinstance(a, dict) and isinstance(b, dict):
         if sorted(a.keys()) != sorted(b.keys()):
             return False
-        for k, v in a.iteritems():
+        for k, v in list(a.items()):
             if not equal(b[k], v):
                 return False
         return True

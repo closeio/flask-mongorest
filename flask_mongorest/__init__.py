@@ -1,5 +1,12 @@
+import re
 from flask import Blueprint
-from flask_mongorest.methods import Create, BulkUpdate, List
+from flask.ext.mongorest.methods import Create, BulkUpdate, List
+
+
+def to_underscore(name):
+
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
 class MongoRest(object):
@@ -15,7 +22,7 @@ class MongoRest(object):
             document_name = klass.resource.document.__name__.lower()
             name = kwargs.pop('name', document_name)
             url = kwargs.pop('url', '/%s/' % document_name)
-
+            endpoint = to_underscore(klass.__name__)
             # Insert the url prefix, if it exists
             if self.url_prefix:
                 url = '%s%s' % (self.url_prefix, url)
@@ -23,11 +30,17 @@ class MongoRest(object):
             # Add url rules
             pk_type = kwargs.pop('pk_type', 'string')
             view_func = klass.as_view(name)
+            print(klass.methods)
+            print(type(List))
+            print([type(m) for m in klass.methods])
             if List in klass.methods:
-                self.app.add_url_rule(url, defaults={'pk': None}, view_func=view_func, methods=[List.method], **kwargs)
+                print(1, url)
+                self.app.add_url_rule(url, defaults={'pk': None}, endpoint=endpoint, view_func=view_func, methods=[List.method], **kwargs)
             if Create in klass.methods or BulkUpdate in klass.methods:
-                self.app.add_url_rule(url, view_func=view_func, methods=[x.method for x in klass.methods if x in (Create, BulkUpdate)], **kwargs)
-            self.app.add_url_rule('%s<%s:%s>/' % (url, pk_type, 'pk'), view_func=view_func, methods=[x.method for x in klass.methods if x not in (List, BulkUpdate)], **kwargs)
+                print(2, url)
+                self.app.add_url_rule(url, view_func=view_func, endpoint=endpoint, methods=[x.method for x in klass.methods if x in (Create, BulkUpdate)], **kwargs)
+            self.app.add_url_rule('%s<%s:%s>/' % (url, pk_type, 'pk'), endpoint=endpoint, view_func=view_func, methods=[x.method for x in klass.methods if x not in (List, BulkUpdate)], **kwargs)
+            print(3, '%s<%s:%s>/' % (url, pk_type, 'pk'))
             return klass
 
         return decorator
