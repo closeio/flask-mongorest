@@ -4,27 +4,29 @@ import mongoengine
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from flask import request, url_for
-from urlparse import urlparse
+from urllib.parse import urlparse
 from mongoengine.base.proxy import DocumentProxy
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, GenericReferenceField, SafeReferenceField
 from mongoengine.fields import DictField
+from mongoengine.errors import ValidationError as MongoEngineValidationError
 
 from cleancat import ValidationError as SchemaValidationError
 from flask.ext.mongorest import methods
 from flask.ext.mongorest.exceptions import ValidationError, UnknownFieldError
 from flask.ext.mongorest.utils import cmp_fields, isbound, isint, equal
+import collections
 
 
 class ResourceMeta(type):
     def __init__(cls, name, bases, classdict):
         if classdict.get('__metaclass__') is not ResourceMeta:
-            for document,resource in cls.child_document_resources.iteritems():
+            for document,resource in list(cls.child_document_resources.items()):
                 if resource == name:
                     cls.child_document_resources[document] = cls
         type.__init__(cls, name, bases, classdict)
 
 
-class Resource(object):
+class Resource(object, metaclass=ResourceMeta):
 
     # MongoEngine Document class related to this resource (required)
     document = None
@@ -90,21 +92,19 @@ class Resource(object):
     # Must start and end with a "/"
     uri_prefix = None
 
-    __metaclass__ = ResourceMeta
-
     def __init__(self, view_method=None):
         """
         Initializes a resource. Optionally, a method class can be given to
         view_method (see methods.py) so the resource can behave differently
         depending on the method.
         """
-        doc_fields = self.document._fields.keys()
+        doc_fields = list(self.document._fields.keys())
         if self.fields is None:
             self.fields = doc_fields
         self._related_resources = self.get_related_resources()
         self._rename_fields = self.get_rename_fields()
         self._reverse_rename_fields = {}
-        for k, v in self._rename_fields.iteritems():
+        for k, v in list(self._rename_fields.items()):
             self._reverse_rename_fields[v] = k
         assert len(self._rename_fields) == len(self._reverse_rename_fields), \
             'Cannot rename multiple fields to the same name'
@@ -159,6 +159,8 @@ class Resource(object):
                     raise ValidationError({'error': "Chunked Transfer-Encoding is not supported."})
 
                 try:
+                    if isinstance(request.data, bytes):
+                        request.data = request.data.decode('utf-8')
                     self._raw_data = json.loads(request.data, parse_constant=self._enforce_strict_json)
                 except ValueError:
                     raise ValidationError({'error': 'The request contains invalid JSON.'})
@@ -296,7 +298,7 @@ class Resource(object):
         and hence use the Gte operator to filter the data.
         """
         filters = {}
-        for field, operators in getattr(self, 'filters', {}).iteritems():
+        for field, operators in list(getattr(self, 'filters', {}).items()):
             field_filters = {}
             for op in operators:
                 if op.op == 'exact':
@@ -392,7 +394,7 @@ class Resource(object):
                 if field_instance.field:
                     return {
                         key: get(elem, field_name, field_instance=field_instance.field)
-                        for (key, elem) in field_value.iteritems()
+                        for (key, elem) in list(field_value.items())
                     }
                 # ... or simply return the dict intact, if the field type
                 # wasn't specified
@@ -402,7 +404,7 @@ class Resource(object):
             # If this field is callable, execute it and return it or serialize
             # it based on its related resource defined in the
             # `related_resources` map.
-            elif callable(field_instance):
+            elif isinstance(field_instance, collections.Callable):
                 if isinstance(field_value, list):
                     value = field_value
                 else:
@@ -441,7 +443,7 @@ class Resource(object):
             renamed_field = self._rename_fields.get(field, field)
 
             # if the field is callable, execute it with `obj` as the param
-            if hasattr(self, field) and callable(getattr(self, field)):
+            if hasattr(self, field) and isinstance(getattr(self, field), collections.Callable):
                 value = getattr(self, field)(obj)
 
                 # if the field is associated with a specific resource (via the
@@ -452,7 +454,7 @@ class Resource(object):
                         value = related_resource.serialize_field(value)
                     elif isinstance(value, dict):
                         value = dict((k, related_resource.serialize_field(v))
-                                     for (k, v) in value.iteritems())
+                                     for (k, v) in list(value.items()))
                     else:  # assume queryset or list
                         value = [related_resource.serialize_field(o)
                                  for o in value]
@@ -509,27 +511,27 @@ class Resource(object):
         # E.g. if a -> b, b -> c, then a should never be renamed to c.
         fields_to_delete = []
         fields_to_update = {}
-        for k, v in self._rename_fields.iteritems():
+        for k, v in list(self._rename_fields.items()):
             if v in self.data:
                 fields_to_update[k] = self.data[v]
                 fields_to_delete.append(v)
         for k in fields_to_delete:
             del self.data[k]
-        for k, v in fields_to_update.iteritems():
+        for k, v in list(fields_to_update.items()):
             self.data[k] = v
 
         # If CleanCat schema exists on this resource, use it to perform the
         # validation
         if self.schema:
             if request.method == 'PUT' and obj is not None:
-                obj_data = dict([(key, getattr(obj, key)) for key in obj._fields.keys()])
+                obj_data = dict([(key, getattr(obj, key)) for key in list(obj._fields.keys())])
             else:
                 obj_data = None
 
             schema = self.schema(self.data, obj_data)
             try:
                 self.data = schema.full_clean()
-            except SchemaValidationError:
+            except (SchemaValidationError, MongoEngineValidationError):
                 raise ValidationError({'field-errors': schema.field_errors, 'errors': schema.errors })
 
     def get_queryset(self):
@@ -563,11 +565,11 @@ class Resource(object):
         # efficiency.
         document_queryset = {}
         for obj in objs:
-            for field_name in self.related_resources_hints.keys():
+            for field_name in list(self.related_resources_hints.keys()):
                 if only_fields is not None and field_name not in only_fields:
                     continue
                 method = getattr(obj, field_name)
-                if callable(method):
+                if isinstance(method, collections.Callable):
                     q = method()
                     if field_name in document_queryset:
                         document_queryset[field_name] = (document_queryset[field_name] | q._query_obj)
@@ -578,7 +580,7 @@ class Resource(object):
         # above, and map the results to each object that references them.
         # TODO This is in dire need of refactoring, or a complete overhaul
         hints = {}
-        for field_name, q_obj in document_queryset.iteritems():
+        for field_name, q_obj in list(document_queryset.items()):
             doc = self.get_related_resources()[field_name].document
 
             # Create a QuerySet based on the query object
@@ -601,7 +603,7 @@ class Resource(object):
             # For each field name, create a map of obj PKs to a list of
             # results they referenced.
             hint_index = {}
-            if field_name in self.related_resources_hints.keys():
+            if field_name in list(self.related_resources_hints.keys()):
                 hint_field = self.related_resources_hints[field_name]
                 for obj in document_queryset[field_name]:
                     hint_field_instance = obj._fields[hint_field]
@@ -622,7 +624,7 @@ class Resource(object):
         # Assign the results to each object
         # TODO This is in dire need of refactoring, or a complete overhaul
         for obj in objs:
-            for field_name, hint_index in hints.iteritems():
+            for field_name, hint_index in list(hints.items()):
                 obj_id = obj.id
                 if isinstance(obj_id, DBRef):
                     obj_id = obj_id.id
@@ -642,7 +644,7 @@ class Resource(object):
         if params is None:
             params = self.params
 
-        for key, value in params.iteritems():
+        for key, value in list(params.items()):
             # If this is a resource identified by a URI, we need
             # to extract the object id at this point since
             # MongoEngine only understands the object id
@@ -844,15 +846,15 @@ class Resource(object):
             # We want to update only the fields that appear in the request data
             # rather than re-updating all the document's existing/other fields.
             filter_fields &= set(self._reverse_rename_fields.get(field, field)
-                                 for field in self.raw_data.keys())
-        update_dict = {field: value for field, value in data.items()
+                                 for field in list(self.raw_data.keys()))
+        update_dict = {field: value for field, value in list(data.items())
                        if field in filter_fields}
         return update_dict
 
     def create_object(self, data=None, save=True, parent_resources=None):
         update_dict = self.get_object_dict(data)
         obj = self.document(**update_dict)
-        self._dirty_fields = update_dict.keys()
+        self._dirty_fields = list(update_dict.keys())
         if save:
             self.save_object(obj)
         return obj
@@ -866,7 +868,7 @@ class Resource(object):
 
         self._dirty_fields = []
 
-        for field, value in update_dict.items():
+        for field, value in list(update_dict.items()):
             update = False
 
             # If we're comparing reference fields, only compare ids without

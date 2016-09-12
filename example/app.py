@@ -11,15 +11,14 @@ from flask.ext.mongorest.authentication import AuthenticationBase
 
 from example import schemas, documents
 
-
 app = Flask(__name__)
 
 app.url_map.strict_slashes = False
 
 app.config.update(
-    DEBUG = True,
-    TESTING = True,
-    MONGODB_SETTINGS = {
+    DEBUG=True,
+    TESTING=True,
+    MONGODB_SETTINGS={
         'HOST': 'localhost',
         'PORT': 27017,
         'DB': 'mongorest_example_app',
@@ -30,6 +29,7 @@ app.config.update(
 db = MongoEngine(app)
 api = MongoRest(app)
 
+
 class UserResource(Resource):
     document = documents.User
     schema = schemas.User
@@ -37,23 +37,26 @@ class UserResource(Resource):
         'datetime': [ops.Exact]
     }
 
+
 @api.register()
 class UserView(ResourceView):
     resource = UserResource
     methods = [Create, Update, Fetch, List, Delete]
 
+
 class ContentResource(Resource):
     document = documents.Content
+
 
 class PostResource(Resource):
     document = documents.Post
     schema = schemas.Post
     related_resources = {
         'content': ContentResource,
-        'sections': ContentResource, #nested complex objects
-        #'author': UserResource,
-        #'editor': UserResource,
-        #'user_lists': UserResource,
+        'sections': ContentResource,  # nested complex objects
+        # 'author': UserResource,
+        # 'editor': UserResource,
+        # 'user_lists': UserResource,
         'primary_user': UserResource,
     }
     filters = {
@@ -84,10 +87,12 @@ class PostResource(Resource):
                 obj.tags.append('art')
         return super(PostResource, self).update_object(obj, data, save, parent_resources)
 
+
 @api.register(name='posts', url='/posts/')
 class PostView(ResourceView):
     resource = PostResource
     methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+
 
 class LimitedPostResource(Resource):
     document = documents.Post
@@ -95,20 +100,24 @@ class LimitedPostResource(Resource):
         'content': ContentResource,
     }
 
+
 @api.register(name='limited_posts', url='/limited_posts/')
 class LimitedPostView(ResourceView):
     resource = LimitedPostResource
     methods = [Create, Update, Fetch, List]
 
+
 class DummyAuthenication(AuthenticationBase):
     def authorized(self):
         return False
+
 
 @api.register(name='auth', url='/auth/')
 class DummyAuthView(ResourceView):
     resource = PostResource
     methods = [Create, Update, Fetch, List, Delete]
     authentication_methods = [DummyAuthenication]
+
 
 @api.register(name='restricted', url='/restricted/')
 class RestrictedPostView(ResourceView):
@@ -133,14 +142,17 @@ class RestrictedPostView(ResourceView):
     def has_delete_permission(self, request, obj):
         return not obj.is_published
 
+
 class TestDocument(db.Document):
     name = db.StringField()
     other = db.StringField()
     dictfield = db.DictField()
     is_new = db.BooleanField()
 
+
 class TestResource(Resource):
     document = TestDocument
+
 
 class TestFieldsResource(Resource):
     document = TestDocument
@@ -148,6 +160,7 @@ class TestFieldsResource(Resource):
 
     def upper_name(self, obj):
         return obj.name.upper()
+
 
 @api.register(name='test', url='/test/')
 class TestView(ResourceView):
@@ -160,8 +173,10 @@ class TestFieldsResource(ResourceView):
     resource = TestFieldsResource
     methods = [Create, Update, Fetch, List]
 
+
 class LanguageResource(Resource):
     document = documents.Language
+
 
 class PersonResource(Resource):
     document = documents.Person
@@ -171,58 +186,72 @@ class PersonResource(Resource):
     }
     save_related_fields = ['languages']
 
+
 @api.register(name='person', url='/person/')
 class PersonView(ResourceView):
     resource = PersonResource
     methods = [Create, Update, Fetch, List]
 
+
 # extra resources for testing max_limit
 class Post10Resource(PostResource):
     max_limit = 10
 
+
 class Post250Resource(PostResource):
     max_limit = 250
+
 
 @api.register(name='posts10', url='/posts10/')
 class Post10View(ResourceView):
     resource = Post10Resource
     methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
 
+
 @api.register(name='posts250', url='/posts250/')
 class Post250View(ResourceView):
     resource = Post250Resource
     methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
 
+
 # Documents, resources, and views for testing differences between db refs and object ids
 class A(db.Document):
     txt = db.StringField()
+
 
 class B(db.Document):
     ref = db.ReferenceField(A, dbref=True)
     txt = db.StringField()
 
+
 class C(db.Document):
     ref = db.ReferenceField(A)
     txt = db.StringField()
 
+
 class AResource(Resource):
     document = A
+
 
 class BResource(Resource):
     document = B
 
+
 class CResource(Resource):
     document = C
+
 
 @api.register(url='/a/')
 class AView(ResourceView):
     resource = AResource
     methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
 
+
 @api.register(url='/b/')
 class BView(ResourceView):
     resource = BResource
     methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+
 
 @api.register(url='/c/')
 class CView(ResourceView):
@@ -234,44 +263,54 @@ class CView(ResourceView):
 class MethodTestDoc(db.Document):
     txt = db.StringField()
 
+
 class MethodTestResource(Resource):
     document = MethodTestDoc
+
 
 @api.register(url='/create_only/')
 class CreateOnlyView(ResourceView):
     resource = MethodTestResource
     methods = [Create]
 
+
 @api.register(url='/update_only/')
 class UpdateOnlyView(ResourceView):
     resource = MethodTestResource
     methods = [Update]
+
 
 @api.register(url='/bulk_update_only/')
 class BulkUpdateOnlyView(ResourceView):
     resource = MethodTestResource
     methods = [BulkUpdate]
 
+
 @api.register(url='/fetch_only/')
 class FetchOnlyView(ResourceView):
     resource = MethodTestResource
     methods = [Fetch]
+
 
 @api.register(url='/list_only/')
 class ListOnlyView(ResourceView):
     resource = MethodTestResource
     methods = [List]
 
+
 @api.register(url='/delete_only/')
 class DeleteOnlyView(ResourceView):
     resource = MethodTestResource
     methods = [Delete]
 
+
 class ViewMethodTestDoc(db.Document):
     txt = db.StringField()
 
+
 class ViewMethodTestResource(Resource):
     document = ViewMethodTestDoc
+
 
 @api.register(url='/test_view_method/')
 class TestViewMethodView(ResourceView):
@@ -280,11 +319,13 @@ class TestViewMethodView(ResourceView):
 
     def _dispatch_request(self, *args, **kwargs):
         super(TestViewMethodView, self)._dispatch_request(*args, **kwargs)
-        return { 'method': self._resource.view_method.__name__ }
+        return {'method': self._resource.view_method.__name__}
+
 
 class DateTimeResource(Resource):
     document = documents.DateTime
     schema = schemas.DateTime
+
 
 @api.register(name='datetime', url='/datetime/')
 class DateTimeView(ResourceView):
@@ -296,8 +337,10 @@ class DateTimeView(ResourceView):
 class DictDoc(db.Document):
     dict = db.DictField()
 
+
 class DictDocResource(Resource):
     document = DictDoc
+
 
 @api.register(url='/dict_doc/')
 class DictDocView(ResourceView):
@@ -308,4 +351,3 @@ class DictDocView(ResourceView):
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8000))
     app.run(host='0.0.0.0', port=port)
-

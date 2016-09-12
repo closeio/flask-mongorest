@@ -18,9 +18,9 @@ render_html = lambda **payload: render_template('mongorest/debug.html', data=jso
 def serialize_mongoengine_validation_error(e):
     def serialize_errors(errors):
         if hasattr(errors, 'iteritems'):
-            return dict((k, serialize_errors(v)) for (k, v) in errors.iteritems())
+            return dict((k, serialize_errors(v)) for (k, v) in list(errors.items()))
         else:
-            return unicode(errors)
+            return errors
 
     if e.errors:
         return {'field-errors': serialize_errors(e.errors)}
@@ -61,15 +61,15 @@ class ResourceView(View):
         except Unauthorized as e:
             return {'error': 'Unauthorized'}, '401 Unauthorized'
         except NotFound as e:
-            return {'error': unicode(e)}, '404 Not Found'
+            return {'error': str(e)}, '404 Not Found'
 
     def handle_validation_error(self, e):
         if isinstance(e, ValidationError):
-            raise
+            raise e
         elif isinstance(e, mongoengine.ValidationError):
             raise ValidationError(serialize_mongoengine_validation_error(e))
         else:
-            raise
+            raise e
 
     def requested_resource(self, request):
         """In the case where the Resource that this view is associated with points to a Document class
@@ -138,7 +138,7 @@ class ResourceView(View):
         self._resource.validate_request()
         try:
             obj = self._resource.create_object()
-        except Exception, e:
+        except Exception as e:
             self.handle_validation_error(e)
 
         # Check if we have permission to create this object
@@ -157,11 +157,13 @@ class ResourceView(View):
         if not self.has_change_permission(request, obj):
             raise Unauthorized
 
-        self._resource.validate_request(obj)
-
+        try:
+            self._resource.validate_request(obj)
+        except ValidationError as e:
+            raise e
         try:
             obj = self._resource.update_object(obj)
-        except Exception, e:
+        except Exception as e:
             self.handle_validation_error(e)
 
     def process_objects(self, objs):
@@ -174,7 +176,7 @@ class ResourceView(View):
             for obj in objs:
                 self.process_object(obj)
                 count += 1
-        except ValidationError, e:
+        except ValidationError as e:
             e.message['count'] = count
             raise e
         else:
@@ -211,10 +213,19 @@ class ResourceView(View):
                 objs, has_more, extra = result
 
             # Update all the objects and return their count
-            return self.process_objects(objs)
+            try:
+                ret = self.process_objects(objs)
+            except ValidationError as e:
+                return e.message, '400 Bad Request'
+
+            return ret
         else:
             obj = self._resource.get_object(pk)
-            self.process_object(obj)
+            try:
+                self.process_object(obj)
+            except ValidationError as e:
+                return e.message, '400 Bad Request'
+
             ret = self._resource.serialize(obj, params=request.args)
             return ret
 
