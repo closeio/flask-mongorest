@@ -30,17 +30,11 @@ class MongoRest(object):
             # Add url rules
             pk_type = kwargs.pop('pk_type', 'string')
             view_func = klass.as_view(name)
-            print(klass.methods)
-            print(type(List))
-            print([type(m) for m in klass.methods])
             if List in klass.methods:
-                print(1, url)
                 self.app.add_url_rule(url, defaults={'pk': None}, endpoint=endpoint, view_func=view_func, methods=[List.method], **kwargs)
             if Create in klass.methods or BulkUpdate in klass.methods:
-                print(2, url)
                 self.app.add_url_rule(url, view_func=view_func, endpoint=endpoint, methods=[x.method for x in klass.methods if x in (Create, BulkUpdate)], **kwargs)
             self.app.add_url_rule('%s<%s:%s>/' % (url, pk_type, 'pk'), endpoint=endpoint, view_func=view_func, methods=[x.method for x in klass.methods if x not in (List, BulkUpdate)], **kwargs)
-            print(3, '%s<%s:%s>/' % (url, pk_type, 'pk'))
             return klass
 
         return decorator
