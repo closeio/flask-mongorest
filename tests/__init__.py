@@ -79,12 +79,14 @@ class MongoRestTestCase(unittest.TestCase):
         # create user 1
         resp = self.app.post('/user/', data=json.dumps(self.user_1))
         response_success(resp)
+        print(resp.data.decode('utf-8'))
         self.user_1_obj = json.loads(resp.data.decode('utf-8'))
         compare_req_resp(self.user_1, self.user_1_obj)
 
         # create user 2
         resp = self.app.post('/user/', data=json.dumps(self.user_2))
         response_success(resp)
+        print(resp.data.decode('utf-8'))
         self.user_2_obj = json.loads(resp.data.decode('utf-8'))
         compare_req_resp(self.user_2, self.user_2_obj)
 
@@ -128,8 +130,9 @@ class MongoRestTestCase(unittest.TestCase):
         }))
         response_error(resp)
         errors = json.loads(resp.data.decode('utf-8'))
+
         self.assertTrue('field-errors' in errors)
-        self.assertEqual(errors['field-errors'].keys(), dict(email='error').keys())
+        self.assertEqual(list(errors['field-errors'].keys()), ['email'])
 
         resp = self.app.put('/user/%s/' % self.user_1_obj['id'], data=json.dumps({
             'email': 'invalid',
@@ -139,7 +142,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp)
         errors = json.loads(resp.data.decode('utf-8'))
         self.assertTrue('field-errors' in errors)
-        self.assertEqual(errors['field-errors'].keys(), dict(email='error').keys())
+        self.assertEqual(list(errors['field-errors'].keys()), ['email'])
 
         resp = self.app.put('/user/%s/' % self.user_1_obj['id'], data=json.dumps({
             'emails': ['one@example.com', 'invalid', 'second@example.com', 'invalid2'],
@@ -148,8 +151,8 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp)
         errors = json.loads(resp.data.decode('utf-8'))
         self.assertTrue('field-errors' in errors)
-        self.assertEqual(errors['field-errors'].keys(), dict(emails='error').keys())
-        self.assertEqual(errors['field-errors']['emails']['errors'].keys(), {'3': 'error', '1': 'error'}.keys())
+        self.assertEqual(list(errors['field-errors'].keys()), ['emails'])
+        self.assertEqual(list(errors['field-errors']['emails']['errors'].keys()), ['1', '3'])
 
     def test_resource_fields(self):
         resp = self.app.post('/testfields/', data=json.dumps({
@@ -424,9 +427,8 @@ class MongoRestTestCase(unittest.TestCase):
         }))
         response_error(resp)
         data = json.loads(resp.data.decode('utf-8'))
-        print(data)
         self.assertEqual(data['count'], 0)
-        self.assertEqual(data['field-errors'].keys(), {'description': 'sss'}.keys())
+        self.assertEqual(list(data['field-errors'].keys()), ['description'])
 
     def test_post_auto_art_tag(self):
         # create a post by vangogh and an 'art' tag should be added automatically
@@ -592,12 +594,12 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.get('/user/%s/?_fields=email' % self.user_1_obj['id'])
         response_success(resp)
         user = json.loads(resp.data.decode('utf-8'))
-        self.assertEqual(user.keys(), dict(email='error').keys())
+        self.assertEqual(list(user.keys()), ['email'])
 
         resp = self.app.get('/user/%s/?_fields=first_name,last_name' % self.user_1_obj['id'])
         response_success(resp)
         user = json.loads(resp.data.decode('utf-8'))
-        self.assertEqual(user.keys(), dict(first_name=1, last_name=2).keys())
+        self.assertEqual(list(user.keys()), ['first_name','last_name'])
 
         # Make sure all fields can still be posted.
         test_user_data = {
@@ -610,7 +612,7 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.post('/user/?_fields=id', data=json.dumps(test_user_data))
         response_success(resp)
         user = json.loads(resp.data.decode('utf-8'))
-        self.assertEqual(user.keys(), dict(id=1).keys())
+        self.assertEqual(list(user.keys()), ['id'])
 
     def test_invalid_json(self):
         resp = self.app.post('/user/', data='{\"}')
@@ -1107,7 +1109,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
         # Test invalid ID
         resp = self.app.put('/person/%s/' % person_id, data=json.dumps({
             'languages': [
-                {'id': 'INVALID'},
+                { 'id': 'INVALID' },
             ]
         }))
         response_error(resp)
