@@ -150,7 +150,7 @@ class MongoRestTestCase(unittest.TestCase):
         errors = json.loads(resp.data.decode('utf-8'))
         self.assertTrue('field-errors' in errors)
         self.assertEqual(list(errors['field-errors'].keys()), ['emails'])
-        self.assertEqual(list(errors['field-errors']['emails']['errors'].keys()), ['1', '3'])
+        self.assertCountEqual(list(errors['field-errors']['emails']['errors'].keys()), ['3', '1'])
 
     def test_resource_fields(self):
         resp = self.app.post('/testfields/', data=json.dumps({
@@ -597,7 +597,7 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.get('/user/%s/?_fields=first_name,last_name' % self.user_1_obj['id'])
         response_success(resp)
         user = json.loads(resp.data.decode('utf-8'))
-        self.assertEqual(list(user.keys()), ['first_name','last_name'])
+        self.assertCountEqual(list(user.keys()), ['last_name', 'first_name'])
 
         # Make sure all fields can still be posted.
         test_user_data = {

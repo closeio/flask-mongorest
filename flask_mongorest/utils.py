@@ -37,7 +37,7 @@ def cmp_fields(ordering):
     # Example: sorted(objs, cmp_fields([('date_created', -1)]))
     def _cmp(x, y):
         for field, direction in ordering:
-            result = cmp(getattr(x, field), getattr(y, field)) * direction
+            result = ((getattr(x, field) > getattr(y, field)) - (getattr(x, field) < getattr(y, field))) * direction
             if result:
                 return result
         return 0
