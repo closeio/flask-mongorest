@@ -1,5 +1,5 @@
-Flask-MongoRest [![Build Status](https://circleci.com/gh/closeio/flask-mongorest.png?branch=master&style=shield)](https://circleci.com/gh/closeio/flask-mongorest)
-===============
+Flask-MongoRest [![Build Status](https://circleci.com/gh/saurabh1e/flask-mongorest.png?branch=master&style=shield)](https://circleci.com/gh/saurabh1e/flask-mongorest)
+======================================================================================================================================================================
 A Restful API framework wrapped around MongoEngine.
 
 Setup
@@ -12,7 +12,7 @@ from flask.ext.mongorest import MongoRest
 from flask.ext.mongorest.views import ResourceView
 from flask.ext.mongorest.resources import Resource
 from flask.ext.mongorest import operators as ops
-from flask.ext.mongorest import methods  
+from flask.ext.mongorest import methods
 
 
 app = Flask(__name__)
@@ -71,7 +71,7 @@ curl -H "Content-Type: application/json" -X POST -d \
   "content": {
     "text": "this is our test post content"
   }
-} 
+}
 ```
 Get a Post:
 ```
@@ -83,7 +83,7 @@ curl http://0.0.0.0:5000/posts/1/
   "content": {
     "text": "this is our test post content"
   }
-} 
+}
 ```
 List all Posts or filter by the title:
 ```
@@ -115,7 +115,7 @@ Request Params
 
 **_fields** => limit the response's fields to those named here (comma separated).
 
-**_order_by** => order results if this string is present in the Resource.allowed_ordering list.  
+**_order_by** => order results if this string is present in the Resource.allowed_ordering list.
 
 
 Resource Configuration
