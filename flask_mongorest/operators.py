@@ -1,3 +1,6 @@
+from datetime import datetime, timedelta
+
+
 class Operator(object):
     op = 'exact'
 
@@ -14,28 +17,34 @@ class Operator(object):
 
     def prepare_queryset_kwargs(self, field, value, negate):
         if negate:
-            return {'__'.join(filter(None, [field, 'not', self.op])): value}
+            return {'__'.join([_f for _f in [field, 'not', self.op] if _f]): value}
         else:
-            return {'__'.join(filter(None, [field, self.op])): value}
+            return {'__'.join([_f for _f in [field, self.op] if _f]): value}
 
     def apply(self, queryset, field, value, negate=False):
         kwargs = self.prepare_queryset_kwargs(field, value, negate)
         return queryset.filter(**kwargs)
 
+
 class Ne(Operator):
     op = 'ne'
+
 
 class Lt(Operator):
     op = 'lt'
 
+
 class Lte(Operator):
     op = 'lte'
+
 
 class Gt(Operator):
     op = 'gt'
 
+
 class Gte(Operator):
     op = 'gte'
+
 
 class Exact(Operator):
     op = 'exact'
@@ -48,8 +57,10 @@ class Exact(Operator):
         else:
             return {field: value}
 
+
 class IExact(Operator):
     op = 'iexact'
+
 
 class In(Operator):
     op = 'in'
@@ -61,25 +72,32 @@ class In(Operator):
             op = negate and 'nin' or self.op
         else:
             op = negate and 'ne' or ''
-        return {'__'.join(filter(None, [field, op])): value}
+        return {'__'.join([_f for _f in [field, op] if _f]): value}
+
 
 class Contains(Operator):
     op = 'contains'
 
+
 class IContains(Operator):
     op = 'icontains'
+
 
 class Startswith(Operator):
     op = 'startswith'
 
+
 class IStartswith(Operator):
     op = 'istartswith'
+
 
 class Endswith(Operator):
     op = 'endswith'
 
+
 class IEndswith(Operator):
     op = 'iendswith'
+
 
 class Boolean(Operator):
     op = 'exact'
@@ -95,3 +113,59 @@ class Boolean(Operator):
 
         return {field: bool_value}
 
+
+class DateExact(Operator):
+    op = 'date'
+
+    def prepare_queryset_kwargs(self, field, value, negate):
+        return {field + '__lte': datetime.strptime(value, '%Y-%m-%dT%H:%M:%S.%fZ').date() + timedelta(days=1),
+                field + '__gte': datetime.strptime(value, '%Y-%m-%dT%H:%M:%S.%fZ').date()}
+
+    def apply(self, queryset, field, value, negate=False):
+        kwargs = self.prepare_queryset_kwargs(field, value, negate)
+        return queryset.filter(**kwargs)
+
+
+class DateLte(Operator):
+    op = 'datelte'
+
+    def prepare_queryset_kwargs(self, field, value, negate):
+        return {field + '__lte': datetime.strptime(value, '%Y-%m-%dT%H:%M:%S.%fZ').date() + timedelta(days=1)}
+
+    def apply(self, queryset, field, value, negate=False):
+        kwargs = self.prepare_queryset_kwargs(field, value, negate)
+        return queryset.filter(**kwargs)
+
+
+class DateGte(Operator):
+    op = 'dategte'
+
+    def prepare_queryset_kwargs(self, field, value, negate):
+        return {field + '__gte': datetime.strptime(value, '%Y-%m-%dT%H:%M:%S.%fZ').date()}
+
+    def apply(self, queryset, field, value, negate=False):
+        kwargs = self.prepare_queryset_kwargs(field, value, negate)
+
+        return queryset.filter(**kwargs)
+
+
+class MatchExact(Operator):
+    op = 'match'
+
+    def prepare_queryset_kwargs(self, field, value, negate):
+        return {field.split('.')[0] + '__' + self.op: {field.split('.')[1]: value}}
+
+    def apply(self, queryset, field, value, negate=False):
+        kwargs = self.prepare_queryset_kwargs(field, value, negate)
+        return queryset.filter(**kwargs)
+
+
+class MatchContains(Operator):
+    op = 'matchcontains'
+
+    def prepare_queryset_kwargs(self, field, value, negate):
+        return {field.replace('.', '__'): {'$regex': value}}
+
+    def apply(self, queryset, field, value, negate=False):
+        kwargs = self.prepare_queryset_kwargs(field, value, negate)
+        return queryset.filter(**kwargs)

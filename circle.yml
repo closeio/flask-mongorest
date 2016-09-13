@@ -1,7 +1,15 @@
+machine:
+    python:
+        version: 3.4.5
+
 dependencies:
     pre:
         - pip install flake8
+        - pip install -r requirements.txt
 
 test:
     pre:
         - flake8 ./
+        - python setup.py build
+        - python setup.py test
+
