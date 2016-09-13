@@ -1,15 +1,9 @@
-language:
-    python:
-        - "3.4"
+
+python:
+      - "3.4"
 dependencies:
     pre:
         - pip install flake8
-install:
-    - pip install .
-    - pip install -r requirements.txt
-
 test:
     pre:
         - flake8 ./
-
-script: nosetests
