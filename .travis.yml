@@ -1,0 +1,11 @@
+language:
+    python:
+        - "3.4"
+dependencies:
+    pre:
+        - pip install flake8
+test:
+    pre:
+        - flake8 ./
+
+script: nosetests
