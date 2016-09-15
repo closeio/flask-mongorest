@@ -1,6 +1,6 @@
 import re
 from flask import Blueprint
-from flask.ext.mongorest.methods import Create, BulkUpdate, List
+from flask_mongorest.methods import Create, BulkUpdate, List
 
 
 def to_underscore(name):
