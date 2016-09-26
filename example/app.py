@@ -6,7 +6,7 @@ from flask.ext.mongorest import MongoRest
 from flask.ext.mongorest.views import ResourceView
 from flask.ext.mongorest.resources import Resource
 from flask.ext.mongorest import operators as ops
-from flask.ext.mongorest.methods import *
+from flask.ext.mongorest.methods import Create, Update, Fetch, List, Delete, BulkUpdate
 from flask.ext.mongorest.authentication import AuthenticationBase
 
 from example import schemas, documents
@@ -27,8 +27,8 @@ app.config.update(
     },
 )
 
-db = MongoEngine(app)
-api = MongoRest(app)
+db = MongoEngine()
+api = MongoRest()
 
 class UserResource(Resource):
     document = documents.User
@@ -304,6 +304,8 @@ class DictDocView(ResourceView):
     resource = DictDocResource
     methods = [Fetch, List, Create, Update]
 
+db.init_app(app)
+api.init_app(app)
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 8000))
