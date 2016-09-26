@@ -5,3 +5,5 @@ dependencies:
 test:
     pre:
         - flake8 ./
+    override:
+        - tox
