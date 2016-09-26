@@ -1,6 +1,4 @@
 import json
-import datetime
-import dateutil.parser
 import mongoengine
 
 from bson.dbref import DBRef
@@ -9,13 +7,12 @@ from flask import request, url_for
 from urlparse import urlparse
 from mongoengine.base.proxy import DocumentProxy
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, GenericReferenceField, SafeReferenceField
-from mongoengine.fields import DateTimeField, DictField
-from werkzeug.datastructures import MultiDict
+from mongoengine.fields import DictField
 
 from cleancat import ValidationError as SchemaValidationError
+from flask_mongorest import methods
 from flask_mongorest.exceptions import ValidationError, UnknownFieldError
-from flask_mongorest.utils import cmp_fields, isbound, isint
-from flask_mongorest.utils import MongoEncoder
+from flask_mongorest.utils import cmp_fields, isbound, isint, equal
 
 
 class ResourceMeta(type):
@@ -26,29 +23,83 @@ class ResourceMeta(type):
                     cls.child_document_resources[document] = cls
         type.__init__(cls, name, bases, classdict)
 
+
 class Resource(object):
-    document = None # required
+
+    # MongoEngine Document class related to this resource (required)
+    document = None
+
+    # List of fields that can (and should by default) be included in the
+    # response
     fields = None
-    readonly_fields = ['id']
-    form = None
-    schema = None
-    related_resources = {}
-    related_resources_hints = {} #@todo this should be integrated into the related_resources dict, possibly as a tuple
-    save_related_fields = []
+
+    # Dict of original field names (as seen in `fields`) and what they should
+    # be renamed to in the API response
     rename_fields = {}
-    child_document_resources = {}
-    paginate = True
-    select_related = False
+
+    # CleanCat Schema class (used for validation)
+    schema = None
+
+    # List of fields that the objects can be ordered by
     allowed_ordering = []
-    uri_prefix = None # Must start and end with a "/"
-    max_limit = 100 # cap the number of records in the _limit param to avoid DDoS'ing the API.
-    default_limit = 100 # default limit if no _limit is specified
+
+    # Define whether or not this resource supports pagination
+    paginate = True
+
+    # Default limit if no _limit is specified in the request. Only relevant
+    # if pagination is enabled.
+    default_limit = 100
+
+    # Maximum value of _limit that can be requested (avoids DDoS'ing the API).
+    # Only relevant if pagination is enabled.
+    max_limit = 100
+
+    # Maximum number of objects which can be bulk-updated by a single request
+    bulk_update_limit = 1000
+
+    # Map of field names and Resource classes that should be used to handle
+    # these fields (for serialization, saving, etc.).
+    related_resources = {}
+
+    # Map of field names on this resource's document to field names on the
+    # related resource's document, used as a helper in the process of
+    # turning a field value from a queryset to a list of objects
+    #
+    # TODO Behavior of this is *very* unintuitive and should be changed or
+    # dropped, or at least refactored
+    related_resources_hints = {}
+
+    # List of field names corresponding to related resources. If a field is
+    # mentioned here and in `related_resources`, it can be created/updated
+    # from within this resource.
+    save_related_fields = []
+
+    # Map of MongoEngine Document classes to Resource class names. Defines
+    # which sub-resource should be used for handling a particular subclass of
+    # this resource's document.
+    child_document_resources = {}
+
+    # Whenever a new document is posted and the system doesn't know the type
+    # of it yet, it will choose a default sub-resource for this document type
+    default_child_resource_document = None
+
+    # Defines whether MongoEngine's select_related should be used on a
+    # filtered query set, pulling all the references efficiently.
+    select_related = False
+
+    # Must start and end with a "/"
+    uri_prefix = None
 
     __metaclass__ = ResourceMeta
 
-    def __init__(self):
+    def __init__(self, view_method=None):
+        """
+        Initializes a resource. Optionally, a method class can be given to
+        view_method (see methods.py) so the resource can behave differently
+        depending on the method.
+        """
         doc_fields = self.document._fields.keys()
-        if self.fields == None:
+        if self.fields is None:
             self.fields = doc_fields
         self._related_resources = self.get_related_resources()
         self._rename_fields = self.get_rename_fields()
@@ -59,18 +110,56 @@ class Resource(object):
             'Cannot rename multiple fields to the same name'
         self._filters = self.get_filters()
         self._child_document_resources = self.get_child_document_resources()
+        self._default_child_resource_document = self.get_default_child_resource_document()
         self.data = None
         self._dirty_fields = None
+        self.view_method = view_method
+
+    @property
+    def params(self):
+        """
+        Return parameters of the request which is currently being processed.
+        Params can be passed in two different ways:
+
+        1. As a querystring (e.g. '/resource/?status=active&_limit=10').
+        2. As a _params property in the JSON payload. For example:
+             { '_params': { 'status': 'active', '_limit': '10' } }
+        """
+        if not hasattr(self, '_params'):
+            if '_params' in self.raw_data:
+                self._params = self.raw_data['_params']
+            else:
+                try:
+                    self._params = request.args.to_dict()
+                except AttributeError: # mocked request with regular dict
+                    self._params = request.args
+        return self._params
+
+    def _enforce_strict_json(self, val):
+        """
+        Helper method used to raise a ValueError if NaN, Infinity, or
+        -Infinity were posted. By default, json.loads accepts these values,
+        but it allows us to perform extra validation via a parse_constant
+        kwarg.
+        """
+        # according to the `json.loads` docs: "parse_constant, if specified,
+        # will be called with one of the following strings: '-Infinity',
+        # 'Infinity', 'NaN'". Since none of them are valid JSON, we can simply
+        # raise an exception here.
+        raise ValueError
 
     @property
     def raw_data(self):
+        """Validate and return parsed JSON payload."""
         if not hasattr(self, '_raw_data'):
-            if request.method in ('PUT', 'POST'):
+            if request.method in ('PUT', 'POST') or request.data:
                 if request.mimetype and 'json' not in request.mimetype:
                     raise ValidationError({'error': "Please send valid JSON with a 'Content-Type: application/json' header."})
+                if request.headers.get('Transfer-Encoding') == 'chunked':
+                    raise ValidationError({'error': "Chunked Transfer-Encoding is not supported."})
 
                 try:
-                    self._raw_data = json.loads(request.data)
+                    self._raw_data = json.loads(request.data, parse_constant=self._enforce_strict_json)
                 except ValueError:
                     raise ValidationError({'error': 'The request contains invalid JSON.'})
                 if not isinstance(self._raw_data, dict):
@@ -82,7 +171,7 @@ class Resource(object):
 
     @classmethod
     def uri(self, path):
-        """This generates a URI reference for the given path"""
+        """Generate a URI reference for the given path"""
         if self.uri_prefix:
             ret = self.uri_prefix+path
             return ret
@@ -91,7 +180,7 @@ class Resource(object):
 
     @classmethod
     def _url(self, path):
-        """This generates a complete URL for the given path.  Requires application context."""
+        """Generate a complete URL for the given path. Requires application context."""
         if self.uri_prefix:
             url = url_for(self.uri_prefix.lstrip("/").rstrip("/"),_external=True)
             ret = url+path
@@ -100,12 +189,27 @@ class Resource(object):
             raise ValueError("Cannot generate URL for resources that do not specify a uri_prefix")
 
     def get_fields(self):
+        """
+        Return a list of fields that should be included in the response
+        (unless a `_fields` param didn't include them).
+        """
         return self.fields
 
     def get_optional_fields(self):
+        """
+        Return a list of fields that can optionally be included in the
+        response (but only if a `_fields` param mentioned them explicitly).
+        """
         return []
 
     def get_requested_fields(self, **kwargs):
+        """
+        Process a list of fields requested by the client and return only the
+        ones which are allowed by get_fields and get_optional_fields.
+
+        If `_fields` param is set to '_all', return a list of all the fields
+        from get_fields and get_optional_fields combined.
+        """
         params = kwargs.get('params', None)
 
         include_all = False
@@ -125,7 +229,7 @@ class Resource(object):
             only_fields = None
 
         requested_fields = []
-        if include_all or only_fields == None:
+        if include_all or only_fields is None:
             if include_all:
                 field_selection = all_fields_set
             else:
@@ -140,6 +244,9 @@ class Resource(object):
 
         return requested_fields
 
+    def get_max_limit(self):
+        return self.max_limit
+
     def get_related_resources(self):
         return self.related_resources
 
@@ -153,9 +260,41 @@ class Resource(object):
         return self.rename_fields
 
     def get_child_document_resources(self):
-        return self.child_document_resources
+        # By default, don't inherit child_document_resources. This lets us have
+        # multiple resources for a child document without having to reset the
+        # child_document_resources property in the subclass.
+        if 'child_document_resources' in self.__class__.__dict__:
+            return self.child_document_resources
+        else:
+            return {}
+
+    def get_default_child_resource_document(self):
+        # See comment on get_child_document_resources.
+        if 'default_child_resource_document' in self.__class__.__dict__:
+            return self.default_child_resource_document
+        else:
+            return None
 
     def get_filters(self):
+        """
+        Given the filters declared on this resource, return a mapping
+        of all allowed filters along with their individual mappings of
+        suffixes and operators.
+
+        For example, if self.filters declares:
+            { 'date': [operators.Exact, operators.Gte] }
+        then this method will return:
+            {
+                'date': {
+                    '': operators.Exact,
+                    'exact': operators.Exact,
+                    'gte': operators.Gte
+                }
+            }
+        Then, when a request comes in, Flask-MongoRest will match
+        `?date__gte=value` to the 'date' field and the 'gte' suffix: 'gte',
+        and hence use the Gte operator to filter the data.
+        """
         filters = {}
         for field, operators in getattr(self, 'filters', {}).iteritems():
             field_filters = {}
@@ -166,22 +305,40 @@ class Resource(object):
             filters[field] = field_filters
         return filters
 
-
     def serialize_field(self, obj, **kwargs):
         if self.uri_prefix and hasattr(obj, "id"):
             return self._url(str(obj.id))
         else:
             return self.serialize(obj, **kwargs)
 
+    def _subresource(self, obj):
+        """
+        Select and create an appropriate sub-resource class for delegation or
+        return None if there isn't one.
+        """
+        s_class = self._child_document_resources.get(obj.__class__)
+        if not s_class and self._default_child_resource_document:
+            s_class = self._child_document_resources[self._default_child_resource_document]
+        if s_class and s_class != self.__class__:
+            r = s_class(view_method=self.view_method)
+            r.data = self.data
+            return r
+        else:
+            return None
+
     def serialize(self, obj, **kwargs):
+        """
+        Given an object, serialize it, turning it into its JSON
+        respresentation.
+        """
         if not obj:
             return {}
 
         # If a subclass of an obj has been called with a base class' resource,
         # use the subclass-specific serialization
-        if obj.__class__ in self._child_document_resources \
-        and self._child_document_resources[obj.__class__] != self.__class__:
-            return obj and self._child_document_resources[obj.__class__]().serialize_field(obj, **kwargs)
+        subresource = self._subresource(obj)
+        if subresource:
+            return subresource.serialize(obj, **kwargs)
 
         def get(obj, field_name, field_instance=None):
             """
@@ -189,8 +346,11 @@ class Resource(object):
             """
 
             has_field_instance = bool(field_instance)
-            field_instance = field_instance or self.document._fields.get(field_name, None) or getattr(self.document, field_name, None)
+            field_instance = (field_instance or
+                              self.document._fields.get(field_name, None) or
+                              getattr(self.document, field_name, None))
 
+            # Determine the field value
             if has_field_instance:
                 field_value = obj
             elif isinstance(obj, dict):
@@ -201,9 +361,16 @@ class Resource(object):
                 except AttributeError:
                     raise UnknownFieldError
 
+            # If this field is a reference or an embedded document, either
+            # return a DBRef or serialize it using a resource found in
+            # `related_resources`.
             if isinstance(field_instance, (ReferenceField, GenericReferenceField, EmbeddedDocumentField)):
                 if field_name in self._related_resources:
-                    return field_value and not isinstance(field_value, DBRef) and self._related_resources[field_name]().serialize_field(field_value, **kwargs)
+                    return (
+                        field_value and
+                        not isinstance(field_value, DBRef) and
+                        self._related_resources[field_name]().serialize_field(field_value, **kwargs)
+                    )
                 else:
                     if isinstance(field_value, DocumentProxy):
                         # Don't perform a DBRef isinstance check below since
@@ -212,16 +379,29 @@ class Resource(object):
                     if isinstance(field_value, DBRef):
                         return field_value
                     return field_value and field_value.to_dbref()
+
+            # If this field is a list, serialize each item in the list separately.
             elif isinstance(field_instance, ListField):
                 return [val for val in [get(elem, field_name, field_instance=field_instance.field) for elem in field_value] if val]
+
+            # If this field is a dict...
             elif isinstance(field_instance, DictField):
+                # ... serialize each value based on an explicit field type
+                # (e.g. if the schema defines a DictField(IntField), where all
+                # the values in the dict should be ints).
                 if field_instance.field:
-                    return dict(
-                        (key, get(elem, field_name,
-                                  field_instance=field_instance.field))
-                        for (key, elem) in field_value.iteritems())
+                    return {
+                        key: get(elem, field_name, field_instance=field_instance.field)
+                        for (key, elem) in field_value.iteritems()
+                    }
+                # ... or simply return the dict intact, if the field type
+                # wasn't specified
                 else:
                     return field_value
+
+            # If this field is callable, execute it and return it or serialize
+            # it based on its related resource defined in the
+            # `related_resources` map.
             elif callable(field_instance):
                 if isinstance(field_value, list):
                     value = field_value
@@ -243,18 +423,29 @@ class Resource(object):
                 return value
             return field_value
 
+        # Get the requested fields
         requested_fields = self.get_requested_fields(**kwargs)
 
-        # We're passing kwargs to child resources so we don't want the fields.
+        # Drop the kwargs we don't need any more (we're passing `kwargs` to
+        # child resources so we don't want to pass `fields` and `params` that
+        # pertain to the parent resource).
         kwargs.pop('fields', None)
         kwargs.pop('params', None)
 
+        # Fill in the `data` dict by serializing each of the requested fields
+        # one by one.
         data = {}
         for field in requested_fields:
+
+            # resolve the user-facing name of the field
             renamed_field = self._rename_fields.get(field, field)
 
+            # if the field is callable, execute it with `obj` as the param
             if hasattr(self, field) and callable(getattr(self, field)):
                 value = getattr(self, field)(obj)
+
+                # if the field is associated with a specific resource (via the
+                # `related_resources` map), use that resource to serialize it
                 if field in self._related_resources and value is not None:
                     related_resource = self._related_resources[field]()
                     if isinstance(value, mongoengine.document.Document):
@@ -278,38 +469,48 @@ class Resource(object):
         return data
 
     def handle_serialization_error(self, exc, obj):
+        """
+        Override this to implement custom behavior whenever serializing an
+        object fails.
+        """
         pass
 
     def value_for_field(self, obj, field):
-        # If we specify a field which doesn't exist on the resource or on the
-        # object, this method lets us return a custom value.
+        """
+        If we specify a field which doesn't exist on the resource or on the
+        object, this method lets us return a custom value.
+        """
         raise UnknownFieldError
 
     def validate_request(self, obj=None):
-        # Don't work on original raw data, we may reuse the resource for bulk updates.
+        """
+        Validate the request that's currently being processed and fill in
+        the self.data dict that'll later be used to save/update an object.
+
+        `obj` points to the object that's being updated, or is empty if a new
+        object is being created.
+        """
+        # When creating or updating a single object, delegate the validation
+        # to a more specific subresource, if it exists
+        if (request.method == 'PUT' and obj) or request.method == 'POST':
+            subresource = self._subresource(obj)
+            if subresource:
+                subresource._raw_data = self._raw_data
+                subresource.validate_request(obj=obj)
+                self.data = subresource.data
+                return
+
+        # Don't work on original raw data, we may reuse the resource for bulk
+        # updates.
         self.data = self.raw_data.copy()
 
-        if not self.schema and self.form:
-
-            if request.method == 'PUT' and obj != None:
-                # We treat 'PUT' like 'PATCH', i.e. when fields are not
-                # specified, existing values are used.
-
-                # TODO: This is not implemented properly for nested objects yet.
-
-                obj_data = self.serialize(obj)
-                obj_data.update(self.data)
-
-                self.data = obj_data
-
-        # @TODO this should rename form fields otherwise in a resource you could say "model_id" and in a form still have to use "model".
-
-        # Do renaming in two passes to prevent potential multiple renames depending on dict traversal order.
+        # Do renaming in two passes to prevent potential multiple renames
+        # depending on dict traversal order.
         # E.g. if a -> b, b -> c, then a should never be renamed to c.
         fields_to_delete = []
         fields_to_update = {}
         for k, v in self._rename_fields.iteritems():
-            if self.data.has_key(v):
+            if v in self.data:
                 fields_to_update[k] = self.data[v]
                 fields_to_delete.append(v)
         for k in fields_to_delete:
@@ -317,8 +518,10 @@ class Resource(object):
         for k, v in fields_to_update.iteritems():
             self.data[k] = v
 
+        # If CleanCat schema exists on this resource, use it to perform the
+        # validation
         if self.schema:
-            if request.method == 'PUT' and obj != None:
+            if request.method == 'PUT' and obj is not None:
                 obj_data = dict([(key, getattr(obj, key)) for key in obj._fields.keys()])
             else:
                 obj_data = None
@@ -329,87 +532,78 @@ class Resource(object):
             except SchemaValidationError:
                 raise ValidationError({'field-errors': schema.field_errors, 'errors': schema.errors })
 
-        elif self.form:
-            # We need to convert JSON data into form data.
-            # e.g. { "people": [ { "name": "A" } ] } into { "people-0-name": "A" }
-            def json_to_form_data(prefix, json_data):
-                form_data = {}
-                for k, v in json_data.iteritems():
-                    if isinstance(v, list): # FieldList
-                        for n, el in enumerate(v):
-                            if isinstance(el, dict): # only dict type is supported
-                                form_data.update(json_to_form_data('%s%s-%d-' % (prefix, k, n), el))
-                    else:
-                        if isinstance(v, dict): # DictField
-                            v = json.dumps(v, cls=MongoEncoder)
-                        if isinstance(v, bool) and v == False: # BooleanField
-                            v = []
-                        if isinstance(v, datetime.datetime): # DateTimeField
-                            v = v.strftime('%Y-%m-%d %H:%M:%S')
-                        if isinstance(v, DBRef): # ReferenceField
-                            v = v.id
-                        if v is None:
-                            v = ''
-                        form_data['%s%s' % (prefix, k)] = v
-                return form_data
-
-            json_data = json_to_form_data('', self.data)
-            data = MultiDict(json_data)
-            form = self.form(data, csrf_enabled=False)
-
-            if not form.validate():
-                raise ValidationError({'field-errors': form.errors})
-
-            self.data = form.data
-
     def get_queryset(self):
+        """
+        Return a MongoEngine queryset that will later be used to return
+        matching documents.
+        """
         return self.document.objects
 
     def get_object(self, pk, qfilter=None):
+        """
+        Given a PK and an optional queryset filter function, find a matching
+        document in the queryset.
+        """
         qs = self.get_queryset()
-        # If a queryset filter was provided, pass our current
-        # queryset in and get a new one out
+        # If a queryset filter was provided, pass our current queryset in and
+        # get a new one out
         if qfilter:
             qs = qfilter(qs)
         return qs.get(pk=pk)
 
     def fetch_related_resources(self, objs, only_fields=None):
+        """
+        Given a list of objects and an optional list of the only fields we
+        should care about, fetch these objects' related resources.
+        """
+
+        # Create a map of field names to MongoEngine Q objects that will
+        # later be used to fetch the related resources from MongoDB
+        # Queries for the same document/collection are combined to improve
+        # efficiency.
         document_queryset = {}
         for obj in objs:
             for field_name in self.related_resources_hints.keys():
-                if only_fields != None and field_name not in only_fields:
+                if only_fields is not None and field_name not in only_fields:
                     continue
-                resource = self.get_related_resources()[field_name]
                 method = getattr(obj, field_name)
                 if callable(method):
                     q = method()
-                    if field_name in document_queryset.keys():
+                    if field_name in document_queryset:
                         document_queryset[field_name] = (document_queryset[field_name] | q._query_obj)
                     else:
                         document_queryset[field_name] = q._query_obj
 
+        # For each field name, execute the queries we generated in the block
+        # above, and map the results to each object that references them.
+        # TODO This is in dire need of refactoring, or a complete overhaul
         hints = {}
-        for k,v in document_queryset.iteritems():
-            doc = self.get_related_resources()[k].document
+        for field_name, q_obj in document_queryset.iteritems():
+            doc = self.get_related_resources()[field_name].document
 
-            query = doc.objects.filter(v)
+            # Create a QuerySet based on the query object
+            query = doc.objects.filter(q_obj)
 
             # Don't let MongoDB do the sorting as it won't use the index.
             # Store the ordering so we can do client sorting afterwards.
             ordering = query._ordering or query._get_order_by(query._document._meta['ordering'])
             query = query.order_by()
 
-            results = [o for o in query] # don't use list() because mongoengine will do a count query
+            # Fetch the results
+            results = list(query)
 
+            # Reapply the ordering and add results to the mapping
             if ordering:
-                document_queryset[k] = sorted(results, cmp_fields(ordering))
+                document_queryset[field_name] = sorted(results, cmp_fields(ordering))
             else:
-                document_queryset[k] = results
+                document_queryset[field_name] = results
 
+            # For each field name, create a map of obj PKs to a list of
+            # results they referenced.
             hint_index = {}
-            if k in self.related_resources_hints.keys():
-                hint_field = self.related_resources_hints[k]
-                for obj in document_queryset[k]:
+            if field_name in self.related_resources_hints.keys():
+                hint_field = self.related_resources_hints[field_name]
+                for obj in document_queryset[field_name]:
                     hint_field_instance = obj._fields[hint_field]
                     # Don't trigger a query for SafeReferenceFields
                     if isinstance(hint_field_instance, SafeReferenceField):
@@ -423,23 +617,30 @@ class Resource(object):
                     else:
                         hint_index[hinted].append(obj)
 
-                hints[k] = hint_index
+                hints[field_name] = hint_index
 
+        # Assign the results to each object
+        # TODO This is in dire need of refactoring, or a complete overhaul
         for obj in objs:
-            for field, hint_index in hints.iteritems():
+            for field_name, hint_index in hints.iteritems():
                 obj_id = obj.id
                 if isinstance(obj_id, DBRef):
                     obj_id = obj_id.id
                 elif isinstance(obj_id, ObjectId):
                     obj_id = str(obj_id)
-                if obj_id not in hint_index.keys():
-                    setattr(obj, field, [])
-                    continue
-                setattr(obj, field, hint_index[obj_id])
+                if obj_id not in hint_index:
+                    setattr(obj, field_name, [])
+                else:
+                    setattr(obj, field_name, hint_index[obj_id])
 
     def apply_filters(self, qs, params=None):
+        """
+        Given this resource's filters, and the params of the request that's
+        currently being processed, apply additional filtering to the queryset
+        and return it.
+        """
         if params is None:
-            params = request.args
+            params = self.params
 
         for key, value in params.iteritems():
             # If this is a resource identified by a URI, we need
@@ -494,139 +695,107 @@ class Resource(object):
         return qs
 
     def apply_ordering(self, qs, params=None):
+        """
+        Given this resource's allowed_ordering, and the params of the request
+        that's currently being processed, apply ordering to the queryset
+        and return it.
+        """
         if params is None:
-            params = request.args
+            params = self.params
         if self.allowed_ordering and params.get('_order_by') in self.allowed_ordering:
             order_params = [self._reverse_rename_fields.get(p, p) for p in params['_order_by'].split(',')]
             qs = qs.order_by(*order_params)
         return qs
 
     def get_skip_and_limit(self, params=None):
+        """
+        Perform validation and return sanitized values for _skip and _limit
+        params of the request that's currently being processed.
+        """
+        max_limit = self.get_max_limit()
         if params is None:
-            params = request.args
+            params = self.params
         if self.paginate:
             # _limit and _skip validation
             if not isint(params.get('_limit', 1)):
                 raise ValidationError({'error': '_limit must be an integer (got "%s" instead).' % params['_limit']})
             if not isint(params.get('_skip', 1)):
                 raise ValidationError({'error': '_skip must be an integer (got "%s" instead).' % params['_skip']})
-            if params.get('_limit') and int(params['_limit']) > self.max_limit:
-                raise ValidationError({'error': "The limit you set is larger than the maximum limit for this resource (max_limit = %d)." % self.max_limit})
+            if params.get('_limit') and int(params['_limit']) > max_limit:
+                raise ValidationError({'error': "The limit you set is larger than the maximum limit for this resource (max_limit = %d)." % max_limit})
+            if params.get('_skip') and int(params['_skip']) < 0:
+                raise ValidationError({'error': '_skip must be a non-negative integer (got "%s" instead).' % params['_skip']})
 
-            limit = min(int(params.get('_limit', self.default_limit)), self.max_limit)
+            limit = min(int(params.get('_limit', self.default_limit)), max_limit)
             # Fetch one more so we know if there are more results.
             return int(params.get('_skip', 0)), limit
         else:
-            return 0, self.max_limit
+            return 0, max_limit
 
-    def get_objects(self, all=False, qs=None, qfilter=None):
-        params = request.args
+    def get_objects(self, qs=None, qfilter=None):
+        """
+        Return objects fetched from the database based on all the parameters
+        of the request that's currently being processed.
+
+        Params:
+        - Custom queryset can be passed via `qs`. Otherwise `self.get_queryset`
+          is used.
+        - Pass `qfilter` function to modify the queryset.
+        """
+        params = self.params
+
         custom_qs = True
         if qs is None:
             custom_qs = False
             qs = self.get_queryset()
 
-        # If a queryset filter was provided, pass our current
-        # queryset in and get a new one out
+        # If a queryset filter was provided, pass our current queryset in and
+        # get a new one out
         if qfilter:
             qs = qfilter(qs)
 
+        # Apply filters and ordering, based on the params supplied by the
+        # request
         qs = self.apply_filters(qs, params)
         qs = self.apply_ordering(qs, params)
 
+        # Apply limit and skip to the queryset
         limit = None
-        if not custom_qs and not all:
+        if self.view_method == methods.BulkUpdate:
+            # limit the number of objects that can be bulk-updated at a time
+            qs = qs.limit(self.bulk_update_limit)
+        elif not custom_qs:
+            # no need to skip/limit if a custom `qs` was provided
             skip, limit = self.get_skip_and_limit(params)
             qs = qs.skip(skip).limit(limit+1)
 
-        # Needs to be at the end as it returns a list.
+        # Needs to be at the end as it returns a list, not a queryset
         if self.select_related:
             qs = qs.select_related()
 
-        if limit is not None and self.paginate:
-            # It is OK to evaluate the queryset as we will do so anyway.
-            qs = [o for o in qs] # don't use list() because mongoengine will do a count query
-            has_more = len(qs) == limit+1
+        # Evaluate the queryset
+        objs = list(qs)
+
+        # Raise a validation error if bulk update would result in more than
+        # bulk_update_limit updates
+        if self.view_method == methods.BulkUpdate and len(objs) >= self.bulk_update_limit:
+            raise ValidationError({
+                'errors': ["It's not allowed to update more than %d objects at once" % self.bulk_update_limit]
+            })
+
+        # Determine the value of has_more
+        if self.view_method != methods.BulkUpdate and self.paginate:
+            has_more = len(objs) > limit
             if has_more:
-                qs = qs[:-1]
+                objs = objs[:-1]
         else:
             has_more = None
 
         # bulk-fetch related resources for moar speed
         if self.related_resources_hints:
-            self.fetch_related_resources(qs, self.get_requested_fields(params=request.args))
+            self.fetch_related_resources(objs, self.get_requested_fields(params=params))
 
-        return qs, has_more
-
-    def _get(self, method, data, field_name, field_instance=None, parent_resources=None):
-        """
-        @TODO needs significant cleanup
-        """
-        if not parent_resources:
-            parent_resources = []
-
-        field_data_value = data if field_instance else data[field_name]
-        field_instance = field_instance or getattr(self.document, field_name)
-
-        if isinstance(field_instance, ReferenceField):
-            if field_name in self._related_resources:
-                restype = self.get_related_resources()[field_name]
-                if restype.uri_prefix:
-                    url = urlparse(field_data_value)
-                    uri = url.path
-                    objid = uri.lstrip(restype.uri_prefix)
-                    qobj = field_instance.document_type.objects.get(pk=objid)
-                    retobj = qobj.to_dbref()
-                    return retobj
-                return restype().create_object(data=field_data_value, save=True, parent_resources=parent_resources+[self])
-            else:
-                if isinstance(field_data_value, mongoengine.Document):
-                    return field_data_value
-                return field_data_value and field_instance.document_type.objects.get(pk=field_data_value).to_dbref()
-
-        elif isinstance(field_instance, DateTimeField):
-            if isinstance(field_data_value, datetime.datetime):
-                return field_data_value
-            else:
-                return field_data_value and dateutil.parser.parse(field_data_value)
-
-        elif isinstance(field_instance, EmbeddedDocumentField):
-            if field_data_value == None:
-                return # no embedded document
-            if field_name in self._related_resources:
-                if isinstance(field_data_value, self.get_related_resources()[field_name].document):
-                    return field_data_value
-                return self.get_related_resources()[field_name]().create_object(data=field_data_value, save=False, parent_resources=parent_resources+[self])
-            else:
-                return {} # dummy embedded document
-
-        elif isinstance(field_instance, ListField):
-            def expand_list(inner_field, inner_data):
-                if isinstance(inner_field, ListField):
-                    return [expand_list(inner_field.field, elem) for elem in inner_data]
-                elif isinstance(inner_field, EmbeddedDocumentField):
-                    if isinstance(inner_data, self.get_related_resources()[field_name].document):
-                        return inner_data
-                    return self.get_related_resources()[field_name]().create_object(data=inner_data, save=False, parent_resources=parent_resources+[self])
-                else:
-                    return self._get(method, inner_data, field_name, field_instance=inner_field, parent_resources=parent_resources)
-            return [expand_list(field_instance.field, elem) for elem in field_data_value]
-
-        elif isinstance(field_instance, DictField) and field_instance.field:
-            def expand_map(inner_field, inner_data):
-                if isinstance(inner_field, DictField) and inner_field.field:
-                    return dict(
-                        (key, expand_map(inner_field.field, elem))
-                        for key, elem in inner_data.items())
-                elif isinstance(inner_field, EmbeddedDocumentField):
-                    return self.related_resources[field_name]().create_object(data=inner_data, save=False, parent_resources=parent_resources+[self])
-                else:
-                    return self._get(method, inner_data, field_name, field_instance=inner_field, parent_resources=parent_resources)
-            return dict(
-                (key, expand_map(field_instance.field, elem))
-                for key, elem in field_data_value.items())
-        else:
-            return field_data_value
+        return objs, has_more
 
     def save_related_objects(self, obj, parent_resources=None):
         if not parent_resources:
@@ -668,127 +837,55 @@ class Resource(object):
 
         self._dirty_fields = None # No longer dirty.
 
-    def _save(self, obj):
-        try:
-            self.save_object(obj)
-        except mongoengine.ValidationError, e:
-            def serialize_errors(errors):
-                if hasattr(errors, 'iteritems'):
-                    return dict((k, serialize_errors(v)) for (k, v) in errors.iteritems())
-                else:
-                    return unicode(errors)
-            raise ValidationError({'field-errors': serialize_errors(e.errors)})
+    def get_object_dict(self, data=None, update=False):
+        data = self.data or data
+        filter_fields = set(self.document._fields.keys())
+        if update:
+            # We want to update only the fields that appear in the request data
+            # rather than re-updating all the document's existing/other fields.
+            filter_fields &= set(self._reverse_rename_fields.get(field, field)
+                                 for field in self.raw_data.keys())
+        update_dict = {field: value for field, value in data.items()
+                       if field in filter_fields}
+        return update_dict
 
     def create_object(self, data=None, save=True, parent_resources=None):
-        kwargs = {}
-        data = data or self.data
-        if self.schema:
-            self._dirty_fields = []
-        for field in self.get_fields():
-            if field in self.document._fields.keys() and field not in self.readonly_fields and (type(data) is list or (type(data) is dict and data.has_key(field))):
-                if self.schema:
-                    kwargs[field] = data[field]
-                    self._dirty_fields.append(field)
-                else:
-                    # TODO: remove old code
-                    kwargs[field] = self._get('create_object', data, field, parent_resources=parent_resources)
-        obj = self.document(**kwargs)
+        update_dict = self.get_object_dict(data)
+        obj = self.document(**update_dict)
+        self._dirty_fields = update_dict.keys()
         if save:
-            self._save(obj)
+            self.save_object(obj)
         return obj
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
-        def equal(a, b):
-            # Two mongoengine objects are equal if their ID is equal. However,
-            # in this case we want to check if the data is equal. Note this
-            # doesn't look into mongoengine documents which are nested within
-            # mongoengine documents.
-            def cmp(a, b):
-                # When comparing dicts (we serialize documents using to_dict)
-                # we may encounter datetime instances in the values, so compare
-                # them item by item.
-                if isinstance(a, dict) and isinstance(b, dict):
-                    if a.keys() != b.keys():
-                        return False
-                    for k, v in a.iteritems():
-                        if not cmp(b[k], v):
-                            return False
-                    return True
+        subresource = self._subresource(obj)
+        if subresource:
+            return subresource.update_object(obj, data=data, save=save, parent_resources=parent_resources)
 
-                # Since comparing an aware and unaware datetime results in an
-                # exception and we may assign unaware datetimes to objects that
-                # previously had an aware datetime, we convert aware datetimes
-                # to their unaware equivalent before comparing.
-                if isinstance(a, datetime.datetime) and isinstance(b, datetime.datetime):
-                    # This doesn't cover all the cases, but it covers the most
-                    # important case where the utcoffset is 0.
-                    if (a.utcoffset() != None) and a.utcoffset() == datetime.timedelta(0):
-                        a = a.replace(tzinfo=None)
-                    if (b.utcoffset() != None) and b.utcoffset() == datetime.timedelta(0):
-                        b = b.replace(tzinfo=None)
-                    try:
-                        return a == b
-                    except:
-                        return False
-                try:
-                    return a == b
-                except: # Exception during comparison, mainly datetimes.
-                    return False
-
-            if not cmp(a, b):
-                return False
-            else:
-                if isinstance(a, list):
-                    return all([equal(m, n) for (m, n) in zip(a, b)])
-                elif isinstance(a, dict):
-                    return all([equal(m, n) for (m, n) in zip(a.values(), b.values())])
-                elif isinstance(a, mongoengine.Document):
-                    # Don't evaluate lazy documents
-                    if getattr(a, '_lazy', False) and getattr(b, '_lazy', False):
-                        return True
-                    return cmp(a.to_dict(), b.to_dict())
-                else:
-                    return True
+        update_dict = self.get_object_dict(data, update=True)
 
         self._dirty_fields = []
-        data = data or self.data
 
-        # For updates, we want to update only the fields that appear in the request data rather than
-        # re-updating all the document's existing/other fields.
-        raw_fields = [self._reverse_rename_fields.get(field, field) for field in self.raw_data.keys()]
-        fields = self.get_fields() if not obj.pk else list(set(self.get_fields()) & set(raw_fields))
-        for field in fields:
-            if self.schema:
-                if (field in self.document._fields.keys() and
-                    field not in self.readonly_fields and
-                    (type(data) is list or (type(data) is dict and field in data))
-                   ):
-                    update = False
+        for field, value in update_dict.items():
+            update = False
 
-                    # If we're comparing reference fields, only compare ids without hitting the database
-                    if isinstance(obj._fields.get(field), ReferenceField):
-                        db_val = obj._db_data.get(field)
-                        id_from_obj = db_val and getattr(db_val, 'id', db_val)
-                        id_from_data = data.get(field) and data[field].pk
-                        if id_from_obj != id_from_data:
-                            update = True
-                    elif not equal(getattr(obj, field), data[field]):
-                        update = True
+            # If we're comparing reference fields, only compare ids without
+            # hitting the database
+            if isinstance(obj._fields.get(field), ReferenceField):
+                db_val = obj._db_data.get(field)
+                id_from_obj = db_val and getattr(db_val, 'id', db_val)
+                id_from_data = value and getattr(value, 'pk', value)
+                if id_from_obj != id_from_data:
+                    update = True
+            elif not equal(getattr(obj, field), value):
+                update = True
 
-                    if update:
-                        setattr(obj, field, data[field])
-                        self._dirty_fields.append(field)
-            else:
-                # TODO: remove old code
-                if field in self.document._fields.keys() and field not in self.readonly_fields and field in data:
-                    if field in self._related_resources and not hasattr(self._related_resources[field], 'uri_prefix'):
-                        field_instance = getattr(self.document, field)
-                        if isinstance(field_instance, ReferenceField) or (isinstance(field_instance, ListField) and isinstance(field_instance.field, ReferenceField)):
-                            continue # Not implemented.
-                    setattr(obj, field, self._get('update_object', data, field, parent_resources=parent_resources))
+            if update:
+                setattr(obj, field, value)
+                self._dirty_fields.append(field)
+
         if save:
-            self._save(obj)
-
+            self.save_object(obj)
         return obj
 
     def delete_object(self, obj, parent_resources=None):

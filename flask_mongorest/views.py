@@ -12,9 +12,20 @@ from flask_views.base import View
 
 mimerender = mimerender.FlaskMimeRender()
 
-render_json = lambda **payload: json.dumps(payload, cls=MongoEncoder)
+render_json = lambda **payload: json.dumps(payload, allow_nan=False, cls=MongoEncoder)
 render_html = lambda **payload: render_template('mongorest/debug.html', data=json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4))
 
+def serialize_mongoengine_validation_error(e):
+    def serialize_errors(errors):
+        if hasattr(errors, 'iteritems'):
+            return dict((k, serialize_errors(v)) for (k, v) in errors.iteritems())
+        else:
+            return unicode(errors)
+
+    if e.errors:
+        return {'field-errors': serialize_errors(e.errors)}
+    else:
+        return {'error': e.message}
 
 class ResourceView(View):
     resource = None
@@ -45,14 +56,20 @@ class ResourceView(View):
             return super(ResourceView, self).dispatch_request(*args, **kwargs)
         except mongoengine.queryset.DoesNotExist as e:
             return {'error': 'Empty query: ' + str(e)}, '404 Not Found'
-        except mongoengine.ValidationError as e:
-            return {'field-errors': e.errors}, '400 Bad Request'
         except ValidationError as e:
             return e.message, '400 Bad Request'
         except Unauthorized as e:
             return {'error': 'Unauthorized'}, '401 Unauthorized'
         except NotFound as e:
             return {'error': unicode(e)}, '404 Not Found'
+
+    def handle_validation_error(self, e):
+        if isinstance(e, ValidationError):
+            raise
+        elif isinstance(e, mongoengine.ValidationError):
+            raise ValidationError(serialize_mongoengine_validation_error(e))
+        else:
+            raise
 
     def requested_resource(self, request):
         """In the case where the Resource that this view is associated with points to a Document class
@@ -70,7 +87,6 @@ class ResourceView(View):
             self._resource.view_method = methods.Fetch
         else:
             self._resource.view_method = methods.List
-
 
         # Create a queryset filter to control read access to the
         # underlying objects
@@ -102,7 +118,7 @@ class ResourceView(View):
                 'data': data
             }
 
-            if has_more != None:
+            if has_more is not None:
                 ret['has_more'] = has_more
 
             if extra:
@@ -120,7 +136,10 @@ class ResourceView(View):
         self._resource.view_method = methods.Create
 
         self._resource.validate_request()
-        obj = self._resource.create_object()
+        try:
+            obj = self._resource.create_object()
+        except Exception, e:
+            self.handle_validation_error(e)
 
         # Check if we have permission to create this object
         if not self.has_add_permission(request, obj):
@@ -131,6 +150,35 @@ class ResourceView(View):
             return ret, "201 Created", {"Location": self._resource._url(str(obj.id))}
         else:
             return ret
+
+    def process_object(self, obj):
+        """Validate and update an object"""
+        # Check if we have permission to change this object
+        if not self.has_change_permission(request, obj):
+            raise Unauthorized
+
+        self._resource.validate_request(obj)
+
+        try:
+            obj = self._resource.update_object(obj)
+        except Exception, e:
+            self.handle_validation_error(e)
+
+    def process_objects(self, objs):
+        """
+        Update each object in the list one by one, and return the total count
+        of updated objects.
+        """
+        count = 0
+        try:
+            for obj in objs:
+                self.process_object(obj)
+                count += 1
+        except ValidationError, e:
+            e.message['count'] = count
+            raise e
+        else:
+            return {'count': count}
 
     def put(self, **kwargs):
         pk = kwargs.pop('pk', None)
@@ -145,7 +193,7 @@ class ResourceView(View):
             # Bulk update where the body contains the new values for certain
             # fields.
 
-            # Currently, fetches all the objects and validate them separately.
+            # Currently, fetches all the objects and validates them separately.
             # If one of them fails, a ValidationError for this object will be
             # triggered.
             # Ideally, this would be translated into an update statement for
@@ -154,33 +202,19 @@ class ResourceView(View):
             # is a bulk update, only the count of objects which were updated is
             # returned.
 
-            result = self._resource.get_objects(all=True)
+            # Get a list of all objects matching the filters, capped at this
+            # resource's `bulk_update_limit`
+            result = self._resource.get_objects()
             if len(result) == 2:
                 objs, has_more = result
             elif len(result) == 3:
                 objs, has_more, extra = result
-            count = 0
-            try:
-                for obj in objs:
-                    self._resource.validate_request(obj)
-                    obj = self._resource.update_object(obj)
-                    # Raise or skip?
-                    if not self.has_change_permission(request, obj):
-                        raise Unauthorized
-                    obj.save()
-                    count += 1
-            except ValidationError, e:
-                e.message['count'] = count
-                raise e
-            else:
-                return {'count': count}
+
+            # Update all the objects and return their count
+            return self.process_objects(objs)
         else:
             obj = self._resource.get_object(pk)
-            # Check if we have permission to change this object
-            if not self.has_change_permission(request, obj):
-                raise Unauthorized
-            self._resource.validate_request(obj)
-            obj = self._resource.update_object(obj)
+            self.process_object(obj)
             ret = self._resource.serialize(obj, params=request.args)
             return ret
 

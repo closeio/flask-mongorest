@@ -1,20 +1,21 @@
 from setuptools import setup
 
 # Stops exit traceback on tests
+# TODO this makes flake8's F401 fail - maybe there's a better way
 try:
-    import multiprocessing
+    import multiprocessing # noqa
 except:
-   pass
+    pass
 
 setup(
     name='Flask-MongoRest',
     version='0.1.1',
-    url='http://github.com/elasticsales/flask-mongorest',
+    url='http://github.com/closeio/flask-mongorest',
     license='BSD',
-    author='Anthony Nemitz',
-    author_email='anemitz@gmail.com',
-    maintainer='Anthony Nemitz',
-    maintainer_email='anemitz@gmail.com',
+    author='Close.io',
+    author_email='engineering@close.io',
+    maintainer='Close.io',
+    maintainer_email='engineering@close.io',
     description='Flask restful API framework for MongoDB/MongoEngine',
     long_description=__doc__,
     packages=[
