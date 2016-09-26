@@ -1,13 +1,13 @@
 import os
 
 from flask import Flask, request
-from flask.ext.mongoengine import MongoEngine
-from flask.ext.mongorest import MongoRest
-from flask.ext.mongorest.views import ResourceView
-from flask.ext.mongorest.resources import Resource
-from flask.ext.mongorest import operators as ops
-from flask.ext.mongorest.methods import *
-from flask.ext.mongorest.authentication import AuthenticationBase
+from flask_mongoengine import MongoEngine
+from flask_mongorest import MongoRest
+from flask_mongorest.views import ResourceView
+from flask_mongorest.resources import Resource
+from flask_mongorest import operators as ops
+from flask_mongorest.methods import *
+from flask_mongorest.authentication import AuthenticationBase
 
 from example import schemas, documents
 

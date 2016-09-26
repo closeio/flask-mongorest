@@ -5,10 +5,10 @@ import mongoengine
 from flask import request, render_template
 from werkzeug.exceptions import NotFound, Unauthorized
 
-from flask.ext.mongorest.exceptions import ValidationError
-from flask.ext.mongorest.utils import MongoEncoder
-from flask.ext.mongorest import methods
-from flask.ext.views.base import View
+from flask_mongorest.exceptions import ValidationError
+from flask_mongorest.utils import MongoEncoder
+from flask_mongorest import methods
+from flask_views.base import View
 
 mimerender = mimerender.FlaskMimeRender()
 
