@@ -10,10 +10,10 @@ class MongoRest(object):
 
     def register(self, **kwargs):
         def decorator(klass):
-
-            # Construct a url based on a 'name' kwarg with a fallback to a Mongo document's name
+            # Construct a url based on a 'name' kwarg with a fallback to the
+            # view's class name. Note that the name must be unique.
             document_name = klass.resource.document.__name__.lower()
-            name = kwargs.pop('name', document_name)
+            name = kwargs.pop('name', klass.__name__)
             url = kwargs.pop('url', '/%s/' % document_name)
 
             # Insert the url prefix, if it exists

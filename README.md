@@ -12,7 +12,7 @@ from flask_mongorest import MongoRest
 from flask_mongorest.views import ResourceView
 from flask_mongorest.resources import Resource
 from flask_mongorest import operators as ops
-from flask_mongorest import methods  
+from flask_mongorest import methods
 
 
 app = Flask(__name__)

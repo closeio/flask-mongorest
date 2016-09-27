@@ -29,7 +29,10 @@ class Post(Document):
     author = ReferenceField(User)
     editor = ReferenceField(User)
     tags = ListField(StringField(max_length=30))
-    user_lists = ListField(SafeReferenceField(User))
+    try:
+        user_lists = ListField(SafeReferenceField(User))
+    except NameError:
+        user_lists = ListField(ReferenceField(User))
     sections = ListField(EmbeddedDocumentField(Content))
     content = EmbeddedDocumentField(Content)
     is_published = BooleanField()

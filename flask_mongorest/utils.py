@@ -17,7 +17,7 @@ def isint(int_str):
 class MongoEncoder(json.JSONEncoder):
     def default(self, value, **kwargs):
         if isinstance(value, ObjectId):
-            return unicode(value)
+            return str(value)
         if isinstance(value, DBRef):
             return value.id
         if isinstance(value, datetime.datetime):
@@ -27,6 +27,11 @@ class MongoEncoder(json.JSONEncoder):
         if isinstance(value, decimal.Decimal):
             return str(value)
         return super(MongoEncoder, self).default(value, **kwargs)
+
+try:
+    cmp
+except NameError: # Python 3
+    cmp = lambda a, b: (a>b)-(a<b)
 
 def cmp_fields(ordering):
     # Takes a list of fields and directions and returns a
@@ -55,7 +60,7 @@ def equal(a, b):
     if isinstance(a, dict) and isinstance(b, dict):
         if sorted(a.keys()) != sorted(b.keys()):
             return False
-        for k, v in a.iteritems():
+        for k, v in a.items():
             if not equal(b[k], v):
                 return False
         return True
@@ -73,7 +78,7 @@ def equal(a, b):
         # Don't evaluate lazy documents
         if getattr(a, '_lazy', False) and getattr(b, '_lazy', False):
             return True
-        return equal(a.to_dict(), b.to_dict())
+        return equal(dict(a.to_mongo()), dict(b.to_mongo()))
 
     # Since comparing an aware and unaware datetime results in an
     # exception and we may assign unaware datetimes to objects that

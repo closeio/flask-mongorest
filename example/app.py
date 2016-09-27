@@ -23,7 +23,7 @@ app.config.update(
         'HOST': 'localhost',
         'PORT': 27017,
         'DB': 'mongorest_example_app',
-        'TZ_AWARE': True,
+        'TZ_AWARE': False,
     },
 )
 

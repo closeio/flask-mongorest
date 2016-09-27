@@ -32,7 +32,6 @@ setup(
         'Flask-MongoEngine',
         'mimerender',
         'nose',
-        'coverage',
         'python-dateutil',
         'cleancat'
     ],
