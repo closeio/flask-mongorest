@@ -1,6 +1,5 @@
 import json
 import mongoengine
-import sys
 
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
