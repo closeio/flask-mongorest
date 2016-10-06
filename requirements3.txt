@@ -1,0 +1,10 @@
+-e git://github.com/closeio/cleancat.git#egg=cleancat-dev
+mongoengine
+flask-mongoengine
+mimerender
+python-dateutil
+sphinx
+Flask>=0.9
+Flask-Views
+pymongo
+flake8
