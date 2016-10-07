@@ -165,7 +165,7 @@ class Resource(object):
                     raise ValidationError({'error': "Chunked Transfer-Encoding is not supported."})
 
                 try:
-                    self._raw_data = json.loads(request.data.decode(), parse_constant=self._enforce_strict_json)
+                    self._raw_data = json.loads(request.data.decode('utf-8'), parse_constant=self._enforce_strict_json)
                 except ValueError:
                     raise ValidationError({'error': 'The request contains invalid JSON.'})
                 if not isinstance(self._raw_data, dict):

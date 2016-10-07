@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import json
 import copy
 import datetime
@@ -144,6 +146,24 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.get('/user/%s/' % self.user_1_obj['id'])
         data2 = resp_json(resp)
         self.assertEqual(data, data2)
+
+    def test_unicode(self):
+        """
+        Make sure unicode data payloads are properly decoded.
+        """
+        self.user_1_obj['first_name'] = u'Jörg'
+
+        # Don't encode unicode characters
+        resp = self.app.put('/user/%s/' % self.user_1_obj['id'], data=json.dumps(self.user_1_obj, ensure_ascii=False))
+        response_success(resp)
+        data = resp_json(resp)
+        compare_req_resp(self.user_1_obj, data)
+
+        # Encode unicode characters as "\uxxxx" (default)
+        resp = self.app.put('/user/%s/' % self.user_1_obj['id'], data=json.dumps(self.user_1_obj, ensure_ascii=True))
+        response_success(resp)
+        data = resp_json(resp)
+        compare_req_resp(self.user_1_obj, data)
 
     def test_model_validation(self):
         resp = self.app.post('/user/', data=json.dumps({
