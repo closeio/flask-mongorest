@@ -6,6 +6,7 @@ import datetime
 import unittest
 import example.app as example
 from mongoengine.context_managers import query_counter
+from mongoengine.errors import ValidationError
 
 try:
     from mongoengine import SafeReferenceField
@@ -1286,6 +1287,39 @@ class MongoRestSchemaTestCase(unittest.TestCase):
         # test list
         self.assertRaises(ValueError, self.app.get, '/dict_doc/')
 
+class InternalTestCase(unittest.TestCase):
+    """
+    Test internal methods.
+    """
+
+    def test_serialize_mongoengine_validation_error(self):
+        from flask_mongorest.views import serialize_mongoengine_validation_error
+
+        error = ValidationError(errors={
+            'a': ValidationError('Invalid value')
+        })
+        result = serialize_mongoengine_validation_error(error)
+        self.assertEqual(result, {
+            'field-errors': {
+                'a': 'Invalid value',
+            }
+        })
+
+        error = ValidationError('Invalid value')
+        result = serialize_mongoengine_validation_error(error)
+        self.assertEqual(result, {
+            'error': 'Invalid value'
+        })
+
+        error = ValidationError(errors={
+            'a': 'Invalid value'
+        })
+        result = serialize_mongoengine_validation_error(error)
+        self.assertEqual(result, {
+            'field-errors': {
+                'a': 'Invalid value',
+            }
+        })
 
 if __name__ == '__main__':
     unittest.main()
