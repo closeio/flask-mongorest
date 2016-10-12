@@ -172,9 +172,15 @@ class MongoRestTestCase(unittest.TestCase):
         }))
         response_error(resp)
         errors = resp_json(resp)
-        self.assertEqual(errors, {
+        self.assertTrue(errors == {
             'field-errors': {
                 'email': u'Invalid email address: 💩'
+            }
+        } or errors == {
+            # Workaround for
+            # https://github.com/MongoEngine/mongoengine/pull/1384
+            'field-errors': {
+                'email': u'Invalid Mail-address: 💩'
             }
         })
 
