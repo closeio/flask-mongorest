@@ -16,14 +16,14 @@ render_json = lambda **payload: json.dumps(payload, allow_nan=False, cls=MongoEn
 render_html = lambda **payload: render_template('mongorest/debug.html', data=json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4))
 
 def serialize_mongoengine_validation_error(e):
-    def serialize_errors(errors):
-        if hasattr(errors, 'items'):
-            return dict((k, serialize_errors(v)) for (k, v) in errors.items())
+    def serialize_errors(e):
+        if e.errors:
+            return dict((k, serialize_errors(v)) for (k, v) in e.errors.items())
         else:
-            return str(errors)
+            return e.message
 
     if e.errors:
-        return {'field-errors': serialize_errors(e.errors)}
+        return {'field-errors': serialize_errors(e)}
     else:
         return {'error': e.message}
 

@@ -165,6 +165,33 @@ class MongoRestTestCase(unittest.TestCase):
         data = resp_json(resp)
         compare_req_resp(self.user_1_obj, data)
 
+    def test_model_validation_unicode(self):
+        # MongoEngine validation error (no schema)
+        resp = self.app.post('/test/', data=json.dumps({
+            'email': u'💩',
+        }))
+        response_error(resp)
+        errors = resp_json(resp)
+        self.assertEqual(errors, {
+            'field-errors': {
+                'email': u'Invalid email address: 💩'
+            }
+        })
+
+        # Schema validation error
+        resp = self.app.post('/user/', data=json.dumps({
+            'email': 'test@example.com',
+            'datetime': 'invalid',
+        }))
+        response_error(resp)
+        errors = resp_json(resp)
+        self.assertEqual(errors, {
+            'errors': [],
+            'field-errors': {
+                'datetime': u'Invalid date 💩'
+            }
+        })
+
     def test_model_validation(self):
         resp = self.app.post('/user/', data=json.dumps({
             'email': 'invalid',

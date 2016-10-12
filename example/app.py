@@ -138,6 +138,7 @@ class TestDocument(db.Document):
     other = db.StringField()
     dictfield = db.DictField()
     is_new = db.BooleanField()
+    email = db.EmailField()
 
 class TestResource(Resource):
     document = TestDocument
