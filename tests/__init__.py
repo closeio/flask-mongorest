@@ -6,6 +6,7 @@ import datetime
 import unittest
 import example.app as example
 from mongoengine.context_managers import query_counter
+from mongoengine.errors import ValidationError
 
 try:
     from mongoengine import SafeReferenceField
@@ -164,6 +165,39 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
         data = resp_json(resp)
         compare_req_resp(self.user_1_obj, data)
+
+    def test_model_validation_unicode(self):
+        # MongoEngine validation error (no schema)
+        resp = self.app.post('/test/', data=json.dumps({
+            'email': u'💩',
+        }))
+        response_error(resp)
+        errors = resp_json(resp)
+        self.assertTrue(errors == {
+            'field-errors': {
+                'email': u'Invalid email address: 💩'
+            }
+        } or errors == {
+            # Workaround for
+            # https://github.com/MongoEngine/mongoengine/pull/1384
+            'field-errors': {
+                'email': u'Invalid Mail-address: 💩'
+            }
+        })
+
+        # Schema validation error
+        resp = self.app.post('/user/', data=json.dumps({
+            'email': 'test@example.com',
+            'datetime': 'invalid',
+        }))
+        response_error(resp)
+        errors = resp_json(resp)
+        self.assertEqual(errors, {
+            'errors': [],
+            'field-errors': {
+                'datetime': u'Invalid date 💩'
+            }
+        })
 
     def test_model_validation(self):
         resp = self.app.post('/user/', data=json.dumps({
@@ -1253,6 +1287,39 @@ class MongoRestSchemaTestCase(unittest.TestCase):
         # test list
         self.assertRaises(ValueError, self.app.get, '/dict_doc/')
 
+class InternalTestCase(unittest.TestCase):
+    """
+    Test internal methods.
+    """
+
+    def test_serialize_mongoengine_validation_error(self):
+        from flask_mongorest.views import serialize_mongoengine_validation_error
+
+        error = ValidationError(errors={
+            'a': ValidationError('Invalid value')
+        })
+        result = serialize_mongoengine_validation_error(error)
+        self.assertEqual(result, {
+            'field-errors': {
+                'a': 'Invalid value',
+            }
+        })
+
+        error = ValidationError('Invalid value')
+        result = serialize_mongoengine_validation_error(error)
+        self.assertEqual(result, {
+            'error': 'Invalid value'
+        })
+
+        error = ValidationError(errors={
+            'a': 'Invalid value'
+        })
+        result = serialize_mongoengine_validation_error(error)
+        self.assertEqual(result, {
+            'field-errors': {
+                'a': 'Invalid value',
+            }
+        })
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from cleancat import *
 
 from example import documents
@@ -7,7 +9,7 @@ class User(Schema):
     first_name = String(required=False)
     last_name = String(required=False)
     emails = List(Email(), required=False)
-    datetime = DateTime(required=False)
+    datetime = DateTime(regex_message=u'Invalid date 💩', required=False)
     datetime_local = DateTime(required=False)
     balance = Integer(required=False)
 

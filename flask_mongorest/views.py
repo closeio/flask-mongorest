@@ -15,12 +15,24 @@ mimerender = mimerender.FlaskMimeRender()
 render_json = lambda **payload: json.dumps(payload, allow_nan=False, cls=MongoEncoder)
 render_html = lambda **payload: render_template('mongorest/debug.html', data=json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4))
 
+try:
+    text_type = unicode # Python 2
+except NameError:
+    text_type = str # Python 3
+
 def serialize_mongoengine_validation_error(e):
-    def serialize_errors(errors):
-        if hasattr(errors, 'items'):
-            return dict((k, serialize_errors(v)) for (k, v) in errors.items())
+    """
+    Takes a MongoEngine ValidationError as an argument, and returns a
+    serializable error dict. Note that we can have nested ValidationErrors.
+    """
+
+    def serialize_errors(e):
+        if getattr(e, 'message', None):
+            return e.message
+        elif hasattr(e, 'items'):
+            return dict((k, serialize_errors(v)) for (k, v) in e.items())
         else:
-            return str(errors)
+            return text_type(e)
 
     if e.errors:
         return {'field-errors': serialize_errors(e.errors)}
