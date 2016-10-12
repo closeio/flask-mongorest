@@ -9,7 +9,7 @@ except:
 
 setup(
     name='Flask-MongoRest',
-    version='0.2.1',
+    version='0.2.2',
     url='http://github.com/closeio/flask-mongorest',
     license='BSD',
     author='Close.io',
