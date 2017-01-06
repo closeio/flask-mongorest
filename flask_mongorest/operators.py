@@ -24,7 +24,7 @@ want to filter them by the range of their scores like so:
 Then you can create a Range Operator:
 
     class Range(Operator):
-        # op is not necessary here
+        op = 'range'
 
         def prepare_queryset_kwargs(self, field, value, negate=False):
             # For the sake of simplicity, we won't support negate here,
