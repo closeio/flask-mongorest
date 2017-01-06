@@ -897,6 +897,7 @@ class Resource(object):
     def delete_object(self, obj, parent_resources=None):
         obj.delete()
 
+
 # Py2/3 compatible way to do metaclasses (or six.add_metaclass)
 body = vars(Resource).copy()
 body.pop('__dict__', None)
