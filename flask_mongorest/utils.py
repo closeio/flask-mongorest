@@ -28,6 +28,7 @@ class MongoEncoder(json.JSONEncoder):
             return str(value)
         return super(MongoEncoder, self).default(value, **kwargs)
 
+
 try:
     cmp
 except NameError: # Python 3
