@@ -5,18 +5,18 @@ from flask_mongorest.methods import Create, BulkUpdate, List
 class MongoRest(object):
     def __init__(self, app=None, **kwargs):
         self.app = None
-        
+        self.url_prefix = kwargs.pop('url_prefix', '')
+         
         if app is not None:
-            self.init_app(app, config)
-    
+            self.init_app(app)
+     
     def init_app(self, app):
         if not app or not isinstance(app, Flask):
             raise Exception('Invalid Flask application instance')
-        
         self.app = app
-        self.url_prefix = kwargs.pop('url_prefix', '')
+
         app.register_blueprint(Blueprint(self.url_prefix, __name__, template_folder='templates'))
-        
+
     def register(self, **kwargs):
         def decorator(klass):
             # Construct a url based on a 'name' kwarg with a fallback to the
