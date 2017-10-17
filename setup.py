@@ -28,12 +28,14 @@ setup(
     zip_safe=False,
     platforms='any',
     setup_requires=[
+        'nose',
+    ],
+    install_requires=[
         'Flask-Views',
         'Flask-MongoEngine',
         'mimerender',
-        'nose',
         'python-dateutil',
-        'cleancat'
+        'cleancat',
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
