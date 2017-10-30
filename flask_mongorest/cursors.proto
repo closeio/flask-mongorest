@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+// Generate protobuf class with:
+//   protoc --python_out=. flask_mongorest/cursors.proto
+message SequentialCursor {
+  uint32 time = 1;
+  uint64 skip = 2;
+  uint64 limit = 3;
+}

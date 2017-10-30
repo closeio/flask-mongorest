@@ -6,5 +6,9 @@ sphinx
 cleancat>=0.3
 Flask>=0.9
 Flask-Views
+protobuf==3.4.0
+pycrypto==2.6
 pymongo<3.0
+pyutil==2.0.0
 flake8
+-e git+ssh://git@github.com/closeio/zbase62.git@e13d2c748ccdb0cafe6465961a0c6a4111ee219f#egg=zbase62

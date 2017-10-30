@@ -5,6 +5,7 @@ import mongoengine
 from flask import request, render_template
 from werkzeug.exceptions import NotFound, Unauthorized
 
+from flask_mongorest.cursors import generate_sequential_cursor
 from flask_mongorest.exceptions import ValidationError
 from flask_mongorest.utils import MongoEncoder
 from flask_mongorest import methods
@@ -132,6 +133,8 @@ class ResourceView(View):
 
             if has_more is not None:
                 ret['has_more'] = has_more
+                if has_more and self._resource.cursor:
+                    ret['cursor'] = self._resource.cursor
 
             if extra:
                 ret.update(extra)
@@ -258,4 +261,3 @@ class ResourceView(View):
 
     def has_delete_permission(self, request, obj):
         return True
-

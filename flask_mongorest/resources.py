@@ -1,9 +1,11 @@
+import time
+
 import json
 import mongoengine
 
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
-from flask import request, url_for
+from flask import current_app, request, url_for
 try:
     from urllib.parse import urlparse
 except ImportError: # Python 2
@@ -21,6 +23,9 @@ from mongoengine.fields import DictField
 
 from cleancat import ValidationError as SchemaValidationError
 from flask_mongorest import methods
+from flask_mongorest.cursors import decode_sequential_cursor, generate_sequential_cursor
+from flask_mongorest.cursors_pb2 import SequentialCursor
+
 from flask_mongorest.exceptions import ValidationError, UnknownFieldError
 from flask_mongorest.utils import cmp_fields, isbound, isint, equal
 
@@ -61,6 +66,10 @@ class Resource(object):
     # Maximum value of _limit that can be requested (avoids DDoS'ing the API).
     # Only relevant if pagination is enabled.
     max_limit = 100
+
+    # Max skip limit before requiring a cursor
+    require_cursor_limit = None
+    cursor = None
 
     # Maximum number of objects which can be bulk-updated by a single request
     bulk_update_limit = 1000
@@ -753,9 +762,28 @@ class Resource(object):
             if params.get('_skip') and int(params['_skip']) < 0:
                 raise ValidationError({'error': '_skip must be a non-negative integer (got "%s" instead).' % params['_skip']})
 
-            limit = min(int(params.get('_limit', self.default_limit)), max_limit)
+            cursor = params.get('_cursor')
+            if (params.get('_skip') or params.get('_limit')) and cursor:
+                raise ValidationError({'error': 'Cannot provide _cursor and _skip/_limit.'})
+
+            if cursor:
+                cursor_value = decode_sequential_cursor(cursor)
+                # Confirm cursor has not expired.  Further checks can be added if necessary like
+                # checking hash of query or URL.
+                ttl = current_app.config.get('CURSOR_TTL')
+                if ttl and time.time() - cursor_value.time > ttl:
+                    raise ValidationError({'error': 'Cursor has expired (max age %ds)' % ttl})
+                skip = cursor_value.skip
+                limit = cursor_value.limit
+            else:
+                skip = int(params.get('_skip', 0))
+                limit = min(int(params.get('_limit', self.default_limit)), max_limit)
+                if self.require_cursor_limit and skip > self.require_cursor_limit:
+                    raise ValidationError({'error': 'The cursor must be used if _skip is greater than %d.' % self.require_cursor_limit})
+
+            self.cursor = generate_sequential_cursor(skip, limit)
             # Fetch one more so we know if there are more results.
-            return int(params.get('_skip', 0)), limit
+            return skip, limit
         else:
             return 0, max_limit
 
