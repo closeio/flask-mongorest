@@ -5,7 +5,6 @@ import mongoengine
 from flask import request, render_template
 from werkzeug.exceptions import NotFound, Unauthorized
 
-from flask_mongorest.cursors import generate_sequential_cursor
 from flask_mongorest.exceptions import ValidationError
 from flask_mongorest.utils import MongoEncoder
 from flask_mongorest import methods

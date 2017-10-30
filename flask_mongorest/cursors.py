@@ -1,6 +1,5 @@
 import logging
 import struct
-import sys
 import time
 
 from flask import current_app
@@ -32,7 +31,7 @@ def decode_sequential_cursor(encrypted_data):
         sc = SequentialCursor()
         # Deserialize data into protobuf instance
         sc.ParseFromString(decrypted_data[INT_SIZE:size+INT_SIZE])
-    except Exception as e:
+    except Exception:
         logger.exception('Error decoding cursor')
         raise ValidationError({'error': '_cursor invalid.'})
 

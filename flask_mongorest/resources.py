@@ -24,7 +24,6 @@ from mongoengine.fields import DictField
 from cleancat import ValidationError as SchemaValidationError
 from flask_mongorest import methods
 from flask_mongorest.cursors import decode_sequential_cursor, generate_sequential_cursor
-from flask_mongorest.cursors_pb2 import SequentialCursor
 
 from flask_mongorest.exceptions import ValidationError, UnknownFieldError
 from flask_mongorest.utils import cmp_fields, isbound, isint, equal
