@@ -1,0 +1,38 @@
+version: 2
+
+workflows:
+  version: 2
+  workflow:
+    jobs:
+      - test-2.7
+      - test-3.5
+
+defaults: &defaults
+  working_directory: ~/code
+  steps:
+  - checkout
+  - run:
+      name: Install dependencies
+      command: pipenv install -r $REQUIREMENTS_FILE nose
+  - run:
+      name: Lint
+      command: pipenv run flake8
+  - run:
+      name: Test
+      command: pipenv run nosetests
+
+jobs:
+  test-2.7:
+    <<: *defaults
+    docker:
+    - image: circleci/python:2.7
+      environment:
+        REQUIREMENTS_FILE: requirements.txt
+    - image: mongo:3.0.7
+  test-3.5:
+    <<: *defaults
+    docker:
+    - image: circleci/python:3.5
+      environment:
+        REQUIREMENTS_FILE: requirements3.txt
+    - image: mongo:3.0.7

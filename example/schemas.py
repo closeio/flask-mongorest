@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from cleancat import *
+from cleancat.mongo import MongoEmbeddedReference, MongoReference
 
 from example import documents
 
