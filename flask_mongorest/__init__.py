@@ -1,5 +1,5 @@
 from flask import Blueprint
-from flask_mongorest.methods import Create, BulkUpdate, List
+from flask_mongorest.methods import BulkUpdate, Create, List
 
 
 class MongoRest(object):
@@ -26,11 +26,23 @@ class MongoRest(object):
             pk_type = kwargs.pop('pk_type', 'string')
             view_func = klass.as_view(name)
             if List in klass.methods:
-                self.app.add_url_rule(url, defaults={'pk': None}, view_func=view_func, methods=[List.method], **kwargs)
+                self.app.add_url_rule(
+                    url,
+                    endpoint=name + '.list',
+                    defaults={'pk': None},
+                    view_func=view_func,
+                    methods=[List.method],
+                    **kwargs
+                )
             if Create in klass.methods or BulkUpdate in klass.methods:
-                self.app.add_url_rule(url, view_func=view_func, methods=[x.method for x in klass.methods if x in (Create, BulkUpdate)], **kwargs)
+                self.app.add_url_rule(
+                    url,
+                    endpoint=name + '.edit',
+                    view_func=view_func,
+                    methods=[x.method for x in klass.methods if x in (Create, BulkUpdate)],
+                    **kwargs
+                )
             self.app.add_url_rule('%s<%s:%s>/' % (url, pk_type, 'pk'), view_func=view_func, methods=[x.method for x in klass.methods if x not in (List, BulkUpdate)], **kwargs)
             return klass
 
         return decorator
-
