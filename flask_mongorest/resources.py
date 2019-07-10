@@ -865,6 +865,8 @@ class Resource(object):
         self._dirty_fields = None # No longer dirty.
 
     def get_object_dict(self, data=None, update=False):
+        if data is None:
+            data = {}
         data = self.data or data
         filter_fields = set(self.document._fields.keys())
         if update:
