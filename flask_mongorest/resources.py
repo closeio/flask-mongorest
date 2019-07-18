@@ -531,6 +531,16 @@ class Resource(object):
         # updates.
         self.data = self.raw_data.copy()
 
+        # Convert object_id to object
+        if request.method == 'PUT' and obj:
+            id_to_obj = {}
+            for k, v in self.data.items():
+                field = obj._fields[k]
+                if isinstance(field, ReferenceField):
+                    id_to_obj[k] = field.document_type.objects.get(pk=v)
+            for k, v in id_to_obj.items():
+                self.data[k] = v
+
         # Do renaming in two passes to prevent potential multiple renames
         # depending on dict traversal order.
         # E.g. if a -> b, b -> c, then a should never be renamed to c.
