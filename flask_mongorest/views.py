@@ -1,14 +1,13 @@
 import json
+
 import mimerender
 import mongoengine
-
-from flask import request, render_template
-from werkzeug.exceptions import NotFound, Unauthorized
-
+from flask import render_template, request
+from flask.views import MethodView
+from flask_mongorest import methods
 from flask_mongorest.exceptions import ValidationError
 from flask_mongorest.utils import MongoEncoder
-from flask_mongorest import methods
-from flask_views.base import View
+from werkzeug.exceptions import NotFound, Unauthorized
 
 mimerender = mimerender.FlaskMimeRender()
 
@@ -39,7 +38,7 @@ def serialize_mongoengine_validation_error(e):
     else:
         return {'error': e.message}
 
-class ResourceView(View):
+class ResourceView(MethodView):
     resource = None
     methods = []
     authentication_methods = []
@@ -258,4 +257,3 @@ class ResourceView(View):
 
     def has_delete_permission(self, request, obj):
         return True
-

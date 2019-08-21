@@ -5,6 +5,5 @@ mimerender
 python-dateutil
 sphinx
 Flask>=0.9
-Flask-Views
 pymongo
 flake8

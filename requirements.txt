@@ -5,6 +5,5 @@ python-dateutil
 sphinx
 cleancat>=0.3
 Flask>=0.9
-Flask-Views
 pymongo>=3.4
 flake8
