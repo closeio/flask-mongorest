@@ -28,11 +28,11 @@ jobs:
     - image: circleci/python:2.7
       environment:
         REQUIREMENTS_FILE: requirements.txt
-    - image: mongo:3.0.7
+    - image: mongo:3.2.19
   test-3.5:
     <<: *defaults
     docker:
     - image: circleci/python:3.5
       environment:
         REQUIREMENTS_FILE: requirements3.txt
-    - image: mongo:3.0.7
+    - image: mongo:3.2.19
