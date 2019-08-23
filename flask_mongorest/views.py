@@ -20,6 +20,17 @@ try:
 except NameError:
     text_type = str # Python 3
 
+def get_exception_message(e):
+    """ME ValidationError has compatibility code with py2.6
+    that doesn't follow py3 .args interface. This works around that.
+    """
+    from mongoengine.errors import ValidationError as MEValidationError
+    if isinstance(e, MEValidationError) and not e.args:
+        return e.message
+    else:
+        return e.args[0]
+
+
 def serialize_mongoengine_validation_error(e):
     """
     Takes a MongoEngine ValidationError as an argument, and returns a
@@ -27,8 +38,8 @@ def serialize_mongoengine_validation_error(e):
     """
 
     def serialize_errors(e):
-        if getattr(e, 'message', None):
-            return e.message
+        if isinstance(e, Exception):
+            return get_exception_message(e)
         elif hasattr(e, 'items'):
             return dict((k, serialize_errors(v)) for (k, v) in e.items())
         else:
@@ -37,7 +48,7 @@ def serialize_mongoengine_validation_error(e):
     if e.errors:
         return {'field-errors': serialize_errors(e.errors)}
     else:
-        return {'error': e.message}
+        return {'error': get_exception_message(e)}
 
 class ResourceView(View):
     resource = None
@@ -69,7 +80,7 @@ class ResourceView(View):
         except mongoengine.queryset.DoesNotExist as e:
             return {'error': 'Empty query: ' + str(e)}, '404 Not Found'
         except ValidationError as e:
-            return e.message, '400 Bad Request'
+            return e.args[0], '400 Bad Request'
         except Unauthorized:
             return {'error': 'Unauthorized'}, '401 Unauthorized'
         except NotFound as e:
@@ -187,7 +198,7 @@ class ResourceView(View):
                 self.process_object(obj)
                 count += 1
         except ValidationError as e:
-            e.message['count'] = count
+            e.args[0]['count'] = count
             raise e
         else:
             return {'count': count}

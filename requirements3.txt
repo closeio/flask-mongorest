@@ -8,3 +8,4 @@ Flask>=0.9
 Flask-Views
 pymongo
 flake8
+flake8-bugbear

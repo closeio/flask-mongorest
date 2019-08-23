@@ -95,5 +95,5 @@ def equal(a, b):
 
     try:
         return a == b
-    except: # Exception during comparison, mainly datetimes.
+    except Exception: # Exception during comparison, mainly datetimes.
         return False
