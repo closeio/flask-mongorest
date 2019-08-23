@@ -4,7 +4,7 @@ from setuptools import setup
 # TODO this makes flake8's F401 fail - maybe there's a better way
 try:
     import multiprocessing # noqa
-except:
+except Exception:
     pass
 
 setup(

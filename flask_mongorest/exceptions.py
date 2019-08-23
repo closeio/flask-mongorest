@@ -1,15 +1,6 @@
 
 class MongoRestException(Exception):
-    def __init__(self, message):
-        self._message = message
-
-    def _get_message(self):
-        return self._message
-
-    def _set_message(self, message):
-        self._message = message
-
-    message = property(_get_message, _set_message)
+    pass
 
 class OperatorNotAllowed(MongoRestException):
     def __init__(self, operator_name):
