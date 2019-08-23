@@ -70,7 +70,7 @@ class ResourceView(View):
             return {'error': 'Empty query: ' + str(e)}, '404 Not Found'
         except ValidationError as e:
             return e.message, '400 Bad Request'
-        except Unauthorized as e:
+        except Unauthorized:
             return {'error': 'Unauthorized'}, '401 Unauthorized'
         except NotFound as e:
             return {'error': str(e)}, '404 Not Found'
