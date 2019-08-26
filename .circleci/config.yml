@@ -14,7 +14,10 @@ defaults: &defaults
   - checkout
   - run:
       name: Install dependencies
-      command: pip install --user -r $REQUIREMENTS_FILE nose flake8
+      command: pip install --user -r $REQUIREMENTS_FILE nose
+  - run:
+      name: Lint
+      command: flake8 flask_mongorest
   - run:
       name: Test
       command: nosetests
