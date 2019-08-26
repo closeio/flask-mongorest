@@ -14,13 +14,13 @@ defaults: &defaults
   - checkout
   - run:
       name: Install dependencies
-      command: pipenv install -r $REQUIREMENTS_FILE nose
+      command: pip install --user -r $REQUIREMENTS_FILE nose
   - run:
       name: Lint
-      command: pipenv run flake8
+      command: flake8 flask_mongorest
   - run:
       name: Test
-      command: pipenv run nosetests
+      command: nosetests
 
 jobs:
   test-2.7:

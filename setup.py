@@ -28,7 +28,6 @@ setup(
     zip_safe=False,
     platforms='any',
     setup_requires=[
-        'Flask-Views',
         'Flask-MongoEngine',
         'mimerender',
         'nose',
