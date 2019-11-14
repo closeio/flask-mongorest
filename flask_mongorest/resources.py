@@ -19,7 +19,17 @@ except ImportError:
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, GenericReferenceField
 from mongoengine.fields import DictField
 
-from cleancat import ValidationError as SchemaValidationError
+try:
+    from cleancat import Schema as CleancatSchema
+    from cleancat import ValidationError as SchemaValidationError
+except ImportError:
+    CleancatSchema = None
+
+try:
+    from marshmallow_mongoengine import ModelSchema
+except ImportError:
+    ModelSchema = None
+
 from flask_mongorest import methods
 from flask_mongorest.exceptions import ValidationError, UnknownFieldError
 from flask_mongorest.utils import cmp_fields, isbound, isint, equal
@@ -556,16 +566,24 @@ class Resource(object):
         # If CleanCat schema exists on this resource, use it to perform the
         # validation
         if self.schema:
+            if CleancatSchema is None and ModelSchema is None:
+                raise ImportError('Cannot validate schema without CleanCat or Marshmallow!')
+
             if request.method == 'PUT' and obj is not None:
                 obj_data = dict([(key, getattr(obj, key)) for key in obj._fields.keys()])
             else:
                 obj_data = None
 
-            schema = self.schema(self.data, obj_data)
-            try:
-                self.data = schema.full_clean()
-            except SchemaValidationError:
-                raise ValidationError({'field-errors': schema.field_errors, 'errors': schema.errors })
+            if CleancatSchema is not None:
+                try:
+                    schema = self.schema(self.data, obj_data)
+                    self.data = schema.full_clean()
+                except SchemaValidationError:
+                    raise ValidationError({'field-errors': schema.field_errors, 'errors': schema.errors })
+            elif ModelSchema is not None:
+                self.data, errors = self.schema().load(self.data)
+                if errors:
+                    raise ValidationError({'errors': errors})
 
     def get_queryset(self):
         """

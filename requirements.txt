@@ -3,7 +3,6 @@
 mimerender
 python-dateutil
 sphinx
-cleancat>=0.3
 Flask>=0.9
 pymongo>=3.4
 flake8

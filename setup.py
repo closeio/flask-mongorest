@@ -31,8 +31,7 @@ setup(
         'Flask-MongoEngine',
         'mimerender',
         'nose',
-        'python-dateutil',
-        'cleancat'
+        'python-dateutil'
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
