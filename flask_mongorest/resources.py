@@ -581,7 +581,8 @@ class Resource(object):
                 except SchemaValidationError:
                     raise ValidationError({'field-errors': schema.field_errors, 'errors': schema.errors })
             elif ModelSchema is not None:
-                self.data, errors = self.schema().load(self.data)
+                partial = bool(request.method == 'PUT' and obj is not None)
+                self.data, errors = self.schema().load(self.data, partial=partial)
                 if errors:
                     raise ValidationError({'errors': errors})
 
@@ -946,7 +947,7 @@ class Resource(object):
                 id_from_data = value and getattr(value, 'pk', value)
                 if id_from_obj != id_from_data:
                     update = True
-            elif not equal(getattr(obj, field), value):
+            elif not obj._fields[field].primary_key and not equal(getattr(obj, field), value):
                 update = True
 
             if update:
