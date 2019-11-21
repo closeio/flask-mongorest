@@ -6,3 +6,4 @@ sphinx
 Flask>=0.9
 pymongo>=3.4
 flake8
+dict-deep==2.0.2
