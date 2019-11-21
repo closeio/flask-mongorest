@@ -75,20 +75,38 @@ class Operator(object):
         kwargs = self.prepare_queryset_kwargs(field, value, negate)
         return queryset.filter(**kwargs)
 
+def try_float(value):
+    try:
+        return float(value)
+    except ValueError:
+        return value
+
 class Ne(Operator):
     op = 'ne'
 
 class Lt(Operator):
     op = 'lt'
 
+    def prepare_queryset_kwargs(self, field, value, negate):
+        return {'__'.join(filter(None, [field, self.op])): try_float(value)}
+
 class Lte(Operator):
     op = 'lte'
+
+    def prepare_queryset_kwargs(self, field, value, negate):
+        return {'__'.join(filter(None, [field, self.op])): try_float(value)}
 
 class Gt(Operator):
     op = 'gt'
 
+    def prepare_queryset_kwargs(self, field, value, negate):
+        return {'__'.join(filter(None, [field, self.op])): try_float(value)}
+
 class Gte(Operator):
     op = 'gte'
+
+    def prepare_queryset_kwargs(self, field, value, negate):
+        return {'__'.join(filter(None, [field, self.op])): try_float(value)}
 
 class Exact(Operator):
     op = 'exact'
