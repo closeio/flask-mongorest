@@ -592,7 +592,8 @@ class Resource(object):
         Return a MongoEngine queryset that will later be used to return
         matching documents.
         """
-        return self.document.objects
+        mask = self.get_requested_fields(params=self.params)
+        return self.document.objects.only(*mask)
 
     def get_object(self, pk, qfilter=None):
         """
