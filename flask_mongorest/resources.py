@@ -593,8 +593,11 @@ class Resource(object):
         Return a MongoEngine queryset that will later be used to return
         matching documents.
         """
-        mask = self.get_requested_fields(params=self.params)
-        return self.document.objects.only(*mask)
+        if request.method == 'PUT':
+            return self.document.objects  # get full documents for updates
+        else:
+            mask = self.get_requested_fields(params=self.params)
+            return self.document.objects.only(*mask)
 
     def get_object(self, pk, qfilter=None):
         """
