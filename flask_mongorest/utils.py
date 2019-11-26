@@ -3,6 +3,7 @@ import decimal
 import datetime
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
+from bson.decimal128 import Decimal128
 import mongoengine
 
 isbound = lambda m: getattr(m, 'im_self', None) is not None
@@ -26,6 +27,9 @@ class MongoEncoder(json.JSONEncoder):
             return value.strftime("%Y-%m-%d")
         if isinstance(value, decimal.Decimal):
             return str(value)
+        if isinstance(value, Decimal128):
+            return str(value.to_decimal())
+
         return super(MongoEncoder, self).default(value, **kwargs)
 
 
