@@ -19,15 +19,15 @@ class MongoEncoder(json.JSONEncoder):
     def default(self, value, **kwargs):
         if isinstance(value, ObjectId):
             return str(value)
-        if isinstance(value, DBRef):
+        elif isinstance(value, DBRef):
             return value.id
-        if isinstance(value, datetime.datetime):
+        elif isinstance(value, datetime.datetime):
             return value.isoformat()
-        if isinstance(value, datetime.date):
+        elif isinstance(value, datetime.date):
             return value.strftime("%Y-%m-%d")
-        if isinstance(value, decimal.Decimal):
+        elif isinstance(value, decimal.Decimal):
             return str(value)
-        if isinstance(value, Decimal128):
+        elif isinstance(value, Decimal128):
             return str(value.to_decimal())
 
         return super(MongoEncoder, self).default(value, **kwargs)

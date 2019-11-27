@@ -76,6 +76,9 @@ class Resource(object):
     # Maximum number of objects which can be bulk-updated by a single request
     bulk_update_limit = 1000
 
+    # Map of field names to paginate with according default and maximum limits
+    fields_to_paginate = {}
+
     # Map of field names and Resource classes that should be used to handle
     # these fields (for serialization, saving, etc.).
     related_resources = {}
@@ -620,6 +623,32 @@ class Resource(object):
                 [obj], self.get_requested_fields(params=self.params)
             )
 
+        return obj
+
+    def paginate_fields(self, obj):
+        """
+        return object with fields paginated according to `fields_to_paginate`
+        """
+        for field, limits in self.fields_to_paginate.items():
+            page = self.params.get(f'{field}_page', 1)
+            per_page = self.params.get(f'{field}_per_page', limits[0])
+            # page and per_page validation
+            if not isint(page):
+                raise ValidationError({'error': f'{field}_page must be an integer.'})
+            if not isint(per_page):
+                raise ValidationError({'error': f'{field}_per_page must be an integer.'})
+            if int(per_page) > limits[1]:
+                raise ValidationError({'error': f"The per page limit ({per_page}) you set is larger than the maximum for the {field} field ({limits[1]})."})
+            if int(page) < 0:
+                raise ValidationError({'error': f'{field}_page must be a non-negative integer.'})
+
+            per_page = min(int(per_page), limits[1])
+            nrows = len(obj[field])
+            max_page = int(nrows/per_page) + bool(nrows % per_page)
+            if int(page) > max_page:
+                obj.data = []
+            else:
+                obj.data = obj.paginate_field(field, int(page), per_page=per_page).items
         return obj
 
     def fetch_related_resources(self, objs, only_fields=None):

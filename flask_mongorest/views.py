@@ -128,6 +128,7 @@ class ResourceView(MethodView):
 
             data = []
             for obj in objs:
+                obj = self._resource.paginate_fields(obj)
                 try:
                     data.append(self._resource.serialize(obj, params=request.args))
                 except Exception as e:
@@ -147,6 +148,7 @@ class ResourceView(MethodView):
                 ret.update(extra)
         else:
             obj = self._resource.get_object(pk, qfilter=qfilter)
+            obj = self._resource.paginate_fields(obj)
             ret = self._resource.serialize(obj, params=request.args)
         return ret
 
