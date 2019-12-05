@@ -597,7 +597,9 @@ class Resource(object):
         if request.method == 'PUT':
             return self.document.objects  # get full documents for updates
         else:
-            mask = self.get_requested_fields(params=self.params)
+            document_fields = set(self.document._fields.keys())
+            requested_fields = set(self.get_requested_fields(params=self.params))
+            mask = requested_fields & document_fields
             return self.document.objects.only(*mask)
 
     def get_object(self, pk, qfilter=None):
