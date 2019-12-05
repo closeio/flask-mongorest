@@ -598,7 +598,9 @@ class Resource(object):
             return self.document.objects  # get full documents for updates
         else:
             document_fields = set(self.document._fields.keys())
-            requested_fields = set(self.get_requested_fields(params=self.params))
+            requested_fields = set(
+                f.split('.', 1)[0] for f in self.get_requested_fields(params=self.params)
+            )
             mask = requested_fields & document_fields
             return self.document.objects.only(*mask)
 
