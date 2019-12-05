@@ -587,9 +587,7 @@ class Resource(object):
                     raise ValidationError({'field-errors': schema.field_errors, 'errors': schema.errors })
             elif ModelSchema is not None:
                 partial = bool(request.method == 'PUT' and obj is not None)
-                self.data, errors = self.schema().load(self.data, partial=partial)
-                if errors:
-                    raise ValidationError({'errors': errors})
+                self.data = self.schema().load(self.data, partial=partial)
 
     def get_queryset(self):
         """
