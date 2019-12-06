@@ -248,7 +248,7 @@ class Resource(object):
             fields = kwargs['fields']
             all_fields_set = list(dict.fromkeys(fields))
         else:
-            fields = self.get_fields()
+            fields = list(self.get_fields())
             all_fields = fields + self.get_optional_fields()
             all_fields_set = list(dict.fromkeys(all_fields))
 
