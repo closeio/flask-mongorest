@@ -658,12 +658,11 @@ class Resource(object):
                 raise ValidationError({'error': f'{field}_page must be a non-negative integer.'})
 
             per_page = min(int(per_page), limits[1])
-            nrows = len(obj[field])
-            max_page = int(nrows/per_page) + bool(nrows % per_page)
-            if int(page) > max_page:
-                obj.data = []
-            else:
-                obj.data = obj.paginate_field(field, int(page), per_page=per_page).items
+            total_rows = len(obj[field])
+            total_pages = int(total_rows/per_page) + bool(total_rows % per_page)
+            if int(page) > total_pages:
+                raise ValidationError({'error': f'{field}_page must be less or equal {total_pages}.'})
+            obj.data = obj.paginate_field(field, int(page), per_page=per_page).items
         return obj
 
     def fetch_related_resources(self, objs, only_fields=None):
