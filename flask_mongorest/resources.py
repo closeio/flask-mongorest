@@ -834,18 +834,31 @@ class Resource(object):
             params = self.params
         if self.paginate:
             # _limit and _skip validation
-            if not isint(params.get('_limit', 1)):
-                raise ValidationError({'error': '_limit must be an integer (got "%s" instead).' % params['_limit']})
-            if not isint(params.get('_skip', 1)):
-                raise ValidationError({'error': '_skip must be an integer (got "%s" instead).' % params['_skip']})
-            if params.get('_limit') and int(params['_limit']) > max_limit:
-                raise ValidationError({'error': "The limit you set is larger than the maximum limit for this resource (max_limit = %d)." % max_limit})
-            if params.get('_skip') and int(params['_skip']) < 0:
-                raise ValidationError({'error': '_skip must be a non-negative integer (got "%s" instead).' % params['_skip']})
+            for par in ['_limit', 'per_page']:
+                if par in params:
+                    if not isint(params[par]):
+                        raise ValidationError({'error': f'{par} must be an integer (got "%s" instead).' % params[par]})
+                    if params[par] and int(params[par]) > max_limit:
+                        raise ValidationError({'error': "The limit you set is larger than the maximum limit for this \
+                                               resource (max_limit = %d)." % max_limit})
+                    limit = min(int(params[par]), max_limit)
+                    break
+            else:
+                limit = min(int(self.default_limit), max_limit)
 
-            limit = min(int(params.get('_limit', self.default_limit)), max_limit)
+            for par in ['_skip', 'page']:
+                if par in params:
+                    if not isint(params[par]):
+                        raise ValidationError({'error': f'{par} must be an integer (got "%s" instead).' % params[par]})
+                    if params[par] and int(params[par]) < 0:
+                        raise ValidationError({'error': f'{par} must be a non-negative integer (got "%s" instead).' % params[par]})
+                    skip = int(params[par]) if par == '_skip' else (int(params[par])-1) * limit
+                    break
+            else:
+                skip = 0
+
             # Fetch one more so we know if there are more results.
-            return int(params.get('_skip', 0)), limit
+            return skip, limit
         else:
             return 0, max_limit
 
