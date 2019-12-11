@@ -1,6 +1,7 @@
 import json
 import mongoengine
 
+from typing import Pattern
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from flask import has_request_context, request, url_for
@@ -135,7 +136,7 @@ class Resource(object):
             self._reverse_rename_fields[v] = k
         assert len(self._rename_fields) == len(self._reverse_rename_fields), \
             'Cannot rename multiple fields to the same name'
-        self._filters = self.get_filters()
+        self._normal_filters, self._regex_filters = self.get_filters()
         self._child_document_resources = self.get_child_document_resources()
         self._default_child_resource_document = self.get_default_child_resource_document()
         self.data = None
@@ -334,15 +335,20 @@ class Resource(object):
         `?date__gte=value` to the 'date' field and the 'gte' suffix: 'gte',
         and hence use the Gte operator to filter the data.
         """
-        filters = {}
+        normal_filters, regex_filters = {}, {}
         for field, operators in getattr(self, 'filters', {}).items():
             field_filters = {}
+
             for op in operators:
                 if op.op == 'exact':
                     field_filters[''] = op
                 field_filters[op.op] = op
-            filters[field] = field_filters
-        return filters
+
+            if isinstance(field, Pattern):
+                regex_filters[field] = field_filters
+            else:
+                normal_filters[field] = field_filters
+        return normal_filters, regex_filters
 
     def serialize_field(self, obj, **kwargs):
         if self.uri_prefix and hasattr(obj, "id"):
@@ -780,7 +786,16 @@ class Resource(object):
             parts = key.split('__')
             for i in range(len(parts) + 1, 0, -1):
                 field = '__'.join(parts[:i])
-                allowed_operators = self._filters.get(field)
+                try:
+                    allowed_operators = self._normal_filters[field]
+                except KeyError:
+                    for k, v in self._regex_filters.items():
+                        m = k.match(field)
+                        if m:
+                            allowed_operators = v
+                            break
+                    else:
+                        allowed_operators = None
                 if allowed_operators:
                     parts = parts[i:]
                     break
