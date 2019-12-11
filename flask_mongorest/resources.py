@@ -142,6 +142,8 @@ class Resource(object):
         self.data = None
         self._dirty_fields = None
         self.view_method = view_method
+        self._normal_allowed_ordering = [o for o in self.allowed_ordering if not isinstance(o, Pattern)]
+        self._regex_allowed_ordering = [o for o in self.allowed_ordering if isinstance(o, Pattern)]
 
     @property
     def params(self):
@@ -834,9 +836,16 @@ class Resource(object):
         """
         if params is None:
             params = self.params
-        if self.allowed_ordering and params.get('_order_by') in self.allowed_ordering:
-            order_params = [self._reverse_rename_fields.get(p, p) for p in params['_order_by'].split(',')]
-            qs = qs.order_by(*order_params)
+        if self.allowed_ordering:
+            oby = params.get('_order_by')
+            if oby:
+                order_params = None
+                if oby in self._normal_allowed_ordering:
+                    order_params = [self._reverse_rename_fields.get(p, p) for p in oby.split(',')]
+                elif any(p.match(oby) for p in self._regex_allowed_ordering):
+                    order_params = [oby]
+                if order_params:
+                    qs = qs.order_by(*order_params)
         return qs
 
     def get_skip_and_limit(self, params=None):
