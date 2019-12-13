@@ -29,6 +29,7 @@ except ImportError:
 
 try:
     from marshmallow_mongoengine import ModelSchema
+    from marshmallow.exceptions import ValidationError as MarshmallowValidationError
 except ImportError:
     ModelSchema = None
 
@@ -607,8 +608,11 @@ class Resource(object):
                 except SchemaValidationError:
                     raise ValidationError({'field-errors': schema.field_errors, 'errors': schema.errors })
             elif ModelSchema is not None:
-                partial = bool(request.method == 'PUT' and obj is not None)
-                self.data = self.schema().load(self.data, partial=partial)
+                try:
+                    partial = bool(request.method == 'PUT' and obj is not None)
+                    self.data = self.schema().load(self.data, partial=partial)
+                except MarshmallowValidationError as ex:
+                    raise ValidationError({'errors': ex.messages})
 
     def get_queryset(self):
         """
