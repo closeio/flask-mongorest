@@ -78,10 +78,12 @@ class ResourceView(MethodView):
             return super(ResourceView, self).dispatch_request(*args, **kwargs)
         except mongoengine.queryset.DoesNotExist as e:
             return {'error': 'Empty query: ' + str(e)}, '404 Not Found'
+        except mongoengine.errors.NotUniqueError as e:
+            return {'error': str(e)}, '401 Unauthorized'
         except ValidationError as e:
             return e.args[0], '400 Bad Request'
-        except Unauthorized:
-            return {'error': 'Unauthorized'}, '401 Unauthorized'
+        except Unauthorized as e:
+            return {'error': str(e)}, '401 Unauthorized'
         except NotFound as e:
             return {'error': str(e)}, '404 Not Found'
 
