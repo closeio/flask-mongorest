@@ -163,13 +163,15 @@ class ResourceView(MethodView):
 
         self._resource.validate_request()
         try:
-            obj = self._resource.create_object()
+            obj = self._resource.create_object(save=False)
         except Exception as e:
             self.handle_validation_error(e)
 
         # Check if we have permission to create this object
         if not self.has_add_permission(request, obj):
             raise Unauthorized
+
+        self._resource.save_object(obj, force_insert=True)
 
         ret = self._resource.serialize(obj, params=request.args)
         if isinstance(obj, mongoengine.Document) and self._resource.uri_prefix:
