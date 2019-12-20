@@ -1041,11 +1041,14 @@ class Resource(object):
                 id_from_data = value and getattr(value, 'pk', value)
                 if id_from_obj != id_from_data:
                     update = True
-            elif getattr(obj, '_fields', None) is not None and isinstance(obj._fields.get(field), DictField):
-                self.update_object(obj[field], data=value, save=False)
-            elif getattr(obj, '_fields', None) is not None and obj._fields[field].primary_key:
-                update = False
-            elif not equal(obj.get(field), value) or not equal(getattr(obj, field), value):
+            elif getattr(obj, '_fields', None) is not None:
+                if isinstance(obj._fields.get(field), DictField):
+                    self.update_object(obj[field], data=value, save=False)
+                elif obj._fields[field].primary_key:
+                    raise ValidationError({'error': f'`{field}` is primary key and cannot be updated'})
+                elif not equal(getattr(obj, field), value):
+                    update = True
+            elif not equal(obj.get(field), value):
                 update = True
 
             if update:
