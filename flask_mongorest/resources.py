@@ -849,7 +849,8 @@ class Resource(object):
                 elif any(p.match(oby) for p in self._regex_allowed_ordering):
                     order_params = [oby]
                 if order_params:
-                    qs = qs.order_by(*order_params)
+                    order_sign = '-' if params.get('order') == 'desc' else '+'
+                    qs = qs.order_by(*[f'{order_sign}{p}' for p in order_params])
         return qs
 
     def get_skip_and_limit(self, params=None):
