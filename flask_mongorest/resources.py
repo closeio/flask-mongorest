@@ -4,6 +4,7 @@ import mongoengine
 from typing import Pattern
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
+from dotty_dict import Dotty
 from flask import has_request_context, request, url_for
 from dict_deep import deep_get
 try:
@@ -389,11 +390,10 @@ class Resource(object):
         # Determine the field value
         if has_field_instance:
             field_value = obj
-        elif isinstance(obj, dict):
-            return deep_get(obj, field_name)
         else:
             try:
-                field_value = deep_get(obj, field_name, getter=get_with_list_index)
+                dotty = Dotty(obj if isinstance(obj, dict) else obj.to_mongo())
+                field_value = dotty[field_name]
             except (AttributeError, KeyError):
                 raise UnknownFieldError
 
@@ -506,7 +506,7 @@ class Resource(object):
 
         # Fill in the `data` dict by serializing each of the requested fields
         # one by one.
-        data = {}
+        data = Dotty({})
         for field in requested_fields:
 
             # resolve the user-facing name of the field
