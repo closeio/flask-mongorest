@@ -392,7 +392,8 @@ class Resource(object):
             field_value = obj
         else:
             try:
-                dotty = Dotty(obj if isinstance(obj, dict) else obj.to_mongo())
+                dotty = Dotty(obj if isinstance(obj, dict) else obj.to_mongo().to_dict())
+                field_name = '_id' if obj._fields[field_name].primary_key else field_name
                 field_value = dotty[field_name]
             except (AttributeError, KeyError):
                 raise UnknownFieldError
@@ -538,7 +539,7 @@ class Resource(object):
                     except UnknownFieldError:
                         pass
 
-        return data
+        return data._data
 
     def handle_serialization_error(self, exc, obj):
         """
