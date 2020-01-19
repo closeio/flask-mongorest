@@ -393,8 +393,9 @@ class Resource(object):
         else:
             try:
                 dotty = Dotty(obj if isinstance(obj, dict) else obj.to_mongo())
-                is_pk = obj._fields[field_name].primary_key
-                field_name = '_id' if is_pk or field_name == 'id' else field_name
+                if '.' not in field_name:
+                    is_pk = obj._fields[field_name].primary_key
+                    field_name = '_id' if is_pk or field_name == 'id' else field_name
                 field_value = dotty[field_name]
             except (AttributeError, KeyError):
                 raise UnknownFieldError
