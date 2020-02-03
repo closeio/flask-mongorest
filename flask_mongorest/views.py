@@ -83,6 +83,8 @@ class ResourceView(MethodView):
             return {'error': str(e)}, '401 Unauthorized'
         except ValidationError as e:
             return e.args[0], '400 Bad Request'
+        except mongoengine.errors.ValidationError as e:
+            return {'error': str(e)}, '400 Bad Request'
         except Unauthorized as e:
             return {'error': str(e)}, '401 Unauthorized'
         except NotFound as e:
