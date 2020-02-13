@@ -1,5 +1,5 @@
 from flask import Blueprint
-from flask_mongorest.methods import Create, BulkUpdate, List
+from flask_mongorest.methods import Create, BulkUpdate, List, Download
 
 def register_class(app, klass, **kwargs):
     # Construct a url based on a 'name' kwarg with a fallback to the
@@ -21,6 +21,9 @@ def register_class(app, klass, **kwargs):
     if List in klass.methods:
         app.add_url_rule(url, defaults={'pk': None}, view_func=view_func,
                          methods=[List.method], endpoint=view_func.__name__+'List', **kwargs)
+    if Download in klass.methods:
+        app.add_url_rule(url + 'download/', defaults={'pk': None}, view_func=view_func,
+                         methods=[Download.method], endpoint=view_func.__name__+'Download', **kwargs)
     if Create in klass.methods or BulkUpdate in klass.methods:
         app.add_url_rule(url, view_func=view_func, methods=[
             x.method for x in klass.methods if x in (Create, BulkUpdate)

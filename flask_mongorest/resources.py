@@ -928,7 +928,7 @@ class Resource(object):
         if self.view_method == methods.BulkUpdate:
             # limit the number of objects that can be bulk-updated at a time
             qs = qs.limit(self.bulk_update_limit)
-        elif not custom_qs:
+        elif not custom_qs and not self.view_method == methods.Download:
             # no need to skip/limit if a custom `qs` was provided
             skip, limit = self.get_skip_and_limit(params)
             qs = qs.skip(skip).limit(limit+1)
@@ -949,7 +949,7 @@ class Resource(object):
             })
 
         # Determine the value of has_more
-        if self.view_method != methods.BulkUpdate and self.paginate:
+        if self.view_method not in [methods.BulkUpdate, methods.Download] and self.paginate:
             has_more = len(objs) > limit
             if has_more:
                 objs = objs[:-1]

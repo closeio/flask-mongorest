@@ -13,5 +13,8 @@ class Fetch:
 class List:
     method = 'GET'
 
+class Download:
+    method = 'GET'
+
 class Delete:
     method = 'DELETE'

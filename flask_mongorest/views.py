@@ -1,19 +1,45 @@
 import json
-
+import zipstream
 import mimerender
 import mongoengine
 from fdict import fdict
-from flask import render_template, request
+from flask import render_template, request, Response
 from flask.views import MethodView
 from flask_mongorest import methods
 from flask_mongorest.exceptions import ValidationError
 from flask_mongorest.utils import MongoEncoder
 from werkzeug.exceptions import NotFound, Unauthorized
 
+mimerender.register_mime('zip', ('application/zip',))
 mimerender = mimerender.FlaskMimeRender()
 
-render_json = lambda **payload: json.dumps(payload, allow_nan=False, cls=MongoEncoder)
-render_html = lambda **payload: render_template('mongorest/debug.html', data=json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4))
+def render_json(**payload):
+    return json.dumps(payload, allow_nan=False, cls=MongoEncoder)
+
+def render_html(**payload):
+    d = json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4)
+    return render_template('mongorest/debug.html', data=d)
+
+def make_zip(**payload):
+    print(len(payload['data']), payload['total_count'])
+
+    def generator():
+        def iterable():
+            yield b'['
+            for idx, doc in enumerate(payload['data']):
+                yield render_json(**doc).encode()
+                if idx < payload['total_count']-1:
+                    yield b','
+            yield b']'
+
+        z = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
+        z.write_iter('data.json', iterable())
+        for chunk in z:
+            yield chunk
+
+    response = Response(generator())
+    response.headers['Content-Disposition'] = 'attachment; filename={}'.format('files.zip')
+    return response
 
 try:
     text_type = unicode # Python 2
@@ -58,7 +84,8 @@ class ResourceView(MethodView):
     def __init__(self):
         assert(self.resource and self.methods)
 
-    @mimerender(default='json', json=render_json, html=render_html)
+    @mimerender(default='json', override_input_key='format',
+                json=render_json, html=render_html, zip=make_zip)
     def dispatch_request(self, *args, **kwargs):
         # keep all the logic in a helper method (_dispatch_request) so that
         # it's easy for subclasses to override this method (when they don't want to use
@@ -112,6 +139,8 @@ class ResourceView(MethodView):
         # Set the view_method on a resource instance
         if pk:
             self._resource.view_method = methods.Fetch
+        elif self._resource.params.get('format'):
+            self._resource.view_method = methods.Download
         else:
             self._resource.view_method = methods.List
 
