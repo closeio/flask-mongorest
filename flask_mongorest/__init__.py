@@ -25,10 +25,10 @@ def register_class(app, klass, **kwargs):
         app.add_url_rule(url, view_func=view_func, methods=[
             x.method for x in klass.methods if x in (Create, BulkUpdate)
         ], endpoint=view_func.__name__+'CreateBulkUpdate', **kwargs)
-    app.add_url_rule('%s<%s:%s>/' % (url, pk_type, 'pk'), view_func=view_func,
+    app.add_url_rule('%s<%s:%s>/' % (url, pk_type, 'pk'), defaults={'short_mime': None}, view_func=view_func,
                      methods=[x.method for x in klass.methods if x not in (List, BulkUpdate)], **kwargs)
     if Download in klass.methods:
-        app.add_url_rule(f'{url}<string:short_mime>/', defaults={'pk': None}, view_func=view_func,
+        app.add_url_rule(f'{url}download/<string:short_mime>/', defaults={'pk': None, 'short_mime': 'gz'}, view_func=view_func,
                          methods=[Download.method], endpoint=view_func.__name__+'Download', **kwargs)
 
 class MongoRest(object):
