@@ -27,9 +27,9 @@ setup(
     test_suite='nose.collector',
     zip_safe=False,
     platforms='any',
-    setup_requires=[
+    install_requires=[
         'Flask-MongoEngine',
-        'mimerender',
+        'mimerender @ git+https://github.com/tschaume/mimerender@mpcontribs#egg=mimerender',
         'nose',
         'python-dateutil'
     ],
