@@ -19,10 +19,10 @@ def register_class(app, klass, **kwargs):
     pk_type = kwargs.pop('pk_type', 'string')
     view_func = klass.as_view(name)
     if List in klass.methods:
-        app.add_url_rule(url, defaults={'pk': None}, view_func=view_func,
+        app.add_url_rule(url, defaults={'pk': None, 'short_mime': None}, view_func=view_func,
                          methods=[List.method], endpoint=view_func.__name__+'List', **kwargs)
     if Download in klass.methods:
-        app.add_url_rule(url + 'download/', defaults={'pk': None}, view_func=view_func,
+        app.add_url_rule(f'{url}<string:short_mime>/', defaults={'pk': None}, view_func=view_func,
                          methods=[Download.method], endpoint=view_func.__name__+'Download', **kwargs)
     if Create in klass.methods or BulkUpdate in klass.methods:
         app.add_url_rule(url, view_func=view_func, methods=[

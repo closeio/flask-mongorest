@@ -1,17 +1,18 @@
 import json
-import zipstream
-import mimerender
 import mongoengine
+from gzip import GzipFile
+from io import BytesIO
 from fdict import fdict
-from flask import render_template, request, Response
+from flask import render_template, request
 from flask.views import MethodView
 from flask_mongorest import methods
 from flask_mongorest.exceptions import ValidationError
 from flask_mongorest.utils import MongoEncoder
 from werkzeug.exceptions import NotFound, Unauthorized
+from mimerender import register_mime, FlaskMimeRender
 
-mimerender.register_mime('zip', ('application/zip',))
-mimerender = mimerender.FlaskMimeRender()
+mimerender = FlaskMimeRender(global_override_input_key='short_mime')
+register_mime('gz', ('application/gzip',))
 
 def render_json(**payload):
     return json.dumps(payload, allow_nan=False, cls=MongoEncoder)
@@ -20,26 +21,25 @@ def render_html(**payload):
     d = json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4)
     return render_template('mongorest/debug.html', data=d)
 
-def make_zip(**payload):
-    print(len(payload['data']), payload['total_count'])
+def render_gz(**payload):
+    contents = ''
+    fmt = request.values.get('format')
+    if fmt == 'json':
+        contents = json.dumps(payload['data'], allow_nan=False, cls=MongoEncoder)
+    elif fmt == 'csv':
+        from pandas import DataFrame
+        fpayload = []
+        for doc in payload['data']:
+            fdoc = {}
+            for k, v in doc.items():
+                fdoc[k] = v[0]['id'] if isinstance(v, list) else doc[k]
+            fpayload.append(fdict(fdoc, delimiter='.').to_dict())
+        contents = DataFrame.from_records(fpayload).to_csv()
 
-    def generator():
-        def iterable():
-            yield b'['
-            for idx, doc in enumerate(payload['data']):
-                yield render_json(**doc).encode()
-                if idx < payload['total_count']-1:
-                    yield b','
-            yield b']'
-
-        z = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
-        z.write_iter('data.json', iterable())
-        for chunk in z:
-            yield chunk
-
-    response = Response(generator())
-    response.headers['Content-Disposition'] = 'attachment; filename={}'.format('files.zip')
-    return response
+    gzip_buffer = BytesIO()
+    with GzipFile(mode='wb', fileobj=gzip_buffer) as gzip_file:
+        gzip_file.write(contents.encode())  # need to give full contents to compression
+    return gzip_buffer.getvalue()
 
 try:
     text_type = unicode # Python 2
@@ -84,8 +84,7 @@ class ResourceView(MethodView):
     def __init__(self):
         assert(self.resource and self.methods)
 
-    @mimerender(default='json', override_input_key='format',
-                json=render_json, html=render_html, zip=make_zip)
+    @mimerender(default='json', json=render_json, html=render_html, gz=render_gz)
     def dispatch_request(self, *args, **kwargs):
         # keep all the logic in a helper method (_dispatch_request) so that
         # it's easy for subclasses to override this method (when they don't want to use
@@ -110,7 +109,7 @@ class ResourceView(MethodView):
             return {'error': str(e)}, '401 Unauthorized'
         except ValidationError as e:
             return e.args[0], '400 Bad Request'
-        except mongoengine.errors.ValidationError as e:
+        except (ValueError, mongoengine.errors.ValidationError) as e:
             return {'error': str(e)}, '400 Bad Request'
         except Unauthorized as e:
             return {'error': str(e)}, '401 Unauthorized'
@@ -135,11 +134,14 @@ class ResourceView(MethodView):
 
     def get(self, **kwargs):
         pk = kwargs.pop('pk', None)
+        short_mime = kwargs.pop('short_mime', None)
 
         # Set the view_method on a resource instance
         if pk:
             self._resource.view_method = methods.Fetch
-        elif self._resource.params.get('format'):
+        elif short_mime:
+            if short_mime != 'gz':
+                raise ValueError(f'{short_mime} not supported')
             self._resource.view_method = methods.Download
         else:
             self._resource.view_method = methods.List
@@ -171,9 +173,7 @@ class ResourceView(MethodView):
                         data.append(fixed_obj)
 
             # Serialize the objects one by one
-            ret = {
-                'data': data
-            }
+            ret = {'data': data}
 
             if has_more is not None:
                 ret['has_more'] = has_more
@@ -184,7 +184,15 @@ class ResourceView(MethodView):
             obj = self._resource.get_object(pk, qfilter=qfilter)
             obj = self._resource.paginate_fields(obj)
             ret = self._resource.serialize(obj, params=request.args)
-        return ret
+
+
+        if self._resource.view_method == methods.Download:
+            fmt = self._resource.params.get('format')
+            return ret, '200 OK', {
+                'Content-Disposition': f'attachment; filename="data.{fmt}.{short_mime}"'
+            }
+        else:
+            return ret
 
     def post(self, **kwargs):
         if 'pk' in kwargs:
