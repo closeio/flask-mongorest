@@ -32,7 +32,8 @@ def render_gz(**payload):
         for doc in payload['data']:
             fdoc = {}
             for k, v in doc.items():
-                fdoc[k] = v[0]['id'] if isinstance(v, list) else doc[k]
+                if v:
+                    fdoc[k] = v[0]['id'] if isinstance(v, list) else doc[k]
             fpayload.append(fdict(fdoc, delimiter='.').to_dict())
         contents = DataFrame.from_records(fpayload).to_csv()
 
