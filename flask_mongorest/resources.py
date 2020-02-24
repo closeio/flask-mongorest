@@ -161,6 +161,10 @@ class Resource(object):
     @property
     def raw_data(self):
         """Validate and return parsed JSON payload."""
+        if not has_request_context():
+            # `raw_data` doesn't make sense if we don't have a request
+            raise AttributeError
+
         if not hasattr(self, '_raw_data'):
             if request.method in ('PUT', 'POST') or request.data:
                 if request.mimetype and 'json' not in request.mimetype:
