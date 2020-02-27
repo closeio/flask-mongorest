@@ -28,14 +28,9 @@ def render_gz(**payload):
         contents = json.dumps(payload['data'], allow_nan=False, cls=MongoEncoder)
     elif fmt == 'csv':
         from pandas import DataFrame
-        fpayload = []
-        for doc in payload['data']:
-            fdoc = {}
-            for k, v in doc.items():
-                if v:
-                    fdoc[k] = v[0]['id'] if isinstance(v, list) else doc[k]
-            fpayload.append(fdict(fdoc, delimiter='.').to_dict())
-        contents = DataFrame.from_records(fpayload).to_csv()
+        from cherrypicker import CherryPicker
+        records = [CherryPicker(d).flatten().get() for d in payload['data']]
+        contents = DataFrame.from_records(records).to_csv()
 
     gzip_buffer = BytesIO()
     with GzipFile(mode='wb', fileobj=gzip_buffer) as gzip_file:
