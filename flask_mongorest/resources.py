@@ -84,7 +84,7 @@ class Resource(object):
     max_limit = 100
 
     # Maximum number of objects which can be bulk-updated by a single request
-    bulk_update_limit = 1000
+    bulk_update_limit = 1000  # NOTE also used for bulk delete
 
     # Map of field names to paginate with according default and maximum limits
     fields_to_paginate = {}
@@ -205,7 +205,7 @@ class Resource(object):
                     self._raw_data = json.loads(request.data.decode('utf-8'), parse_constant=self._enforce_strict_json)
                 except ValueError:
                     raise ValidationError({'error': 'The request contains invalid JSON.'})
-                if not isinstance(self._raw_data, dict):
+                if request.method == 'PUT' and not isinstance(self._raw_data, dict):
                     raise ValidationError({'error': 'JSON data must be a dict.'})
             else:
                 self._raw_data = {}
@@ -935,7 +935,7 @@ class Resource(object):
 
         # Apply limit and skip to the queryset
         limit = None
-        if self.view_method == methods.BulkUpdate:
+        if self.view_method in [methods.BulkUpdate, methods.BulkDelete]:
             # limit the number of objects that can be bulk-updated at a time
             qs = qs.limit(self.bulk_update_limit)
         elif not custom_qs and not self.view_method == methods.Download:
@@ -944,27 +944,27 @@ class Resource(object):
             qs = qs.skip(skip).limit(limit+1)
             extra['total_pages'] = int(extra['total_count']/limit) + bool(extra['total_count'] % limit)
 
+        # Raise a validation error if bulk update would result in more than
+        # bulk_update_limit updates
+        if self.view_method in [methods.BulkUpdate, methods.BulkDelete] and qs.count() > self.bulk_update_limit:
+            raise ValidationError({
+                'errors': [f"Change query to update/delete less than {self.bulk_update_limit} documents at once"]
+            })
+
+        # Determine the value of has_more
+        if self.view_method not in [methods.BulkUpdate, methods.BulkDelete, methods.Download] and self.paginate:
+            has_more = bool(qs.count() > limit)
+        else:
+            has_more = None
+
         # Needs to be at the end as it returns a list, not a queryset
         if self.select_related:
             qs = qs.select_related()
 
         # Evaluate the queryset
         objs = list(qs)
-
-        # Raise a validation error if bulk update would result in more than
-        # bulk_update_limit updates
-        if self.view_method == methods.BulkUpdate and len(objs) >= self.bulk_update_limit:
-            raise ValidationError({
-                'errors': ["It's not allowed to update more than %d objects at once" % self.bulk_update_limit]
-            })
-
-        # Determine the value of has_more
-        if self.view_method not in [methods.BulkUpdate, methods.Download] and self.paginate:
-            has_more = len(objs) > limit
-            if has_more:
-                objs = objs[:-1]
-        else:
-            has_more = None
+        if has_more:
+            objs = objs[:-1]
 
         # bulk-fetch related resources for moar speed
         self.fetch_related_resources(

@@ -1,20 +1,28 @@
+class Fetch:
+    method = 'GET'
+
 class Create:
     method = 'POST'
 
 class Update:
     method = 'PUT'
 
+class Delete:
+    method = 'DELETE'
+
+
+class BulkFetch:
+    method = 'GET'
+
+class BulkCreate:
+    method = 'POST'
+
 class BulkUpdate:
     method = 'PUT'
 
-class Fetch:
-    method = 'GET'
+class BulkDelete:
+    method = 'DELETE'
 
-class List:
-    method = 'GET'
 
 class Download:
     method = 'GET'
-
-class Delete:
-    method = 'DELETE'

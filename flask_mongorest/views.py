@@ -3,6 +3,7 @@ import mongoengine
 from gzip import GzipFile
 from io import BytesIO
 from fdict import fdict
+from collections import deque
 from flask import render_template, request
 from flask.views import MethodView
 from flask_mongorest import methods
@@ -140,7 +141,7 @@ class ResourceView(MethodView):
                 raise ValueError(f'{short_mime} not supported')
             self._resource.view_method = methods.Download
         else:
-            self._resource.view_method = methods.List
+            self._resource.view_method = methods.BulkFetch
 
         # Create a queryset filter to control read access to the
         # underlying objects
@@ -191,12 +192,30 @@ class ResourceView(MethodView):
             return ret
 
     def post(self, **kwargs):
-        if 'pk' in kwargs:
+        if kwargs.pop('pk'):
             raise NotFound("Did you mean to use PUT?")
 
-        # Set the view_method on a resource instance
-        self._resource.view_method = methods.Create
+        raw_data = self._resource.raw_data
+        if isinstance(raw_data, dict):
+            # create single object
+            self._resource.view_method = methods.Create
+            return self.create_object()
+        elif isinstance(raw_data, list):
+            if len(raw_data) > self._resource.bulk_update_limit:
+                raise ValidationError({
+                    'errors': [f"Can only create {self.bulk_update_limit} documents at once"]
+                })
+            raw_data_deque = deque(raw_data)
+            self._resource.view_method = methods.BulkCreate
+            ret = []
+            while len(raw_data_deque):
+                self._resource._raw_data = raw_data_deque.popleft()
+                ret.append(self.create_object())
+            return {'data': ret, 'count': len(ret)}, '201 Created'
+        else:
+            raise ValidationError({'error': 'wrong payload type'})
 
+    def create_object(self):
         self._resource.validate_request()
         try:
             obj = self._resource.create_object(save=False)
@@ -208,12 +227,7 @@ class ResourceView(MethodView):
             raise Unauthorized
 
         self._resource.save_object(obj, force_insert=True)
-
-        ret = self._resource.serialize(obj, params=request.args)
-        if isinstance(obj, mongoengine.Document) and self._resource.uri_prefix:
-            return ret, "201 Created", {"Location": self._resource._url(str(obj.id))}
-        else:
-            return ret
+        return self._resource.serialize(obj, params=request.args)
 
     def process_object(self, obj):
         """Validate and update an object"""
@@ -283,20 +297,53 @@ class ResourceView(MethodView):
             fields = ','.join(raw_data.keys())
             return self._resource.serialize(obj, params={'_fields': fields})
 
-    def delete(self, **kwargs):
-        pk = kwargs.pop('pk', None)
 
-        # Set the view_method on a resource instance
-        self._resource.view_method = methods.Delete
-
-        obj = self._resource.get_object(pk)
-
+    def delete_object(self, obj):
+        """Delete an object"""
         # Check if we have permission to delete this object
         if not self.has_delete_permission(request, obj):
             raise Unauthorized
 
-        self._resource.delete_object(obj)
-        return {}
+        try:
+            self._resource.delete_object(obj)
+        except Exception as e:
+            self.handle_validation_error(e)
+
+    def delete_objects(self, objs):
+        """Delete each object in the list one by one, and return the total count."""
+        count = 0
+        try:
+            for obj in objs:
+                self.delete_object(obj)
+                count += 1
+        except ValidationError as e:
+            e.args[0]['count'] = count
+            raise e
+        else:
+            return {'count': count}
+
+    def delete(self, **kwargs):
+        pk = kwargs.pop('pk', None)
+
+        # Set the view_method on a resource instance
+        if pk:
+            self._resource.view_method = methods.Delete
+        else:
+            self._resource.view_method = methods.BulkDelete
+
+        if pk is None:
+            result = self._resource.get_objects()
+            if len(result) == 2:
+                objs, has_more = result
+            elif len(result) == 3:
+                objs, has_more, extra = result
+
+            # Delete all the objects and return their count
+            return self.delete_objects(objs)
+        else:
+            obj = self._resource.get_object(pk)
+            self.delete_object(obj)
+            return {}
 
     # This takes a QuerySet as an argument and then
     # returns a query set that this request can read
