@@ -201,7 +201,7 @@ class ResourceView(MethodView):
             self._resource.view_method = methods.Create
             return self.create_object()
         elif isinstance(raw_data, list):
-            limit = self._resource.bulk_update_limit
+            limit = self._resource.max_limit
             if len(raw_data) > limit:
                 raise ValidationError({
                     'errors': [f"Can only create {limit} documents at once"]
@@ -290,7 +290,10 @@ class ResourceView(MethodView):
                 objs, has_more, extra = result
 
             # Update all the objects and return their count
-            return self.process_objects(objs)
+            ret = self.process_objects(objs)
+            ret['has_more'] = has_more
+            ret.update(extra)
+            return ret
         else:
             obj = self._resource.get_object(pk)
             self.process_object(obj)
@@ -340,11 +343,14 @@ class ResourceView(MethodView):
                 objs, has_more, extra = result
 
             # Delete all the objects and return their count
-            return self.delete_objects(objs)
+            ret = self.delete_objects(objs)
+            ret['has_more'] = has_more
+            ret.update(extra)
+            return ret
         else:
             obj = self._resource.get_object(pk)
             self.delete_object(obj)
-            return {}
+            return {'count': 1}
 
     # This takes a QuerySet as an argument and then
     # returns a query set that this request can read

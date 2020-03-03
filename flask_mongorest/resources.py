@@ -83,9 +83,6 @@ class Resource(object):
     # Only relevant if pagination is enabled.
     max_limit = 100
 
-    # Maximum number of objects which can be bulk-updated by a single request
-    bulk_update_limit = 1000  # NOTE also used for bulk delete
-
     # Map of field names to paginate with according default and maximum limits
     fields_to_paginate = {}
 
@@ -933,29 +930,12 @@ class Resource(object):
         qs = self.apply_ordering(qs, params)
         extra['total_count'] = qs.count()
 
-        # Apply limit and skip to the queryset
+        # Apply limit and skip to the queryset (if not Download and no custom queryset provided)
         limit = None
-        if self.view_method in [methods.BulkUpdate, methods.BulkDelete]:
-            # limit the number of objects that can be bulk-updated at a time
-            qs = qs.limit(self.bulk_update_limit)
-        elif not custom_qs and not self.view_method == methods.Download:
-            # no need to skip/limit if a custom `qs` was provided
+        if not custom_qs and self.view_method != methods.Download:
             skip, limit = self.get_skip_and_limit(params)
-            qs = qs.skip(skip).limit(limit+1)
+            qs = qs.skip(skip).limit(limit+1)  # get one extra to determine has_more
             extra['total_pages'] = int(extra['total_count']/limit) + bool(extra['total_count'] % limit)
-
-        # Raise a validation error if bulk update would result in more than
-        # bulk_update_limit updates
-        if self.view_method in [methods.BulkUpdate, methods.BulkDelete] and qs.count() > self.bulk_update_limit:
-            raise ValidationError({
-                'errors': [f"Change query to update/delete less than {self.bulk_update_limit} documents at once"]
-            })
-
-        # Determine the value of has_more
-        if self.view_method not in [methods.BulkUpdate, methods.BulkDelete, methods.Download] and self.paginate:
-            has_more = bool(qs.count() > limit)
-        else:
-            has_more = None
 
         # Needs to be at the end as it returns a list, not a queryset
         if self.select_related:
@@ -963,6 +943,10 @@ class Resource(object):
 
         # Evaluate the queryset
         objs = list(qs)
+        has_more = None
+        if self.view_method != methods.Download and self.paginate:
+            has_more = bool(len(objs) > limit)
+
         if has_more:
             objs = objs[:-1]
 
