@@ -447,7 +447,7 @@ class Resource(object):
     def serialize(self, obj, **kwargs):
         """
         Given an object, serialize it, turning it into its JSON
-        respresentation.
+        representation.
         """
         if not obj:
             return {}
