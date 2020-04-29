@@ -1,3 +1,6 @@
+import sys
+import inspect
+
 class Fetch:
     method = 'GET'
 
@@ -26,3 +29,6 @@ class BulkDelete:
 
 class Download:
     method = 'GET'
+
+members = inspect.getmembers(sys.modules[__name__], inspect.isclass)
+__all__ = [m[0] for m in members]
