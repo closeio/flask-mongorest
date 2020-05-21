@@ -161,7 +161,8 @@ class ResourceView(MethodView):
 
             data = []
             for obj in objs:
-                obj = self._resource.paginate_fields(obj)
+                if self._resource.view_method != methods.Download:
+                    obj = self._resource.paginate_fields(obj)
                 try:
                     data.append(self._resource.serialize(obj, params=request.args))
                 except Exception as e:

@@ -1,6 +1,8 @@
 import json
 import mongoengine
 
+from glom import glom
+from glom.core import PathAccessError
 from typing import Pattern
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
@@ -392,12 +394,8 @@ class Resource(object):
             field_value = obj
         else:
             try:
-                dotty = Dotty(obj if isinstance(obj, dict) else obj.to_mongo())
-                if '.' not in field_name:
-                    is_pk = obj._fields[field_name].primary_key
-                    field_name = '_id' if is_pk or field_name == 'id' else field_name
-                field_value = dotty[field_name]
-            except (AttributeError, KeyError):
+                field_value = glom(obj, field_name)
+            except PathAccessError as ex:
                 raise UnknownFieldError
 
         return self.serialize_field_value(obj, field_name, field_instance, field_value, **kwargs)
