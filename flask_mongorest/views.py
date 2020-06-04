@@ -1,4 +1,7 @@
+import os
 import json
+import boto3
+import hashlib
 import mongoengine
 from gzip import GzipFile
 from io import BytesIO
@@ -11,7 +14,13 @@ from flask_mongorest.exceptions import ValidationError
 from flask_mongorest.utils import MongoEncoder
 from werkzeug.exceptions import NotFound, Unauthorized
 from mimerender import register_mime, FlaskMimeRender
+from botocore.errorfactory import ClientError
 
+BUCKET = os.environ.get('S3_DOWNLOADS_BUCKET', 'mongorest-downloads')
+CNAME = os.environ.get('PORTAL_CNAME')
+S3_DOWNLOAD_URL = f"https://{BUCKET}.s3.amazonaws.com"
+
+s3_client = boto3.client('s3')
 mimerender = FlaskMimeRender(global_override_input_key='short_mime')
 register_mime('gz', ('application/gzip',))
 
@@ -23,20 +32,37 @@ def render_html(**payload):
     return render_template('mongorest/debug.html', data=d)
 
 def render_gz(**payload):
-    contents = ''
-    fmt = request.values.get('format')
-    if fmt == 'json':
-        contents = json.dumps(payload['data'], allow_nan=False, cls=MongoEncoder)
-    elif fmt == 'csv':
-        from pandas import DataFrame
-        from cherrypicker import CherryPicker
-        records = [CherryPicker(d).flatten().get() for d in payload['data']]
-        contents = DataFrame.from_records(records).to_csv()
+    s3 = payload.get("s3")
 
-    gzip_buffer = BytesIO()
-    with GzipFile(mode='wb', fileobj=gzip_buffer) as gzip_file:
-        gzip_file.write(contents.encode())  # need to give full contents to compression
+    if s3 and not s3["exists"]:
+        fmt = request.args.get('format')
+        content_type = 'text/csv' if fmt == 'csv' else 'application/json'
+        if fmt == 'json':
+            contents = json.dumps(payload['data'], allow_nan=False, cls=MongoEncoder)
+        elif fmt == 'csv':
+            from pandas import DataFrame
+            from cherrypicker import CherryPicker
+            records = [CherryPicker(d).flatten().get() for d in payload['data']]
+            contents = DataFrame.from_records(records).to_csv()
+
+        gzip_buffer = BytesIO()
+        with GzipFile(mode='wb', fileobj=gzip_buffer) as gzip_file:
+            gzip_file.write(contents.encode('utf-8'))  # need to give full contents to compression
+
+        body = gzip_buffer.getvalue()
+        s3_client.put_object(
+            Bucket=BUCKET,
+            Key=s3["key"],
+            ContentType=content_type,
+            ContentEncoding='gzip',
+            Body=body
+        )
+        return body
+
+    retr = s3_client.get_object(Bucket=BUCKET, Key=s3["key"])
+    gzip_buffer = BytesIO(retr['Body'].read())
     return gzip_buffer.getvalue()
+
 
 try:
     text_type = unicode # Python 2
@@ -132,6 +158,7 @@ class ResourceView(MethodView):
     def get(self, **kwargs):
         pk = kwargs.pop('pk', None)
         short_mime = kwargs.pop('short_mime', None)
+        fmt = self._resource.params.get('format')
 
         # Set the view_method on a resource instance
         if pk:
@@ -146,6 +173,7 @@ class ResourceView(MethodView):
         # Create a queryset filter to control read access to the
         # underlying objects
         qfilter = lambda qs: self.has_read_permission(request, qs.clone())
+
         if pk is None:
             result = self._resource.get_objects(qfilter=qfilter)
 
@@ -159,18 +187,42 @@ class ResourceView(MethodView):
             else:
                 raise ValueError('Unsupported value of resource.get_objects')
 
-            data = []
-            for obj in objs:
-                if self._resource.view_method != methods.Download:
-                    obj = self._resource.paginate_fields(obj)
+            # generate hash/etag and S3 object name
+            if self._resource.view_method == methods.Download:
+                dct = {
+                    "ids": [str(obj.pk) for obj in objs],
+                    "params": self._resource.params
+                }
+                sha1 = hashlib.sha1(json.dumps(dct).encode('utf-8')).hexdigest()
+                filename = f"{sha1}.{fmt}"
+                key = f"{CNAME}/{filename}" if CNAME else filename
+                extra["s3"] = {"key": key, "exists": False}
                 try:
-                    data.append(self._resource.serialize(obj, params=request.args))
-                except Exception as e:
-                    fixed_obj = self._resource.handle_serialization_error(e, obj)
-                    if fixed_obj is not None:
-                        data.append(fixed_obj)
+                    s3_client.head_object(Bucket=BUCKET, Key=key)
+                    extra["s3"]["exists"] = True
+                except ClientError:
+                    pass
 
             # Serialize the objects one by one
+            data = []
+            if "s3" not in extra or not extra["s3"]["exists"]:
+                print("serializing ...")
+                tic = time.perf_counter()
+                batch_size = 200
+                for idx, obj in enumerate(objs):
+                    if idx > 0 and not idx % batch_size:
+                        toc = time.perf_counter()
+                        print(f"{idx} Took {toc - tic:0.4f} seconds to serialize {batch_size} objects.")
+                        tic = time.perf_counter()
+                    if self._resource.view_method != methods.Download:
+                        obj = self._resource.paginate_fields(obj)
+                    try:
+                        data.append(self._resource.serialize(obj, params=request.args))
+                    except Exception as e:
+                        fixed_obj = self._resource.handle_serialization_error(e, obj)
+                        if fixed_obj is not None:
+                            data.append(fixed_obj)
+
             ret = {'data': data}
 
             if has_more is not None:
@@ -183,11 +235,9 @@ class ResourceView(MethodView):
             obj = self._resource.paginate_fields(obj)
             ret = self._resource.serialize(obj, params=request.args)
 
-
         if self._resource.view_method == methods.Download:
-            fmt = self._resource.params.get('format')
             return ret, '200 OK', {
-                'Content-Disposition': f'attachment; filename="data.{fmt}.{short_mime}"'
+                'Content-Disposition': f'attachment; filename="{filename}.{short_mime}"'
             }
         else:
             return ret

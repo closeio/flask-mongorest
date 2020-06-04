@@ -395,6 +395,7 @@ class Resource(object):
         else:
             try:
                 field_value = glom(obj, field_name)
+                #field_value = getattr(obj, field_name)  # TODO improve serialization time
             except PathAccessError as ex:
                 raise UnknownFieldError
 
