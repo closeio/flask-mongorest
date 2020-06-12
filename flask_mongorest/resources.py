@@ -395,10 +395,12 @@ class Resource(object):
             field_value = obj
         else:
             try:
-                field_value = glom(obj, field_name)
-                #field_value = getattr(obj, field_name)  # TODO improve serialization time
-            except PathAccessError as ex:
-                raise UnknownFieldError
+                field_value = getattr(obj, field_name)
+            except AttributeError:
+                try:
+                    field_value = glom(obj, field_name)  # TODO improve serialization time
+                except PathAccessError as ex:
+                    raise UnknownFieldError
 
         return self.serialize_field_value(obj, field_name, field_instance, field_value, **kwargs)
 
@@ -628,12 +630,10 @@ class Resource(object):
         if request.method == 'PUT':
             return self.document.objects  # get full documents for updates
         else:
-            document_fields = set(self.document._fields.keys())
             requested_fields = set(
                 f.split('.', 1)[0] for f in self.get_requested_fields(params=self.params)
             )
-            mask = requested_fields & document_fields
-            return self.document.objects.only(*mask)
+            return self.document.objects.only(*requested_fields)
 
     def get_object(self, pk, qfilter=None):
         """
