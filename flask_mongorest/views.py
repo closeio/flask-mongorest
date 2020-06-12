@@ -215,8 +215,6 @@ class ResourceView(MethodView):
                         toc = time.perf_counter()
                         print(f"{idx} Took {toc - tic:0.4f} seconds to serialize {batch_size} objects.")
                         tic = time.perf_counter()
-                    if self._resource.view_method != methods.Download:
-                        obj = self._resource.paginate_fields(obj)
                     try:
                         data.append(self._resource.serialize(obj, params=request.args))
                     except Exception as e:
@@ -233,7 +231,6 @@ class ResourceView(MethodView):
                 ret.update(extra)
         else:
             obj = self._resource.get_object(pk, qfilter=qfilter)
-            obj = self._resource.paginate_fields(obj)
             ret = self._resource.serialize(obj, params=request.args)
 
         if self._resource.view_method == methods.Download:
