@@ -10,12 +10,14 @@ from fdict import fdict
 from collections import deque
 from flask import render_template, request
 from flask.views import MethodView
+from flask_sse import sse
 from flask_mongorest import methods
 from flask_mongorest.exceptions import ValidationError
 from flask_mongorest.utils import MongoEncoder
 from werkzeug.exceptions import NotFound, Unauthorized
 from mimerender import register_mime, FlaskMimeRender
 from botocore.errorfactory import ClientError
+from urllib.parse import unquote
 
 BUCKET = os.environ.get('S3_DOWNLOADS_BUCKET', 'mongorest-downloads')
 CNAME = os.environ.get('PORTAL_CNAME')
@@ -207,13 +209,17 @@ class ResourceView(MethodView):
             # Serialize the objects one by one
             data = []
             if "s3" not in extra or not extra["s3"]["exists"]:
-                print("serializing ...")
+                url = unquote(request.url).encode('utf-8')
+                channel = hashlib.sha1(url).hexdigest()
+                print(f"serializing {channel}...")
                 tic = time.perf_counter()
-                batch_size = 200
+                batch_size = 1000
                 for idx, obj in enumerate(objs):
                     if idx > 0 and not idx % batch_size:
                         toc = time.perf_counter()
-                        print(f"{idx} Took {toc - tic:0.4f} seconds to serialize {batch_size} objects.")
+                        print(f"{idx} Took {toc - tic:0.4f}s to serialize {batch_size} objects.")
+                        if self._resource.view_method == methods.Download:
+                            sse.publish({"message": idx + 1}, type="download", channel=channel)
                         tic = time.perf_counter()
                     try:
                         data.append(self._resource.serialize(obj, params=request.args))
@@ -234,6 +240,7 @@ class ResourceView(MethodView):
             ret = self._resource.serialize(obj, params=request.args)
 
         if self._resource.view_method == methods.Download:
+            sse.publish({"message": 0}, type="download", channel=channel)
             return ret, '200 OK', {
                 'Content-Disposition': f'attachment; filename="{filename}.{short_mime}"'
             }
