@@ -33,7 +33,7 @@ except ImportError:
 try:
     from marshmallow_mongoengine import ModelSchema
     from marshmallow.exceptions import ValidationError as MarshmallowValidationError
-    from marshmallow.utils import get_value, set_value
+    from marshmallow.utils import get_value, set_value, _Missing
 except ImportError:
     ModelSchema = None
     from glom import glom, assign
@@ -405,9 +405,8 @@ class Resource(object):
                 except PathAccessError as ex:
                     raise UnknownFieldError
         else:
-            try:
-                field_value = get_value(obj, field_name)
-            except AttributeError:
+            field_value = get_value(obj, field_name)
+            if isinstance(field_value, _Missing):
                 raise UnknownFieldError
 
         return self.serialize_field_value(obj, field_name, field_instance, field_value, **kwargs)
