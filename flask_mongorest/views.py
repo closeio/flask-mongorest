@@ -208,9 +208,9 @@ class ResourceView(MethodView):
 
             # Serialize the objects one by one
             data = []
+            url = unquote(request.url).encode('utf-8')
+            channel = hashlib.sha1(url).hexdigest()
             if "s3" not in extra or not extra["s3"]["exists"]:
-                url = unquote(request.url).encode('utf-8')
-                channel = hashlib.sha1(url).hexdigest()
                 print(f"serializing {channel}...")
                 tic = time.perf_counter()
                 batch_size = 1000
