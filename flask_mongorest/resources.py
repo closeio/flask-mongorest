@@ -2,8 +2,6 @@ import json
 import time
 import mongoengine
 
-from glom import glom, assign
-from glom.core import PathAccessError
 from typing import Pattern
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
@@ -35,8 +33,11 @@ except ImportError:
 try:
     from marshmallow_mongoengine import ModelSchema
     from marshmallow.exceptions import ValidationError as MarshmallowValidationError
+    from marshmallow.utils import get_value, set_value
 except ImportError:
     ModelSchema = None
+    from glom import glom, assign
+    from glom.core import PathAccessError
 
 from flask_mongorest import methods
 from flask_mongorest.exceptions import ValidationError, UnknownFieldError
@@ -395,14 +396,19 @@ class Resource(object):
         # Determine the field value
         if has_field_instance:
             field_value = obj
-        else:
+        elif ModelSchema is None:
             try:
                 field_value = getattr(obj, field_name)
             except AttributeError:
                 try:
-                    field_value = glom(obj, field_name)  # TODO improve serialization time
+                    field_value = glom(obj, field_name)  # slow
                 except PathAccessError as ex:
                     raise UnknownFieldError
+        else:
+            try:
+                field_value = get_value(obj, field_name)
+            except AttributeError:
+                raise UnknownFieldError
 
         return self.serialize_field_value(obj, field_name, field_instance, field_value, **kwargs)
 
@@ -550,7 +556,10 @@ class Resource(object):
                         pass
 
             if value is not None:
-                assign(data, renamed_field, value, missing=dict)
+                if ModelSchema is None:
+                    assign(data, renamed_field, value, missing=dict)  # slow
+                else:
+                    set_value(data, renamed_field, value)
 
         return data
 
