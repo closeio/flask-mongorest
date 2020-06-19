@@ -965,7 +965,6 @@ class Resource(object):
             qs = qs.select_related()
 
         # Evaluate the queryset
-        print("evaluate...")
         objs = list(qs)
         has_more = None
         if self.view_method != methods.Download and self.paginate:

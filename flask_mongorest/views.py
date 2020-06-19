@@ -213,11 +213,14 @@ class ResourceView(MethodView):
             if "s3" not in extra or not extra["s3"]["exists"]:
                 print(f"serializing {channel}...")
                 tic = time.perf_counter()
-                batch_size = 1000
+                batch_size, total_count = 1000, extra["total_count"]
                 for idx, obj in enumerate(objs):
-                    if idx > 0 and not idx % batch_size:
+                    if idx > 0 and (not idx % batch_size or idx == total_count - 1):
                         toc = time.perf_counter()
-                        print(f"{idx} Took {toc - tic:0.4f}s to serialize {batch_size} objects.")
+                        nobjs = batch_size
+                        if idx == total_count - 1:
+                            nobjs = total_count - batch_size * int(idx/batch_size) - 1
+                        print(f"{idx} Took {toc - tic:0.4f}s to serialize {nobjs} objects.")
                         if self._resource.view_method == methods.Download:
                             sse.publish({"message": idx + 1}, type="download", channel=channel)
                         tic = time.perf_counter()
