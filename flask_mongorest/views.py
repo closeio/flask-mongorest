@@ -37,7 +37,7 @@ def render_html(**payload):
 def render_gz(**payload):
     s3 = payload.get("s3")
 
-    if s3 and not s3["exists"]:
+    if s3 and s3["update"]:
         fmt = request.args.get('format')
         content_type = 'text/csv' if fmt == 'csv' else 'application/json'
         if fmt == 'json':
@@ -192,25 +192,27 @@ class ResourceView(MethodView):
 
             # generate hash/etag and S3 object name
             if self._resource.view_method == methods.Download:
-                dct = {
-                    "ids": [str(obj.pk) for obj in objs],
-                    "params": self._resource.params
-                }
-                sha1 = hashlib.sha1(json.dumps(dct).encode('utf-8')).hexdigest()
+                primary_keys = [str(obj.pk) for obj in objs]
+                last_modified = max(obj.last_modified for obj in objs)
+                dct = {"ids": primary_keys, "params": self._resource.params}
+                sha1 = hashlib.sha1(
+                    json.dumps(dct, sort_keys=True).encode('utf-8')
+                ).hexdigest()
                 filename = f"{sha1}.{fmt}"
                 key = f"{CNAME}/{filename}" if CNAME else filename
-                extra["s3"] = {"key": key, "exists": False}
+                extra["s3"] = {"key": key, "update": False}
                 try:
-                    s3_client.head_object(Bucket=BUCKET, Key=key)
-                    extra["s3"]["exists"] = True
+                    s3_client.head_object(
+                        Bucket=BUCKET, Key=key, IfModifiedSince=last_modified
+                    )
                 except ClientError:
-                    pass
+                    extra["s3"]["update"] = True
 
             # Serialize the objects one by one
             data = []
             url = unquote(request.url).encode('utf-8')
             channel = hashlib.sha1(url).hexdigest()
-            if "s3" not in extra or not extra["s3"]["exists"]:
+            if "s3" not in extra or extra["s3"]["update"]:
                 print(f"serializing {channel}...")
                 tic = time.perf_counter()
                 batch_size, total_count = 1000, extra["total_count"]
