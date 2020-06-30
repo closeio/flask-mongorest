@@ -1069,6 +1069,8 @@ class Resource(object):
                     if value is None:
                         update = True
                     else:
+                        if obj[field] is None:
+                            obj[field] = {}
                         self.update_object(obj[field], data=value, save=False)
                 elif obj._fields[field].primary_key:
                     raise ValidationError({'error': f'`{field}` is primary key and cannot be updated'})
