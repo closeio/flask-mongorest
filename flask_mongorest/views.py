@@ -362,7 +362,6 @@ class ResourceView(MethodView):
             fields = ','.join(raw_data.keys())
             return self._resource.serialize(obj, params={'_fields': fields})
 
-
     def delete_object(self, obj):
         """Delete an object"""
         # Check if we have permission to delete this object

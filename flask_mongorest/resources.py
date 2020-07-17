@@ -1,7 +1,7 @@
 import json
-import time
 import mongoengine
 
+from unflatten import unflatten
 from typing import Pattern
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
@@ -42,7 +42,6 @@ except ImportError:
 from flask_mongorest import methods
 from flask_mongorest.exceptions import ValidationError, UnknownFieldError
 from flask_mongorest.utils import cmp_fields, isbound, isint, equal
-from flask_mongoengine.pagination import ListFieldPagination
 
 
 def get_with_list_index(o, k):
@@ -59,6 +58,7 @@ class ResourceMeta(type):
                 if resource == name:
                     cls.child_document_resources[document] = cls
         type.__init__(cls, name, bases, classdict)
+
 
 class Resource(object):
     # MongoEngine Document class related to this resource (required)
@@ -205,7 +205,12 @@ class Resource(object):
                     raise ValidationError({'error': "Chunked Transfer-Encoding is not supported."})
 
                 try:
-                    self._raw_data = json.loads(request.data.decode('utf-8'), parse_constant=self._enforce_strict_json)
+                    self._raw_data = json.loads(
+                        request.data.decode('utf-8'),
+                        parse_constant=self._enforce_strict_json
+                    )
+                    if request.method == 'PUT':
+                        self._raw_data = unflatten(self._raw_data)
                 except ValueError:
                     raise ValidationError({'error': 'The request contains invalid JSON.'})
                 if request.method == 'PUT' and not isinstance(self._raw_data, dict):
@@ -402,7 +407,7 @@ class Resource(object):
             except AttributeError:
                 try:
                     field_value = glom(obj, field_name)  # slow
-                except PathAccessError as ex:
+                except PathAccessError:
                     raise UnknownFieldError
         else:
             field_value = get_value(obj, field_name)
@@ -501,7 +506,6 @@ class Resource(object):
         Given an object, serialize it, turning it into its JSON
         representation.
         """
-        #tic = time.perf_counter()
         if not obj:
             return {}
 
