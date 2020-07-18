@@ -480,7 +480,7 @@ class Resource(object):
         return [val for val in [
             self.get_field_value(elem, field_name, field_instance=field_instance.field, **kwargs)
             for elem in field_value
-        ] if val is not None]
+        ] if val is not None] if field_value else []
 
     def serialize_document_field(self, field_name, field_value, **kwargs):
         """If this field is a reference or an embedded document, either return

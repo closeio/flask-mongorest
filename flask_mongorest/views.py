@@ -28,7 +28,7 @@ mimerender = FlaskMimeRender(global_override_input_key='short_mime')
 register_mime('gz', ('application/gzip',))
 
 def render_json(**payload):
-    return json.dumps(payload, allow_nan=False, cls=MongoEncoder)
+    return json.dumps(payload, allow_nan=True, cls=MongoEncoder)
 
 def render_html(**payload):
     d = json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4)
@@ -41,7 +41,7 @@ def render_gz(**payload):
         fmt = request.args.get('format')
         content_type = 'text/csv' if fmt == 'csv' else 'application/json'
         if fmt == 'json':
-            contents = json.dumps(payload['data'], allow_nan=False, cls=MongoEncoder)
+            contents = json.dumps(payload['data'], allow_nan=True, cls=MongoEncoder)
         elif fmt == 'csv':
             from pandas import DataFrame
             from cherrypicker import CherryPicker
