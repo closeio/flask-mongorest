@@ -31,7 +31,8 @@ setup(
         'Flask-MongoEngine',
         'mimerender @ git+https://github.com/tschaume/mimerender@mpcontribs#egg=mimerender',
         'nose',
-        'python-dateutil'
+        'python-dateutil',
+        'unflatten'
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
