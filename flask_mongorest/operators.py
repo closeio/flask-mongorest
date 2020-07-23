@@ -1,4 +1,57 @@
+"""
+Flask-MongoRest operators.
+
+Operators are the building blocks that Resource filters are built upon.
+Their role is to generate and apply the right filters to a provided
+queryset. For example:
+
+    GET /post/?title__startswith=John
+
+Such request would result in calling this module's `Startswith` operator
+like so:
+
+    new_queryset = Startswith().apply(queryset, 'title', 'John')
+
+Where the original queryset would be `BlogPost.objects.all()` and the
+new queryset would be equivalent to:
+
+    BlogPost.objects.filter(title__startswith='John')
+
+It's also easy to create your own Operator subclass and use it in your
+Resource. For example, if you have an endpoint listing students and you
+want to filter them by the range of their scores like so:
+
+    GET /student/?score__range=0,10
+
+Then you can create a Range Operator:
+
+    class Range(Operator):
+        op = 'range'
+        def prepare_queryset_kwargs(self, field, value, negate=False):
+            # For the sake of simplicity, we won't support negate here,
+            # i.e. /student/?score__not__range=0,10 won't work.
+            lower, upper = value.split(',')
+            return {
+                field + '__lte': upper,
+                field + '__gte': lower
+            }
+
+Then you include it in your Resource's filters:
+
+    class StudentResource(Resource):
+        document = documents.Student
+        filters = {
+            'score': [Range]
+        }
+
+And this way, the request we mentioned above would result in:
+
+    Student.objects.filter(score__lte=upper, score__gte=lower)
+"""
+
 class Operator(object):
+    """Base class that all the other operators should inherit from."""
+
     op = 'exact'
 
     # Can be overridden via constructor.
