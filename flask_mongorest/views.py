@@ -362,14 +362,14 @@ class ResourceView(MethodView):
             fields = ','.join(raw_data.keys())
             return self._resource.serialize(obj, params={'_fields': fields})
 
-    def delete_object(self, obj):
+    def delete_object(self, obj, skip_post_delete=False):
         """Delete an object"""
         # Check if we have permission to delete this object
         if not self.has_delete_permission(request, obj):
             raise Unauthorized
 
         try:
-            self._resource.delete_object(obj)
+            self._resource.delete_object(obj, skip_post_delete=skip_post_delete)
         except Exception as e:
             self.handle_validation_error(e)
 
@@ -377,9 +377,13 @@ class ResourceView(MethodView):
         """Delete each object in the list one by one, and return the total count."""
         count = 0
         try:
-            for obj in objs:
-                self.delete_object(obj)
+            # separately delete last object to send skip signal
+            for obj in objs[:-1]:
+                self.delete_object(obj, skip_post_delete=True)
                 count += 1
+
+            self.delete_object(objs[-1])
+            count += 1
         except ValidationError as e:
             e.args[0]['count'] = count
             raise e

@@ -1101,8 +1101,8 @@ class Resource(object):
             self.save_object(obj)
         return obj
 
-    def delete_object(self, obj, parent_resources=None):
-        obj.delete()
+    def delete_object(self, obj, parent_resources=None, skip_post_delete=False):
+        obj.delete(signal_kwargs={"skip": skip_post_delete})
 
 
 # Py2/3 compatible way to do metaclasses (or six.add_metaclass)
