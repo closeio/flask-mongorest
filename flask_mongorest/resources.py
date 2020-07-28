@@ -499,7 +499,7 @@ class Resource(object):
         if field_name in self._related_resources:
             if field_value and not isinstance(field_value, DBRef):
                 res = self._related_resources[field_name](view_method=self.view_method)
-            return res.serialize_field(field_value, **kwargs)
+                return res.serialize_field(field_value, **kwargs)
         else:
             if DocumentProxy and isinstance(field_value, DocumentProxy):
                 # Don't perform a DBRef isinstance check below since
