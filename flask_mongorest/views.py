@@ -129,17 +129,11 @@ class ResourceView(MethodView):
         try:
             self._resource = self.requested_resource(request)
             return super(ResourceView, self).dispatch_request(*args, **kwargs)
-        except mongoengine.queryset.DoesNotExist as e:
-            return {'error': 'Empty query: ' + str(e)}, '404 Not Found'
-        except mongoengine.errors.NotUniqueError as e:
-            return {'error': str(e)}, '401 Unauthorized'
-        except ValidationError as e:
-            return e.args[0], '400 Bad Request'
-        except (ValueError, mongoengine.errors.ValidationError) as e:
+        except (ValueError, ValidationError, mongoengine.errors.ValidationError) as e:
             return {'error': str(e)}, '400 Bad Request'
-        except Unauthorized as e:
+        except (Unauthorized, mongoengine.errors.NotUniqueError) as e:
             return {'error': str(e)}, '401 Unauthorized'
-        except NotFound as e:
+        except (NotFound, mongoengine.queryset.DoesNotExist) as e:
             return {'error': str(e)}, '404 Not Found'
 
     def handle_validation_error(self, e):
