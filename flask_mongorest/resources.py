@@ -957,15 +957,17 @@ class Resource(object):
             custom_qs = False
             qs = self.get_queryset()
 
+        # Apply filters and ordering, based on the params supplied by the
+        # request
+        qs = self.apply_filters(qs, params)
+        qs = self.apply_ordering(qs, params)
+
         # If a queryset filter was provided, pass our current queryset in and
         # get a new one out
         if qfilter:
             qs = qfilter(qs)
 
-        # Apply filters and ordering, based on the params supplied by the
-        # request
-        qs = self.apply_filters(qs, params)
-        qs = self.apply_ordering(qs, params)
+        # set total count
         extra['total_count'] = qs.count()
 
         # Apply pagination to the queryset (if not Download and no custom queryset provided)
