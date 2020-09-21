@@ -1,8 +1,10 @@
 import os
+import sys
 import time
 import json
 import boto3
 import hashlib
+import traceback
 import mongoengine
 from gzip import GzipFile
 from io import BytesIO
@@ -135,6 +137,12 @@ class ResourceView(MethodView):
             return {'error': str(e)}, '401 Unauthorized'
         except (NotFound, mongoengine.queryset.DoesNotExist) as e:
             return {'error': str(e)}, '404 Not Found'
+        except Exception as e:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            tb = traceback.format_exception(exc_type, exc_value, exc_tb)
+            err = ''.join(tb)
+            print(err)
+            return {'error': err}, '500 Internal Server Error'
 
     def handle_validation_error(self, e):
         if isinstance(e, ValidationError):
