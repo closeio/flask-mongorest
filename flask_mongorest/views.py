@@ -271,11 +271,24 @@ class ResourceView(MethodView):
                 })
             raw_data_deque = deque(raw_data)
             self._resource.view_method = methods.BulkCreate
-            ret = []
+            data = []
+            tic = time.perf_counter()
             while len(raw_data_deque):
                 self._resource._raw_data = raw_data_deque.popleft()
-                ret.append(self.create_object())
-            return {'data': ret, 'count': len(ret)}, '201 Created'
+                data.append(self.create_object())
+                dt = time.perf_counter() - tic
+                if dt > 50:
+                    break
+
+            count = len(data)
+            msg = f"Created {count} objects in {dt:0.1f}s ({count/dt:0.3f}/s)."
+            print(msg)
+            ret = {'data': data, 'count': count}
+            if raw_data_deque:
+                remain = len(raw_data_deque)
+                msg += f" Remaining {remain} objects skipped to avoid Server Timeout."
+                ret['warning'] = msg
+            return ret, '201 Created'
         else:
             raise ValidationError({'error': 'wrong payload type'})
 
@@ -377,20 +390,29 @@ class ResourceView(MethodView):
 
     def delete_objects(self, objs):
         """Delete each object in the list one by one, and return the total count."""
-        count = 0
+        tic = time.perf_counter()
+        nobjs, count = len(objs), 0
         try:
             # separately delete last object to send skip signal
-            for obj in objs[:-1]:
-                self.delete_object(obj, skip_post_delete=True)
+            for iobj, obj in enumerate(objs):
+                skip = iobj < nobjs - 1
+                self.delete_object(obj, skip_post_delete=skip)
                 count += 1
-
-            self.delete_object(objs[-1])
-            count += 1
+                dt = time.perf_counter() - tic
+                if dt > 50:
+                    break
         except ValidationError as e:
             e.args[0]['count'] = count
             raise e
         else:
-            return {'count': count}
+            msg = f"Deleted {count} objects in {dt:0.1f}s ({count/dt:0.3f}/s)."
+            print(msg)
+            ret = {'count': count}
+            remain = nobjs - count
+            if remain:
+                msg += f" Remaining {remain} objects skipped to avoid Server Timeout."
+                ret['warning'] = msg
+            return ret
 
     def delete(self, **kwargs):
         pk = kwargs.pop('pk', None)
