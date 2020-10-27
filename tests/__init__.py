@@ -426,6 +426,11 @@ class MongoRestTestCase(unittest.TestCase):
         posts = resp_json(resp)
         self.assertEqual(len(posts['data']), 2)
 
+        resp = self.app.get('/posts/?title__in=')
+        response_success(resp)
+        posts = resp_json(resp)
+        self.assertEqual(len(posts['data']), 0)
+
         resp = self.app.get('/user/?datetime=%s' % '2012-10-09 10:00:00')
         response_success(resp)
         users = resp_json(resp)
