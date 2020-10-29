@@ -423,7 +423,7 @@ class Resource(object):
         For other fields, see get_field_value method.
         """
         if isinstance(field_instance, (LazyReferenceField, GenericLazyReferenceField)):
-            return field_value.pk
+            return field_value and field_value.pk
 
         if isinstance(field_instance, (ReferenceField, GenericReferenceField, EmbeddedDocumentField)):
             return self.serialize_document_field(field_name, field_value, **kwargs)
