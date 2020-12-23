@@ -7,7 +7,6 @@ from typing import Pattern
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from flask import has_request_context, request, url_for
-from dict_deep import deep_get
 try:
     from urllib.parse import urlparse
 except ImportError: # Python 2
@@ -958,8 +957,7 @@ class Resource(object):
             custom_qs = False
             qs = self.get_queryset()
 
-        # Apply filters and ordering, based on the params supplied by the
-        # request
+        # Apply filters and ordering, based on the params supplied by the request
         qs = self.apply_filters(qs, params)
         qs = self.apply_ordering(qs, params)
 
