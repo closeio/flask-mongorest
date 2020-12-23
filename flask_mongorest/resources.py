@@ -1,6 +1,7 @@
 import json
 import mongoengine
 
+from fastnumbers import fast_int
 from unflatten import unflatten
 from typing import Pattern
 from bson.dbref import DBRef
@@ -46,7 +47,7 @@ from flask_mongorest.utils import cmp_fields, isbound, isint, equal
 
 def get_with_list_index(o, k):
     try:
-        return o[int(k)]
+        return o[fast_int(k)]
     except ValueError:
         return o[k]
 
