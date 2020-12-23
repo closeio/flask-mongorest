@@ -264,7 +264,7 @@ class ResourceView(MethodView):
             self._resource.view_method = methods.Create
             return self.create_object()
         elif isinstance(raw_data, list):
-            limit = self._resource.max_limit
+            limit = self._resource.bulk_update_limit
             if len(raw_data) > limit:
                 raise ValidationError({
                     'errors': [f"Can only create {limit} documents at once"]
