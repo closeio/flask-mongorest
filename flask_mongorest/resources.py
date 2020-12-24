@@ -870,7 +870,7 @@ class Resource(object):
 
         return objs, has_more
 
-    def save_related_objects(self, obj, parent_resources=None):
+    def save_related_objects(self, obj, parent_resources=None, **kwargs):
         if not parent_resources:
             parent_resources = [self]
         else:
@@ -905,7 +905,7 @@ class Resource(object):
 
     def save_object(self, obj, **kwargs):
         self.save_related_objects(obj, **kwargs)
-        obj.save()
+        obj.save(**kwargs)
         obj.reload()
 
         self._dirty_fields = None # No longer dirty.
@@ -929,7 +929,7 @@ class Resource(object):
         obj = self.document(**update_dict)
         self._dirty_fields = update_dict.keys()
         if save:
-            self.save_object(obj)
+            self.save_object(obj, force_insert=True)
         return obj
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
@@ -937,7 +937,7 @@ class Resource(object):
         if subresource:
             return subresource.update_object(obj, data=data, save=save, parent_resources=parent_resources)
 
-        update_dict = self.get_object_dict(data, update=True)
+        update_dict = self.get_object_dict(data, update=True) if save else data
 
         self._dirty_fields = []
 
@@ -963,8 +963,8 @@ class Resource(object):
             self.save_object(obj)
         return obj
 
-    def delete_object(self, obj, parent_resources=None):
-        obj.delete()
+    def delete_object(self, obj, parent_resources=None, skip_post_delete=False):
+        obj.delete(signal_kwargs={"skip": skip_post_delete})
 
 
 # Py2/3 compatible way to do metaclasses (or six.add_metaclass)
