@@ -1,3 +1,4 @@
+import os
 from setuptools import setup
 
 # Stops exit traceback on tests
@@ -6,6 +7,10 @@ try:
     import multiprocessing # noqa
 except Exception:
     pass
+
+SETUP_PTH = os.path.dirname(os.path.abspath(__file__))
+with open(os.path.join(SETUP_PTH, "requirements.txt")) as f:
+    required = f.read().splitlines()
 
 setup(
     name='Flask-MongoRest',
@@ -27,13 +32,7 @@ setup(
     test_suite='nose.collector',
     zip_safe=False,
     platforms='any',
-    setup_requires=[
-        'Flask-MongoEngine',
-        'mimerender',
-        'nose',
-        'python-dateutil',
-        'cleancat'
-    ],
+    install_requires=required,
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Web Environment',
