@@ -288,10 +288,12 @@ class ResourceView(MethodView):
         nobjs, count = len(objs), 0
         try:
             # separately delete last object to send skip signal
-            for iobj, obj in enumerate(objs):
-                skip = iobj < nobjs - 1
-                self.delete_object(obj, skip_post_delete=skip)
+            for obj in objs[:-1]:
+                self.delete_object(obj, skip_post_delete=True)
                 count += 1
+
+            self.delete_object(objs[-1])
+            count += 1
         except ValidationError as e:
             e.args[0]['count'] = count
             raise e
