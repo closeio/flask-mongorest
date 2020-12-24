@@ -769,7 +769,7 @@ class MongoRestTestCase(unittest.TestCase):
 
         resp = self.app.get('/test_view_method/')
         response_success(resp)
-        self.assertEqual(resp_json(resp), {'method': 'List'})
+        self.assertEqual(resp_json(resp), {'method': 'BulkFetch'})
 
         resp = self.app.post('/test_view_method/', data=json.dumps({
             'txt': 'doc2'

@@ -53,6 +53,7 @@ class Operator(object):
     """Base class that all the other operators should inherit from."""
 
     op = 'exact'
+    typ = 'string'
 
     # Can be overridden via constructor.
     allow_negation = False
@@ -75,20 +76,42 @@ class Operator(object):
         kwargs = self.prepare_queryset_kwargs(field, value, negate)
         return queryset.filter(**kwargs)
 
+def try_float(value):
+    try:
+        return float(value)
+    except ValueError:
+        return value
+
 class Ne(Operator):
     op = 'ne'
 
 class Lt(Operator):
     op = 'lt'
+    typ = 'number'
+
+    def prepare_queryset_kwargs(self, field, value, negate):
+        return {'__'.join(filter(None, [field, self.op])): try_float(value)}
 
 class Lte(Operator):
     op = 'lte'
+    typ = 'number'
+
+    def prepare_queryset_kwargs(self, field, value, negate):
+        return {'__'.join(filter(None, [field, self.op])): try_float(value)}
 
 class Gt(Operator):
     op = 'gt'
+    typ = 'number'
+
+    def prepare_queryset_kwargs(self, field, value, negate):
+        return {'__'.join(filter(None, [field, self.op])): try_float(value)}
 
 class Gte(Operator):
     op = 'gte'
+    typ = 'number'
+
+    def prepare_queryset_kwargs(self, field, value, negate):
+        return {'__'.join(filter(None, [field, self.op])): try_float(value)}
 
 class Exact(Operator):
     op = 'exact'
@@ -106,6 +129,7 @@ class IExact(Operator):
 
 class In(Operator):
     op = 'in'
+    typ = 'array'
 
     def prepare_queryset_kwargs(self, field, value, negate):
         # this is null if the user submits an empty in expression (like
@@ -140,6 +164,7 @@ class IEndswith(Operator):
 
 class Boolean(Operator):
     op = 'exact'
+    typ = 'boolean'
 
     def prepare_queryset_kwargs(self, field, value, negate):
         if value == 'false':

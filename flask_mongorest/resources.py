@@ -16,7 +16,9 @@ except ImportError:
     DocumentProxy = None
     SafeReferenceField = None
 
-from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, GenericReferenceField
+from mongoengine.fields import EmbeddedDocumentField, ListField
+from mongoengine.fields import GenericReferenceField, ReferenceField
+from mongoengine.fields import GenericLazyReferenceField, LazyReferenceField
 from mongoengine.fields import DictField
 
 from cleancat import ValidationError as SchemaValidationError
@@ -209,7 +211,8 @@ class Resource(object):
         """
         return self.fields
 
-    def get_optional_fields(self):
+    @staticmethod
+    def get_optional_fields():
         """
         Return a list of fields that can optionally be included in the
         response (but only if a `_fields` param mentioned them explicitly).
@@ -228,15 +231,18 @@ class Resource(object):
 
         include_all = False
 
+        # NOTE use list(dict.fromkeys()) below instead of set() to maintain order
         if 'fields' in kwargs:
             fields = kwargs['fields']
-            all_fields_set = set(fields)
+            all_fields_set = list(dict.fromkeys(fields))
         else:
-            fields = self.get_fields()
-            all_fields_set = set(fields) | set(self.get_optional_fields())
+            fields = list(self.get_fields())
+            all_fields = fields + self.get_optional_fields()
+            all_fields_set = list(dict.fromkeys(all_fields))
 
         if params and '_fields' in params:
-            only_fields = set(params['_fields'].split(','))
+            params_fields = params['_fields'].split(',')
+            only_fields = list(dict.fromkeys(params_fields))
             if '_all' in only_fields:
                 include_all = True
         else:
@@ -371,6 +377,9 @@ class Resource(object):
         field_value is an actual value to be serialized.
         For other fields, see get_field_value method.
         """
+        if isinstance(field_instance, (LazyReferenceField, GenericLazyReferenceField)):
+            return field_value and field_value.pk
+
         if isinstance(field_instance, (ReferenceField, GenericReferenceField, EmbeddedDocumentField)):
             return self.serialize_document_field(field_name, field_value, **kwargs)
 
@@ -382,6 +391,7 @@ class Resource(object):
 
         elif callable(field_instance):
             return self.serialize_callable_field(obj, field_instance, field_name, field_value, **kwargs)
+
         return field_value
 
     def serialize_callable_field(self, obj, field_instance, field_name, field_value, **kwargs):
@@ -398,12 +408,13 @@ class Resource(object):
             else:
                 value = field_instance(obj)
         if field_name in self._related_resources:
+            res = self._related_resources[field_name](view_method=self.view_method)
             if isinstance(value, list):
-                return [self._related_resources[field_name]().serialize_field(o, **kwargs) for o in value]
+                return [res.serialize_field(o, **kwargs) for o in value]
             elif value is None:
                 return None
             else:
-                return self._related_resources[field_name]().serialize_field(value, **kwargs)
+                return res.serialize_field(value, **kwargs)
         return value
 
     def serialize_dict_field(self, field_instance, field_name, field_value, **kwargs):
@@ -423,18 +434,27 @@ class Resource(object):
 
     def serialize_list_field(self, field_instance, field_name, field_value, **kwargs):
         """Serialize each item in the list separately."""
-        return [val for val in [self.get_field_value(elem, field_name, field_instance=field_instance.field, **kwargs) for elem in field_value] if val]
+        if not field_value:
+            return []
+
+        field_values = []
+        for elem in field_value:
+            fv = self.get_field_value(
+                elem, field_name, field_instance=field_instance.field, **kwargs
+            )
+            if fv is not None:
+                field_values.append(fv)
+
+        return field_values
 
     def serialize_document_field(self, field_name, field_value, **kwargs):
         """If this field is a reference or an embedded document, either return
         a DBRef or serialize it using a resource found in `related_resources`.
         """
         if field_name in self._related_resources:
-            return (
-                field_value and
-                not isinstance(field_value, DBRef) and
-                self._related_resources[field_name]().serialize_field(field_value, **kwargs)
-            )
+            if field_value and not isinstance(field_value, DBRef):
+                res = self._related_resources[field_name](view_method=self.view_method)
+                return res.serialize_field(field_value, **kwargs)
         else:
             if DocumentProxy and isinstance(field_value, DocumentProxy):
                 # Don't perform a DBRef isinstance check below since
@@ -476,13 +496,16 @@ class Resource(object):
             renamed_field = self._rename_fields.get(field, field)
 
             # if the field is callable, execute it with `obj` as the param
+            value = None
             if hasattr(self, field) and callable(getattr(self, field)):
                 value = getattr(self, field)(obj)
 
                 # if the field is associated with a specific resource (via the
                 # `related_resources` map), use that resource to serialize it
                 if field in self._related_resources and value is not None:
-                    related_resource = self._related_resources[field]()
+                    related_resource = self._related_resources[field](
+                        view_method=self.view_method
+                    )
                     if isinstance(value, mongoengine.document.Document):
                         value = related_resource.serialize_field(value)
                     elif isinstance(value, dict):
@@ -808,8 +831,9 @@ class Resource(object):
         qs = self.apply_ordering(qs, params)
 
         # Apply limit and skip to the queryset
+        bulk_methods = {methods.BulkUpdate, methods.BulkDelete}
         limit = None
-        if self.view_method == methods.BulkUpdate:
+        if self.view_method in bulk_methods:
             # limit the number of objects that can be bulk-updated at a time
             qs = qs.limit(self.bulk_update_limit)
         elif not custom_qs:
@@ -826,13 +850,13 @@ class Resource(object):
 
         # Raise a validation error if bulk update would result in more than
         # bulk_update_limit updates
-        if self.view_method == methods.BulkUpdate and len(objs) >= self.bulk_update_limit:
+        if self.view_method in bulk_methods and len(objs) >= self.bulk_update_limit:
             raise ValidationError({
                 'errors': ["It's not allowed to update more than %d objects at once" % self.bulk_update_limit]
             })
 
         # Determine the value of has_more
-        if self.view_method != methods.BulkUpdate and self.paginate:
+        if self.view_method not in bulk_methods and self.paginate:
             has_more = len(objs) > limit
             if has_more:
                 objs = objs[:-1]
@@ -846,7 +870,7 @@ class Resource(object):
 
         return objs, has_more
 
-    def save_related_objects(self, obj, parent_resources=None):
+    def save_related_objects(self, obj, parent_resources=None, **kwargs):
         if not parent_resources:
             parent_resources = [self]
         else:
@@ -881,7 +905,7 @@ class Resource(object):
 
     def save_object(self, obj, **kwargs):
         self.save_related_objects(obj, **kwargs)
-        obj.save()
+        obj.save(**kwargs)
         obj.reload()
 
         self._dirty_fields = None # No longer dirty.
@@ -905,7 +929,7 @@ class Resource(object):
         obj = self.document(**update_dict)
         self._dirty_fields = update_dict.keys()
         if save:
-            self.save_object(obj)
+            self.save_object(obj, force_insert=True)
         return obj
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
@@ -913,7 +937,7 @@ class Resource(object):
         if subresource:
             return subresource.update_object(obj, data=data, save=save, parent_resources=parent_resources)
 
-        update_dict = self.get_object_dict(data, update=True)
+        update_dict = self.get_object_dict(data, update=True) if save else data
 
         self._dirty_fields = []
 
@@ -939,8 +963,8 @@ class Resource(object):
             self.save_object(obj)
         return obj
 
-    def delete_object(self, obj, parent_resources=None):
-        obj.delete()
+    def delete_object(self, obj, parent_resources=None, skip_post_delete=False):
+        obj.delete(signal_kwargs={"skip": skip_post_delete})
 
 
 # Py2/3 compatible way to do metaclasses (or six.add_metaclass)

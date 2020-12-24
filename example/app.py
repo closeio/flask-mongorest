@@ -40,7 +40,7 @@ class UserResource(Resource):
 @api.register()
 class UserView(ResourceView):
     resource = UserResource
-    methods = [Create, Update, Fetch, List, Delete]
+    methods = [Create, Update, Fetch, BulkFetch, Delete]
 
 class ContentResource(Resource):
     document = documents.Content
@@ -87,7 +87,7 @@ class PostResource(Resource):
 @api.register(name='posts', url='/posts/')
 class PostView(ResourceView):
     resource = PostResource
-    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+    methods = [Create, Update, BulkUpdate, Fetch, BulkFetch, Delete]
 
 class LimitedPostResource(Resource):
     document = documents.Post
@@ -98,7 +98,7 @@ class LimitedPostResource(Resource):
 @api.register(name='limited_posts', url='/limited_posts/')
 class LimitedPostView(ResourceView):
     resource = LimitedPostResource
-    methods = [Create, Update, Fetch, List]
+    methods = [Create, Update, Fetch, BulkFetch]
 
 class DummyAuthenication(AuthenticationBase):
     def authorized(self):
@@ -107,7 +107,7 @@ class DummyAuthenication(AuthenticationBase):
 @api.register(name='auth', url='/auth/')
 class DummyAuthView(ResourceView):
     resource = PostResource
-    methods = [Create, Update, Fetch, List, Delete]
+    methods = [Create, Update, Fetch, BulkFetch, Delete]
     authentication_methods = [DummyAuthenication]
 
 @api.register(name='restricted', url='/restricted/')
@@ -115,7 +115,7 @@ class RestrictedPostView(ResourceView):
     """This class allows us to put restrictions in place regarding
        who/what can be read, changed, added or deleted"""
     resource = PostResource
-    methods = [Create, Update, Fetch, List, Delete]
+    methods = [Create, Update, Fetch, BulkFetch, Delete]
 
     # Can't read a post if it isn't published
     def has_read_permission(self, request, qs):
@@ -153,13 +153,13 @@ class TestFieldsResource(Resource):
 @api.register(name='test', url='/test/')
 class TestView(ResourceView):
     resource = TestResource
-    methods = [Create, Update, Fetch, List]
+    methods = [Create, Update, Fetch, BulkFetch]
 
 
 @api.register(name='testfields', url='/testfields/')
 class TestFieldsResource(ResourceView):
     resource = TestFieldsResource
-    methods = [Create, Update, Fetch, List]
+    methods = [Create, Update, Fetch, BulkFetch]
 
 class LanguageResource(Resource):
     document = documents.Language
@@ -175,7 +175,7 @@ class PersonResource(Resource):
 @api.register(name='person', url='/person/')
 class PersonView(ResourceView):
     resource = PersonResource
-    methods = [Create, Update, Fetch, List]
+    methods = [Create, Update, Fetch, BulkFetch]
 
 # extra resources for testing max_limit
 class Post10Resource(PostResource):
@@ -187,12 +187,12 @@ class Post250Resource(PostResource):
 @api.register(name='posts10', url='/posts10/')
 class Post10View(ResourceView):
     resource = Post10Resource
-    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+    methods = [Create, Update, BulkUpdate, Fetch, BulkFetch, Delete]
 
 @api.register(name='posts250', url='/posts250/')
 class Post250View(ResourceView):
     resource = Post250Resource
-    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+    methods = [Create, Update, BulkUpdate, Fetch, BulkFetch, Delete]
 
 # Documents, resources, and views for testing differences between db refs and object ids
 class A(db.Document):
@@ -218,17 +218,17 @@ class CResource(Resource):
 @api.register(url='/a/')
 class AView(ResourceView):
     resource = AResource
-    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+    methods = [Create, Update, BulkUpdate, Fetch, BulkFetch, Delete]
 
 @api.register(url='/b/')
 class BView(ResourceView):
     resource = BResource
-    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+    methods = [Create, Update, BulkUpdate, Fetch, BulkFetch, Delete]
 
 @api.register(url='/c/')
 class CView(ResourceView):
     resource = CResource
-    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+    methods = [Create, Update, BulkUpdate, Fetch, BulkFetch, Delete]
 
 
 # Documents, resources, and views for testing method permissions
@@ -261,7 +261,7 @@ class FetchOnlyView(ResourceView):
 @api.register(url='/list_only/')
 class ListOnlyView(ResourceView):
     resource = MethodTestResource
-    methods = [List]
+    methods = [BulkFetch]
 
 @api.register(url='/delete_only/')
 class DeleteOnlyView(ResourceView):
@@ -277,7 +277,7 @@ class ViewMethodTestResource(Resource):
 @api.register(url='/test_view_method/')
 class TestViewMethodView(ResourceView):
     resource = ViewMethodTestResource
-    methods = [Create, Update, BulkUpdate, Fetch, List, Delete]
+    methods = [Create, Update, BulkUpdate, Fetch, BulkFetch, Delete]
 
     def _dispatch_request(self, *args, **kwargs):
         super(TestViewMethodView, self)._dispatch_request(*args, **kwargs)
@@ -290,7 +290,7 @@ class DateTimeResource(Resource):
 @api.register(name='datetime', url='/datetime/')
 class DateTimeView(ResourceView):
     resource = DateTimeResource
-    methods = [Create, Update, Fetch, List]
+    methods = [Create, Update, Fetch, BulkFetch]
 
 
 # Document, resource, and view for testing invalid JSON
@@ -303,7 +303,7 @@ class DictDocResource(Resource):
 @api.register(url='/dict_doc/')
 class DictDocView(ResourceView):
     resource = DictDocResource
-    methods = [Fetch, List, Create, Update]
+    methods = [Fetch, BulkFetch, Create, Update]
 
 
 if __name__ == "__main__":
