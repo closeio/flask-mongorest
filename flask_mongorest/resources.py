@@ -231,15 +231,18 @@ class Resource(object):
 
         include_all = False
 
+        # NOTE use list(dict.fromkeys()) below instead of set() to maintain order
         if 'fields' in kwargs:
             fields = kwargs['fields']
-            all_fields_set = set(fields)
+            all_fields_set = list(dict.fromkeys(fields))
         else:
-            fields = self.get_fields()
-            all_fields_set = set(fields) | set(self.get_optional_fields())
+            fields = list(self.get_fields())
+            all_fields = fields + self.get_optional_fields()
+            all_fields_set = list(dict.fromkeys(all_fields))
 
         if params and '_fields' in params:
-            only_fields = set(params['_fields'].split(','))
+            params_fields = params['_fields'].split(',')
+            only_fields = list(dict.fromkeys(params_fields))
             if '_all' in only_fields:
                 include_all = True
         else:
