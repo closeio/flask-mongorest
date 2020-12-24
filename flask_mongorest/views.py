@@ -108,11 +108,12 @@ class ResourceView(MethodView):
         if pk:
             self._resource.view_method = methods.Fetch
         else:
-            self._resource.view_method = methods.List
+            self._resource.view_method = methods.BulkFetch
 
         # Create a queryset filter to control read access to the
         # underlying objects
         qfilter = lambda qs: self.has_read_permission(request, qs.clone())
+
         if pk is None:
             result = self._resource.get_objects(qfilter=qfilter)
 

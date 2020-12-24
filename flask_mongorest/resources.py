@@ -808,8 +808,9 @@ class Resource(object):
         qs = self.apply_ordering(qs, params)
 
         # Apply limit and skip to the queryset
+        bulk_methods = {methods.BulkUpdate, methods.BulkDelete}
         limit = None
-        if self.view_method == methods.BulkUpdate:
+        if self.view_method in bulk_methods:
             # limit the number of objects that can be bulk-updated at a time
             qs = qs.limit(self.bulk_update_limit)
         elif not custom_qs:
@@ -826,13 +827,13 @@ class Resource(object):
 
         # Raise a validation error if bulk update would result in more than
         # bulk_update_limit updates
-        if self.view_method == methods.BulkUpdate and len(objs) >= self.bulk_update_limit:
+        if self.view_method in bulk_methods and len(objs) >= self.bulk_update_limit:
             raise ValidationError({
                 'errors': ["It's not allowed to update more than %d objects at once" % self.bulk_update_limit]
             })
 
         # Determine the value of has_more
-        if self.view_method != methods.BulkUpdate and self.paginate:
+        if self.view_method not in bulk_methods and self.paginate:
             has_more = len(objs) > limit
             if has_more:
                 objs = objs[:-1]
