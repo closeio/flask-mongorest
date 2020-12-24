@@ -1,5 +1,6 @@
+import sys
 import json
-
+import traceback
 import mimerender
 import mongoengine
 from flask import render_template, request
@@ -76,14 +77,18 @@ class ResourceView(MethodView):
         try:
             self._resource = self.requested_resource(request)
             return super(ResourceView, self).dispatch_request(*args, **kwargs)
-        except mongoengine.queryset.DoesNotExist as e:
-            return {'error': 'Empty query: ' + str(e)}, '404 Not Found'
-        except ValidationError as e:
-            return e.args[0], '400 Bad Request'
-        except Unauthorized:
-            return {'error': 'Unauthorized'}, '401 Unauthorized'
-        except NotFound as e:
+        except (ValueError, ValidationError, mongoengine.errors.ValidationError) as e:
+            return {'error': str(e)}, '400 Bad Request'
+        except (Unauthorized, mongoengine.errors.NotUniqueError) as e:
+            return {'error': str(e)}, '401 Unauthorized'
+        except (NotFound, mongoengine.queryset.DoesNotExist) as e:
             return {'error': str(e)}, '404 Not Found'
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            tb = traceback.format_exception(exc_type, exc_value, exc_tb)
+            err = ''.join(tb)
+            print(err)
+            return {'error': err}, '500 Internal Server Error'
 
     def handle_validation_error(self, e):
         if isinstance(e, ValidationError):
