@@ -408,12 +408,13 @@ class Resource(object):
             else:
                 value = field_instance(obj)
         if field_name in self._related_resources:
+            res = self._related_resources[field_name](view_method=self.view_method)
             if isinstance(value, list):
-                return [self._related_resources[field_name]().serialize_field(o, **kwargs) for o in value]
+                return [res.serialize_field(o, **kwargs) for o in value]
             elif value is None:
                 return None
             else:
-                return self._related_resources[field_name]().serialize_field(value, **kwargs)
+                return res.serialize_field(value, **kwargs)
         return value
 
     def serialize_dict_field(self, field_instance, field_name, field_value, **kwargs):
@@ -433,18 +434,27 @@ class Resource(object):
 
     def serialize_list_field(self, field_instance, field_name, field_value, **kwargs):
         """Serialize each item in the list separately."""
-        return [val for val in [self.get_field_value(elem, field_name, field_instance=field_instance.field, **kwargs) for elem in field_value] if val]
+        if not field_value:
+            return []
+
+        field_values = []
+        for elem in field_value:
+            fv = self.get_field_value(
+                elem, field_name, field_instance=field_instance.field, **kwargs
+            )
+            if fv is not None:
+                field_values.append(fv)
+
+        return field_values
 
     def serialize_document_field(self, field_name, field_value, **kwargs):
         """If this field is a reference or an embedded document, either return
         a DBRef or serialize it using a resource found in `related_resources`.
         """
         if field_name in self._related_resources:
-            return (
-                field_value and
-                not isinstance(field_value, DBRef) and
-                self._related_resources[field_name]().serialize_field(field_value, **kwargs)
-            )
+            if field_value and not isinstance(field_value, DBRef):
+                res = self._related_resources[field_name](view_method=self.view_method)
+                return res.serialize_field(field_value, **kwargs)
         else:
             if DocumentProxy and isinstance(field_value, DocumentProxy):
                 # Don't perform a DBRef isinstance check below since
@@ -486,13 +496,16 @@ class Resource(object):
             renamed_field = self._rename_fields.get(field, field)
 
             # if the field is callable, execute it with `obj` as the param
+            value = None
             if hasattr(self, field) and callable(getattr(self, field)):
                 value = getattr(self, field)(obj)
 
                 # if the field is associated with a specific resource (via the
                 # `related_resources` map), use that resource to serialize it
                 if field in self._related_resources and value is not None:
-                    related_resource = self._related_resources[field]()
+                    related_resource = self._related_resources[field](
+                        view_method=self.view_method
+                    )
                     if isinstance(value, mongoengine.document.Document):
                         value = related_resource.serialize_field(value)
                     elif isinstance(value, dict):
