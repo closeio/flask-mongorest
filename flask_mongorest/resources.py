@@ -211,7 +211,8 @@ class Resource(object):
         """
         return self.fields
 
-    def get_optional_fields(self):
+    @staticmethod
+    def get_optional_fields():
         """
         Return a list of fields that can optionally be included in the
         response (but only if a `_fields` param mentioned them explicitly).
