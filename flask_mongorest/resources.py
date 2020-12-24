@@ -16,7 +16,9 @@ except ImportError:
     DocumentProxy = None
     SafeReferenceField = None
 
-from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, GenericReferenceField
+from mongoengine.fields import EmbeddedDocumentField, ListField
+from mongoengine.fields import GenericReferenceField, ReferenceField
+from mongoengine.fields import GenericLazyReferenceField, LazyReferenceField
 from mongoengine.fields import DictField
 
 from cleancat import ValidationError as SchemaValidationError
@@ -371,6 +373,9 @@ class Resource(object):
         field_value is an actual value to be serialized.
         For other fields, see get_field_value method.
         """
+        if isinstance(field_instance, (LazyReferenceField, GenericLazyReferenceField)):
+            return field_value and field_value.pk
+
         if isinstance(field_instance, (ReferenceField, GenericReferenceField, EmbeddedDocumentField)):
             return self.serialize_document_field(field_name, field_value, **kwargs)
 
@@ -382,6 +387,7 @@ class Resource(object):
 
         elif callable(field_instance):
             return self.serialize_callable_field(obj, field_instance, field_name, field_value, **kwargs)
+
         return field_value
 
     def serialize_callable_field(self, obj, field_instance, field_name, field_value, **kwargs):
