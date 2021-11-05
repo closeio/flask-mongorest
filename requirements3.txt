@@ -3,7 +3,6 @@ mongoengine
 flask-mongoengine
 mimerender
 python-dateutil
-sphinx
 Flask>=0.9
 pymongo
 flake8
