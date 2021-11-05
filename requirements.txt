@@ -2,7 +2,6 @@
 -e git://github.com/closeio/flask-mongoengine.git#egg=flask-mongoengine
 mimerender
 python-dateutil
-sphinx
 cleancat>=0.3
 Flask>=0.9
 pymongo>=3.4
