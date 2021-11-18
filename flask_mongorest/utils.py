@@ -1,3 +1,4 @@
+import enum
 import json
 import decimal
 import datetime
@@ -26,6 +27,8 @@ class MongoEncoder(json.JSONEncoder):
             return value.strftime("%Y-%m-%d")
         if isinstance(value, decimal.Decimal):
             return str(value)
+        if isinstance(value, enum.Enum):
+            return value.value
         return super(MongoEncoder, self).default(value, **kwargs)
 
 
