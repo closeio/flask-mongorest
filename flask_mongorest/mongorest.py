@@ -1,4 +1,6 @@
-from flask import Blueprint
+from typing import Union
+
+from flask import Blueprint, Flask
 
 from flask_mongorest import BulkUpdate, Create, List
 
@@ -15,7 +17,7 @@ class DelayedApp:
         self.url_rules.append((args, kwargs))
 
 
-def register_class(app: DelayedApp, klass, *, url_prefix, **kwargs):
+def register_class(app: Union[DelayedApp, Flask], klass, *, url_prefix, **kwargs):
     # Construct a url based on a 'name' kwarg with a fallback to the
     # view's class name. Note that the name must be unique.
     name = kwargs.pop("name", klass.__name__)
@@ -58,7 +60,8 @@ class MongoRest:
     def __init__(self, app=None, url_prefix="", template_folder="templates"):
         self.url_prefix = url_prefix
         self.template_folder = template_folder
-        self._app = DelayedApp()
+        self._delayed_app = DelayedApp()
+        self._registered_apps = []
 
         if app is not None:
             self.init_app(app)
@@ -73,12 +76,15 @@ class MongoRest:
             Blueprint(self.url_prefix, __name__, template_folder=self.template_folder)
         )
 
-        for args, kwargs in self._app.url_rules:
+        for args, kwargs in self._delayed_app.url_rules:
             app.add_url_rule(*args, **kwargs)
+
+        self._registered_apps.append(app)
 
     def register(self, **kwargs):
         def decorator(klass):
-            register_class(self._app, klass, url_prefix=self.url_prefix, **kwargs)
+            for app in [self._delayed_app] + self._registered_apps:
+                register_class(app, klass, url_prefix=self.url_prefix, **kwargs)
             return klass
 
         return decorator
