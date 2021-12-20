@@ -3,7 +3,19 @@ from flask import Blueprint
 from flask_mongorest.methods import BulkUpdate, Create, List
 
 
-def register_class(app, klass, *, url_prefix, **kwargs):
+class DelayedApp:
+    """
+    Stores URL rules for later merging with an application URL map.
+    """
+
+    def __init__(self):
+        self.url_rules = []
+
+    def add_url_rule(self, *args, **kwargs):
+        self.url_rules.append((args, kwargs))
+
+
+def register_class(app: DelayedApp, klass, *, url_prefix, **kwargs):
     # Construct a url based on a 'name' kwarg with a fallback to the
     # view's class name. Note that the name must be unique.
     name = kwargs.pop("name", klass.__name__)
@@ -43,16 +55,31 @@ def register_class(app, klass, *, url_prefix, **kwargs):
 
 
 class MongoRest:
-    def __init__(self, app, **kwargs):
-        self.app = app
-        self.url_prefix = kwargs.pop("url_prefix", "")
+    def __init__(self, app=None, url_prefix="", template_folder=""):
+        self.url_prefix = url_prefix
+        self.template_folder = template_folder
+        self._app = DelayedApp()
+
+        if app is not None:
+            self.init_app(app)
+
+    def init_app(self, app):
+        """
+        Provides delayed application instance initialization to support
+        Flask application factory pattern. For further details on application
+        factories see: https://flask.palletsprojects.com/en/2.0.x/extensiondev/
+        """
+
         app.register_blueprint(
-            Blueprint(self.url_prefix, __name__, template_folder="templates")
+            Blueprint(self.url_prefix, __name__, template_folder=self.template_folder)
         )
+
+        for args, kwargs in self._app.url_rules:
+            app.add_url_rule(*args, **kwargs)
 
     def register(self, **kwargs):
         def decorator(klass):
-            register_class(self.app, klass, url_prefix=self.url_prefix, **kwargs)
+            register_class(self._app, klass, url_prefix=self.url_prefix, **kwargs)
             return klass
 
         return decorator
