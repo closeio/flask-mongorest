@@ -810,7 +810,7 @@ class Resource(object):
             if negate and not operator.allow_negation:
                 continue
             if parts:
-                field = "%s__%s" % (field, "__".join(parts))
+                field = f"{field}__{'__'.join(parts)}"
             field = self._reverse_rename_fields.get(field, field)
             qs = operator().apply(qs, field, value, negate)
         return qs
@@ -844,29 +844,31 @@ class Resource(object):
             if not isint(params.get("_limit", 1)):
                 raise ValidationError(
                     {
-                        "error": '_limit must be an integer (got "%s" instead).'
-                        % params["_limit"]
+                        "error": '_limit must be an integer (got "{}" instead).'.format(
+                            params["_limit"]
+                        )
                     }
                 )
             if not isint(params.get("_skip", 1)):
                 raise ValidationError(
                     {
-                        "error": '_skip must be an integer (got "%s" instead).'
-                        % params["_skip"]
+                        "error": '_skip must be an integer (got "{}" instead).'.format(
+                            params["_skip"]
+                        )
                     }
                 )
             if params.get("_limit") and int(params["_limit"]) > max_limit:
                 raise ValidationError(
                     {
-                        "error": "The limit you set is larger than the maximum limit for this resource (max_limit = %d)."
-                        % max_limit
+                        "error": f"The limit you set is larger than the maximum limit for this resource (max_limit = {max_limit})."
                     }
                 )
             if params.get("_skip") and int(params["_skip"]) < 0:
                 raise ValidationError(
                     {
-                        "error": '_skip must be a non-negative integer (got "%s" instead).'
-                        % params["_skip"]
+                        "error": '_skip must be a non-negative integer (got "{}" instead).'.format(
+                            params["_skip"]
+                        )
                     }
                 )
 
@@ -929,8 +931,7 @@ class Resource(object):
             raise ValidationError(
                 {
                     "errors": [
-                        "It's not allowed to update more than %d objects at once"
-                        % self.bulk_update_limit
+                        f"It's not allowed to update more than {self.bulk_update_limit} objects at once"
                     ]
                 }
             )

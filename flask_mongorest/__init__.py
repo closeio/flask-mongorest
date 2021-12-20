@@ -19,11 +19,11 @@ class MongoRest(object):
             url = kwargs.pop("url", None)
             if not url:
                 document_name = klass.resource.document.__name__.lower()
-                url = "/%s/" % document_name
+                url = f"/{document_name}/"
 
             # Insert the url prefix, if it exists
             if self.url_prefix:
-                url = "%s%s" % (self.url_prefix, url)
+                url = f"{self.url_prefix}{url}"
 
             # Add url rules
             pk_type = kwargs.pop("pk_type", "string")
@@ -34,7 +34,7 @@ class MongoRest(object):
                     defaults={"pk": None},
                     view_func=view_func,
                     methods=[List.method],
-                    **kwargs
+                    **kwargs,
                 )
             if Create in klass.methods or BulkUpdate in klass.methods:
                 self.app.add_url_rule(
@@ -43,15 +43,15 @@ class MongoRest(object):
                     methods=[
                         x.method for x in klass.methods if x in (Create, BulkUpdate)
                     ],
-                    **kwargs
+                    **kwargs,
                 )
             self.app.add_url_rule(
-                "%s<%s:%s>/" % (url, pk_type, "pk"),
+                f"{url}<{pk_type}:pk>/",
                 view_func=view_func,
                 methods=[
                     x.method for x in klass.methods if x not in (List, BulkUpdate)
                 ],
-                **kwargs
+                **kwargs,
             )
             return klass
 

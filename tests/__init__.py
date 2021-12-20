@@ -37,41 +37,34 @@ except ImportError:
 
 def response_success(response, code=None):
     if code is None:
-        assert 200 <= response.status_code < 300, "Received %d response: %s" % (
-            response.status_code,
-            response.data,
-        )
+        assert (
+            200 <= response.status_code < 300
+        ), f"Received {response.status_code} response: {response.data}"
     else:
-        assert code == response.status_code, "Received %d response: %s" % (
-            response.status_code,
-            response.data,
-        )
+        assert (
+            code == response.status_code
+        ), f"Received {response.status_code} response: {response.data}"
 
 
 def response_error(response, code=None):
     if code is None:
-        assert 400 <= response.status_code < 500, "Received %d response: %s" % (
-            response.status_code,
-            response.data,
-        )
+        assert (
+            400 <= response.status_code < 500
+        ), f"Received {response.status_code} response: {response.data}"
     else:
-        assert code == response.status_code, "Received %d response: %s" % (
-            response.status_code,
-            response.data,
-        )
+        assert (
+            code == response.status_code
+        ), f"Received {response.status_code} response: {response.data}"
 
 
 def compare_req_resp(req_obj, resp_obj):
     for k, v in req_obj.items():
-        assert k in resp_obj.keys(), "Key %r not in response (keys are %r)" % (
-            k,
-            resp_obj.keys(),
-        )
-        assert resp_obj[k] == v, "Value for key %r should be %r but is %r" % (
-            k,
-            v,
-            resp_obj[k],
-        )
+        assert (
+            k in resp_obj.keys()
+        ), f"Key {k!r} not in response (keys are {resp_obj.keys()!r})"
+        assert (
+            resp_obj[k] == v
+        ), f"Value for key {k!r} should be {v!r} but is {resp_obj[k]}"
 
 
 def resp_json(resp):
@@ -135,22 +128,22 @@ class MongoRestTestCase(unittest.TestCase):
 
     def tearDown(self):
         # delete user 1
-        resp = self.app.delete("/user/%s/" % self.user_1_obj["id"])
+        resp = self.app.delete(f"/user/{self.user_1_obj['id']}/")
         response_success(resp)
-        resp = self.app.get("/user/%s/" % self.user_1_obj["id"])
+        resp = self.app.get(f"/user/{self.user_1_obj['id']}/")
         response_error(resp, code=404)
 
         # delete user 2
-        resp = self.app.delete("/user/%s/" % self.user_2_obj["id"])
+        resp = self.app.delete(f"/user/{self.user_2_obj['id']}/")
         response_success(resp)
-        resp = self.app.get("/user/%s/" % self.user_2_obj["id"])
+        resp = self.app.get(f"/user/{self.user_2_obj['id']}/")
         response_error(resp, code=404)
 
     def test_update_user(self):
         self.user_1_obj["first_name"] = "anthony"
         self.user_1_obj["datetime"] = datetime.datetime.utcnow().isoformat()
         resp = self.app.put(
-            "/user/%s/" % self.user_1_obj["id"], data=json.dumps(self.user_1_obj)
+            f"/user/{self.user_1_obj['id']}/", data=json.dumps(self.user_1_obj)
         )
         response_success(resp)
 
@@ -162,7 +155,7 @@ class MongoRestTestCase(unittest.TestCase):
 
         # response from PUT should be completely identical as a subsequent GET
         # (including precision of datetimes)
-        resp = self.app.get("/user/%s/" % self.user_1_obj["id"])
+        resp = self.app.get(f"/user/{self.user_1_obj['id']}/")
         data2 = resp_json(resp)
         self.assertEqual(data, data2)
 
@@ -170,11 +163,11 @@ class MongoRestTestCase(unittest.TestCase):
         """
         Make sure unicode data payloads are properly decoded.
         """
-        self.user_1_obj["first_name"] = u"Jörg"
+        self.user_1_obj["first_name"] = "Jörg"
 
         # Don't encode unicode characters
         resp = self.app.put(
-            "/user/%s/" % self.user_1_obj["id"],
+            f"/user/{self.user_1_obj['id']}/",
             data=json.dumps(self.user_1_obj, ensure_ascii=False),
         )
         response_success(resp)
@@ -183,7 +176,7 @@ class MongoRestTestCase(unittest.TestCase):
 
         # Encode unicode characters as "\uxxxx" (default)
         resp = self.app.put(
-            "/user/%s/" % self.user_1_obj["id"],
+            f"/user/{self.user_1_obj['id']}/",
             data=json.dumps(self.user_1_obj, ensure_ascii=True),
         )
         response_success(resp)
@@ -192,16 +185,16 @@ class MongoRestTestCase(unittest.TestCase):
 
     def test_model_validation_unicode(self):
         # MongoEngine validation error (no schema)
-        resp = self.app.post("/test/", data=json.dumps({"email": u"💩"}))
+        resp = self.app.post("/test/", data=json.dumps({"email": "💩"}))
         response_error(resp)
         errors = resp_json(resp)
         self.assertTrue(
-            errors == {"field-errors": {"email": u"Invalid email address: 💩"}}
+            errors == {"field-errors": {"email": "Invalid email address: 💩"}}
             or errors
             == {
                 # Workaround for
                 # https://github.com/MongoEngine/mongoengine/pull/1384
-                "field-errors": {"email": u"Invalid Mail-address: 💩"}
+                "field-errors": {"email": "Invalid Mail-address: 💩"}
             }
         )
 
@@ -213,7 +206,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp)
         errors = resp_json(resp)
         self.assertEqual(
-            errors, {"errors": [], "field-errors": {"datetime": u"Invalid date 💩"}}
+            errors, {"errors": [], "field-errors": {"datetime": "Invalid date 💩"}}
         )
 
     def test_model_validation(self):
@@ -235,7 +228,7 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(set(errors["field-errors"]), set(["email"]))
 
         resp = self.app.put(
-            "/user/%s/" % self.user_1_obj["id"],
+            f"/user/{self.user_1_obj['id']}/",
             data=json.dumps(
                 {"email": "invalid", "first_name": "joe", "last_name": "baker"}
             ),
@@ -246,7 +239,7 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(set(errors["field-errors"]), set(["email"]))
 
         resp = self.app.put(
-            "/user/%s/" % self.user_1_obj["id"],
+            f"/user/{self.user_1_obj['id']}/",
             data=json.dumps(
                 {
                     "emails": [
@@ -281,7 +274,7 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(obj["name"], "thename")
         self.assertEqual(obj["upper_name"], "THENAME")
 
-        resp = self.app.get("/test/%s/" % obj["id"])
+        resp = self.app.get(f"/test/{obj['id']}/")
         response_success(resp)
         obj = resp_json(resp)
 
@@ -290,7 +283,7 @@ class MongoRestTestCase(unittest.TestCase):
         # self.assertEqual(obj['other'], None)
 
         resp = self.app.put(
-            "/test/%s/" % obj["id"], data=json.dumps({"other": "new othervalue"})
+            f"/test/{obj['id']}/", data=json.dumps({"other": "new othervalue"})
         )
         response_success(resp)
         obj = resp_json(resp)
@@ -298,7 +291,7 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(obj["other"], "new othervalue")
 
         resp = self.app.put(
-            "/testfields/%s/" % obj["id"],
+            f"/testfields/{obj['id']}/",
             data=json.dumps({"name": "namevalue2", "upper_name": "INVALID"}),
         )
         response_success(resp)
@@ -351,33 +344,25 @@ class MongoRestTestCase(unittest.TestCase):
 
         # Try to change the title
         post["title"] = "New title"
-        resp = self.app.put(
-            "/restricted/%s/" % (str(data["id"])), data=json.dumps(post)
-        )
+        resp = self.app.put(f"/restricted/{str(data['id'])}/", data=json.dumps(post))
         # Works because we haven't published it yet
         response_success(resp, code=200)
 
         # Now let's publish it
         post["is_published"] = True
-        resp = self.app.put(
-            "/restricted/%s/" % (str(data["id"])), data=json.dumps(post)
-        )
+        resp = self.app.put(f"/restricted/{str(data['id'])}/", data=json.dumps(post))
         # This works because the object we are changing is still
         # in the unpublished state before we update it
         response_success(resp, code=200)
 
         # Now change the title again
         post["title"] = "Another title"
-        resp = self.app.put(
-            "/restricted/%s/" % (str(data["id"])), data=json.dumps(post)
-        )
+        resp = self.app.put(f"/restricted/{str(data['id'])}/", data=json.dumps(post))
         # Can't do it, object has already been published
         response_success(resp, code=401)
 
         # Try to delete this post
-        resp = self.app.delete(
-            "/restricted/%s/" % (str(data["id"])), data=json.dumps(post)
-        )
+        resp = self.app.delete(f"/restricted/{str(data['id'])}/", data=json.dumps(post))
         # Again, won't work because it was already published
         response_success(resp, code=401)
 
@@ -393,7 +378,7 @@ class MongoRestTestCase(unittest.TestCase):
         data = resp_json(resp)
 
         # Now let's try and delete an unpublished post
-        resp = self.app.delete("/restricted/%s/" % (data["id"],), data=json.dumps(post))
+        resp = self.app.delete(f"/restricted/{data['id']}/", data=json.dumps(post))
         # Should work
         response_success(resp, code=200)
 
@@ -429,13 +414,13 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
         compare_req_resp(self.post_1, resp_json(resp))
         self.post_1_obj = resp_json(resp)
-        resp = self.app.get("/posts/%s/" % self.post_1_obj["id"])
+        resp = self.app.get(f"/posts/{self.post_1_obj['id']}/")
         response_success(resp)
         compare_req_resp(self.post_1_obj, resp_json(resp))
 
         self.post_1_obj["author_id"] = self.user_2_obj["id"]
         resp = self.app.put(
-            "/posts/%s/" % self.post_1_obj["id"], data=json.dumps(self.post_1_obj)
+            f"/posts/{self.post_1_obj['id']}/", data=json.dumps(self.post_1_obj)
         )
         response_success(resp)
         jd = resp_json(resp)
@@ -463,8 +448,7 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(data_list, [])
 
         resp = self.app.get(
-            "/posts/?title__in=%s,%s"
-            % (self.post_1_obj["title"], self.post_2_obj["title"])
+            f"/posts/?title__in={self.post_1_obj['title']},{self.post_2_obj['title']}"
         )
         response_success(resp)
         posts = resp_json(resp)
@@ -475,17 +459,17 @@ class MongoRestTestCase(unittest.TestCase):
         posts = resp_json(resp)
         self.assertEqual(len(posts["data"]), 0)
 
-        resp = self.app.get("/user/?datetime=%s" % "2012-10-09 10:00:00")
+        resp = self.app.get(f"/user/?datetime={'2012-10-09 10:00:00'}")
         response_success(resp)
         users = resp_json(resp)
         self.assertEqual(len(users["data"]), 1)
 
-        resp = self.app.get("/user/?datetime__gt=%s" % "2012-10-08 10:00:00")
+        resp = self.app.get(f"/user/?datetime__gt={'2012-10-08 10:00:00'}")
         response_success(resp)
         users = resp_json(resp)
         self.assertEqual(len(users["data"]), 2)
 
-        resp = self.app.get("/user/?datetime__gte=%s" % "2012-10-09 10:00:00")
+        resp = self.app.get(f"/user/?datetime__gte={'2012-10-09 10:00:00'}")
         response_success(resp)
         users = resp_json(resp)
         self.assertEqual(len(users["data"]), 2)
@@ -494,20 +478,21 @@ class MongoRestTestCase(unittest.TestCase):
 
         # exclude many
         resp = self.app.get(
-            "/posts/?title__not__in=%s,%s"
-            % (self.post_1_obj["title"], self.post_2_obj["title"])
+            "/posts/?title__not__in={},{}".format(
+                self.post_1_obj["title"], self.post_2_obj["title"]
+            )
         )
         response_success(resp)
         posts = resp_json(resp)
         self.assertEqual(len(posts["data"]), 0)
 
         # exclude one
-        resp = self.app.get("/posts/?title__not__in=%s" % (self.post_1_obj["title"]))
+        resp = self.app.get(f"/posts/?title__not__in={self.post_1_obj['title']}")
         response_success(resp)
         posts = resp_json(resp)
         self.assertEqual(len(posts["data"]), 1)
 
-        resp = self.app.get("/posts/?author_id=%s" % self.user_2_obj["id"])
+        resp = self.app.get(f"/posts/?author_id={self.user_2_obj['id']}")
         response_success(resp)
         data_list = resp_json(resp)["data"]
         compare_req_resp(self.post_1_obj, data_list[0])
@@ -584,7 +569,7 @@ class MongoRestTestCase(unittest.TestCase):
         post = resp_json(resp)
 
         resp = self.app.put(
-            "/posts/%s/" % post["id"], data=json.dumps({"author_id": author})
+            f"/posts/{post['id']}/", data=json.dumps({"author_id": author})
         )
         response_success(resp)
         post = resp_json(resp)
@@ -620,10 +605,10 @@ class MongoRestTestCase(unittest.TestCase):
         post = resp_json(resp)
 
         # remove the user and see if its reference is cleaned up properly
-        resp = self.app.delete("/user/%s/" % user_3["id"])
+        resp = self.app.delete(f"/user/{user_3['id']}/")
         response_success(resp)
 
-        resp = self.app.get("/posts/%s/" % post["id"])
+        resp = self.app.get(f"/posts/{post['id']}/")
         response_success(resp)
 
         self.assertEqual(resp_json(resp)["user_lists"], [])
@@ -639,7 +624,7 @@ class MongoRestTestCase(unittest.TestCase):
         # create 101 posts
         post = self.post_1.copy()
         for i in range(1, 102):
-            post["title"] = "Post #%d" % i
+            post["title"] = f"Post #{i}"
             resp = self.app.post("/posts/", data=json.dumps(post))
             response_success(resp)
 
@@ -748,13 +733,13 @@ class MongoRestTestCase(unittest.TestCase):
         )
 
     def test_fields(self):
-        resp = self.app.get("/user/%s/?_fields=email" % self.user_1_obj["id"])
+        resp = self.app.get(f"/user/{self.user_1_obj['id']}/?_fields=email")
         response_success(resp)
         user = resp_json(resp)
         self.assertEqual(set(user), set(["email"]))
 
         resp = self.app.get(
-            "/user/%s/?_fields=first_name,last_name" % self.user_1_obj["id"]
+            f"/user/{self.user_1_obj['id']}/?_fields=first_name,last_name"
         )
         response_success(resp)
         user = resp_json(resp)
@@ -811,11 +796,11 @@ class MongoRestTestCase(unittest.TestCase):
         objectid_obj = resp_json(resp)
 
         # compare objects with a dbref reference and an objectid reference
-        resp = self.app.get("/b/{0}/".format(dbref_obj["id"]))
+        resp = self.app.get(f"/b/{dbref_obj['id']}/")
         response_success(resp)
         dbref_obj = resp_json(resp)
 
-        resp = self.app.get("/c/{0}/".format(objectid_obj["id"]))
+        resp = self.app.get(f"/c/{objectid_obj['id']}/")
         response_success(resp)
         objectid_obj = resp_json(resp)
 
@@ -824,20 +809,20 @@ class MongoRestTestCase(unittest.TestCase):
 
         # make sure both dbref and objectid are updated correctly
         resp = self.app.put(
-            "/b/{0}/".format(dbref_obj["id"]), data=json.dumps({"ref": a2["id"]})
+            f"/b/{dbref_obj['id']}/", data=json.dumps({"ref": a2["id"]})
         )
         response_success(resp)
 
         resp = self.app.put(
-            "/c/{0}/".format(objectid_obj["id"]), data=json.dumps({"ref": a2["id"]})
+            f"/c/{objectid_obj['id']}/", data=json.dumps({"ref": a2["id"]})
         )
         response_success(resp)
 
-        resp = self.app.get("/b/{0}/".format(dbref_obj["id"]))
+        resp = self.app.get(f"/b/{dbref_obj['id']}/")
         response_success(resp)
         dbref_obj = resp_json(resp)
 
-        resp = self.app.get("/c/{0}/".format(objectid_obj["id"]))
+        resp = self.app.get(f"/c/{objectid_obj['id']}/")
         response_success(resp)
         objectid_obj = resp_json(resp)
 
@@ -848,7 +833,7 @@ class MongoRestTestCase(unittest.TestCase):
     def test_view_methods(self):
         doc = example.ViewMethodTestDoc.objects.create(txt="doc1")
 
-        resp = self.app.get("/test_view_method/%s/" % doc.pk)
+        resp = self.app.get(f"/test_view_method/{doc.pk}/")
         response_success(resp)
         self.assertEqual(resp_json(resp), {"method": "Fetch"})
 
@@ -861,7 +846,7 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(resp_json(resp), {"method": "Create"})
 
         resp = self.app.put(
-            "/test_view_method/%s/" % doc.pk, data=json.dumps({"txt": "doc1new"})
+            f"/test_view_method/{doc.pk}/", data=json.dumps({"txt": "doc1new"})
         )
         response_success(resp)
         self.assertEqual(resp_json(resp), {"method": "Update"})
@@ -871,7 +856,7 @@ class MongoRestTestCase(unittest.TestCase):
         self.assertEqual(resp_json(resp), {"method": "BulkUpdate"})
 
         resp = self.app.delete(
-            "/test_view_method/%s/" % doc.pk, data=json.dumps({"txt": "doc"})
+            f"/test_view_method/{doc.pk}/", data=json.dumps({"txt": "doc"})
         )
         response_success(resp)
         self.assertEqual(resp_json(resp), {"method": "Delete"})
@@ -880,7 +865,7 @@ class MongoRestTestCase(unittest.TestCase):
         doc1 = example.MethodTestDoc.objects.create(txt="doc1")
         doc2 = example.MethodTestDoc.objects.create(txt="doc2")
 
-        resp = self.app.get("/fetch_only/%s/" % doc1.pk)
+        resp = self.app.get(f"/fetch_only/{doc1.pk}/")
         response_success(resp)
 
         resp = self.app.get("/list_only/")
@@ -890,21 +875,21 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
 
         resp = self.app.put(
-            "/update_only/%s/" % doc2.pk, data=json.dumps({"txt": "works"})
+            f"/update_only/{doc2.pk}/", data=json.dumps({"txt": "works"})
         )
         response_success(resp)
 
         resp = self.app.put("/bulk_update_only/", data=json.dumps({"txt": "both work"}))
         response_success(resp)
 
-        resp = self.app.delete("/delete_only/%s/" % doc1.pk)
+        resp = self.app.delete(f"/delete_only/{doc1.pk}/")
         response_success(resp)
 
     def test_fetch_method_permissions(self):
         doc1 = example.MethodTestDoc.objects.create(txt="doc1")
 
         # fetch
-        resp = self.app.get("/fetch_only/%s/" % doc1.pk)
+        resp = self.app.get(f"/fetch_only/{doc1.pk}/")
         response_success(resp)
 
         # list
@@ -917,7 +902,7 @@ class MongoRestTestCase(unittest.TestCase):
 
         # put
         resp = self.app.put(
-            "/fetch_only/%s/" % doc1.pk, data=json.dumps({"txt": "doesnt work"})
+            f"/fetch_only/{doc1.pk}/", data=json.dumps({"txt": "doesnt work"})
         )
         response_error(resp, code=405)
 
@@ -926,7 +911,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp, code=404)
 
         # delete
-        resp = self.app.delete("/fetch_only/%s/" % doc1.pk)
+        resp = self.app.delete(f"/fetch_only/{doc1.pk}/")
         response_error(resp, code=405)
 
     def test_list_method_permissions(self):
@@ -937,7 +922,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
 
         # fetch
-        resp = self.app.get("/list_only/%s/" % doc1.pk)
+        resp = self.app.get(f"/list_only/{doc1.pk}/")
         response_error(resp, code=405)
 
         # create
@@ -946,7 +931,7 @@ class MongoRestTestCase(unittest.TestCase):
 
         # put
         resp = self.app.put(
-            "/list_only/%s/" % doc1.pk, data=json.dumps({"txt": "doesnt work"})
+            f"/list_only/{doc1.pk}/", data=json.dumps({"txt": "doesnt work"})
         )
         response_error(resp, code=405)
 
@@ -955,7 +940,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp, code=405)
 
         # delete
-        resp = self.app.delete("/list_only/%s/" % doc1.pk)
+        resp = self.app.delete(f"/list_only/{doc1.pk}/")
         response_error(resp, code=405)
 
     def test_create_method_permissions(self):
@@ -970,12 +955,12 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp, code=405)
 
         # fetch
-        resp = self.app.get("/create_only/%s/" % doc1.pk)
+        resp = self.app.get(f"/create_only/{doc1.pk}/")
         response_error(resp, code=405)
 
         # put
         resp = self.app.put(
-            "/create_only/%s/" % doc1.pk, data=json.dumps({"txt": "doesnt work"})
+            f"/create_only/{doc1.pk}/", data=json.dumps({"txt": "doesnt work"})
         )
         response_error(resp, code=405)
 
@@ -984,7 +969,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp, code=405)
 
         # delete
-        resp = self.app.delete("/create_only/%s/" % doc1.pk)
+        resp = self.app.delete(f"/create_only/{doc1.pk}/")
         response_error(resp, code=405)
 
     def test_update_method_permissions(self):
@@ -992,7 +977,7 @@ class MongoRestTestCase(unittest.TestCase):
 
         # put
         resp = self.app.put(
-            "/update_only/%s/" % doc1.pk, data=json.dumps({"txt": "doesnt work"})
+            f"/update_only/{doc1.pk}/", data=json.dumps({"txt": "doesnt work"})
         )
         response_success(resp)
 
@@ -1005,7 +990,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp, code=404)
 
         # fetch
-        resp = self.app.get("/update_only/%s/" % doc1.pk)
+        resp = self.app.get(f"/update_only/{doc1.pk}/")
         response_error(resp, code=405)
 
         # bulk put
@@ -1013,7 +998,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp, code=404)
 
         # delete
-        resp = self.app.delete("/update_only/%s/" % doc1.pk)
+        resp = self.app.delete(f"/update_only/{doc1.pk}/")
         response_error(resp, code=405)
 
     def test_bulk_update_method_permissions(self):
@@ -1025,7 +1010,7 @@ class MongoRestTestCase(unittest.TestCase):
 
         # put
         resp = self.app.put(
-            "/bulk_update_only/%s/" % doc1.pk, data=json.dumps({"txt": "doesnt work"})
+            f"/bulk_update_only/{doc1.pk}/", data=json.dumps({"txt": "doesnt work"})
         )
         response_error(resp, code=405)
 
@@ -1038,18 +1023,18 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp, code=405)
 
         # fetch
-        resp = self.app.get("/bulk_update_only/%s/" % doc1.pk)
+        resp = self.app.get(f"/bulk_update_only/{doc1.pk}/")
         response_error(resp, code=405)
 
         # delete
-        resp = self.app.delete("/bulk_update_only/%s/" % doc1.pk)
+        resp = self.app.delete(f"/bulk_update_only/{doc1.pk}/")
         response_error(resp, code=405)
 
     def test_delete_method_permissions(self):
         doc1 = example.MethodTestDoc.objects.create(txt="doc1")
 
         # delete
-        resp = self.app.delete("/delete_only/%s/" % doc1.pk)
+        resp = self.app.delete(f"/delete_only/{doc1.pk}/")
         response_success(resp)
 
         # bulk put
@@ -1058,7 +1043,7 @@ class MongoRestTestCase(unittest.TestCase):
 
         # put
         resp = self.app.put(
-            "/delete_only/%s/" % doc1.pk, data=json.dumps({"txt": "doesnt work"})
+            f"/delete_only/{doc1.pk}/", data=json.dumps({"txt": "doesnt work"})
         )
         response_error(resp, code=405)
 
@@ -1071,13 +1056,13 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp, code=404)
 
         # fetch
-        resp = self.app.get("/delete_only/%s/" % doc1.pk)
+        resp = self.app.get(f"/delete_only/{doc1.pk}/")
         response_error(resp, code=405)
 
     def test_request_bad_accept(self):
         """Make sure we gracefully handle requests where an invalid Accept header is sent."""
         resp = self.app.get(
-            "/user/%s/" % self.user_1_obj["id"], headers={"Accept": "whatever"}
+            f"/user/{self.user_1_obj['id']}/", headers={"Accept": "whatever"}
         )
         response_error(resp)
         self.assertEqual(resp.data, b"Invalid Accept header requested")
@@ -1092,7 +1077,7 @@ class MongoRestTestCase(unittest.TestCase):
         for i in range(limit + 1):
             resp = self.app.post(
                 "/posts/",
-                data=json.dumps({"title": "Title %d" % i, "is_published": False}),
+                data=json.dumps({"title": f"Title {i}", "is_published": False}),
             )
             response_success(resp)
 
@@ -1139,7 +1124,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
 
         # No change (same data)
         resp = self.app.put(
-            "/person/%s/" % person_id,
+            f"/person/{person_id}/",
             data=json.dumps(
                 {
                     "name": "John",
@@ -1161,7 +1146,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
 
         # No change (omitted fields of related document)
         resp = self.app.put(
-            "/person/%s/" % person_id,
+            f"/person/{person_id}/",
             data=json.dumps(
                 {"name": "John", "languages": [{"id": english_id}, {"id": german_id}]}
             ),
@@ -1176,7 +1161,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
         self.assertEqual(person["languages"][1]["name"], "German")
 
         # Also no change (empty data)
-        resp = self.app.put("/person/%s/" % person_id, data=json.dumps({}))
+        resp = self.app.put(f"/person/{person_id}/", data=json.dumps({}))
         response_success(resp)
         person = resp_json(resp)
         self.assertEqual(len(person["languages"]), 2)
@@ -1188,7 +1173,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
 
         # Change value
         resp = self.app.put(
-            "/person/%s/" % person_id,
+            f"/person/{person_id}/",
             data=json.dumps(
                 {
                     "languages": [
@@ -1209,7 +1194,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
 
         # Insert item / rename back
         resp = self.app.put(
-            "/person/%s/" % person_id,
+            f"/person/{person_id}/",
             data=json.dumps(
                 {
                     "languages": [
@@ -1232,8 +1217,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
 
         # Remove item
         resp = self.app.put(
-            "/person/%s/" % person_id,
-            data=json.dumps({"languages": [{"id": german_id}]}),
+            f"/person/{person_id}/", data=json.dumps({"languages": [{"id": german_id}]})
         )
         response_success(resp)
         person = resp_json(resp)
@@ -1244,7 +1228,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
 
         # Assign back (item is still in the database)
         resp = self.app.put(
-            "/person/%s/" % person_id,
+            f"/person/{person_id}/",
             data=json.dumps({"languages": [{"id": german_id}, {"id": english_id}]}),
         )
         response_success(resp)
@@ -1258,8 +1242,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
 
         # Test invalid ID
         resp = self.app.put(
-            "/person/%s/" % person_id,
-            data=json.dumps({"languages": [{"id": "INVALID"}]}),
+            f"/person/{person_id}/", data=json.dumps({"languages": [{"id": "INVALID"}]})
         )
         response_error(resp)
 
@@ -1273,7 +1256,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
 
         with query_counter() as c:
             resp = self.app.put(
-                "/datetime/%s/" % datetime["id"],
+                f"/datetime/{datetime['id']}/",
                 data=json.dumps({"datetime": "2010-01-02T00:00:00"}),
             )
             response_success(resp)
@@ -1284,7 +1267,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
 
         with query_counter() as c:
             resp = self.app.put(
-                "/datetime/%s/" % datetime["id"],
+                f"/datetime/{datetime['id']}/",
                 data=json.dumps({"datetime": "2010-01-02T00:00:00"}),
             )
             response_success(resp)
@@ -1299,7 +1282,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
 
         # Same as above, with no body
         with query_counter() as c:
-            resp = self.app.put("/datetime/%s/" % datetime["id"], data=json.dumps({}))
+            resp = self.app.put(f"/datetime/{datetime['id']}/", data=json.dumps({}))
             response_success(resp)
             datetime = resp_json(resp)
             self.assertEqual(datetime["datetime"], "2010-01-02T00:00:00")
@@ -1334,7 +1317,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
         resp = self.app.post("/dict_doc/", data=json.dumps({"dict": {"aaa": "bbb"}}))
         response_success(resp)
         resp = self.app.put(
-            "/dict_doc/%s/" % resp_json(resp)["id"],
+            f"/dict_doc/{resp_json(resp)['id']}/",
             data=json.dumps(
                 {
                     "dict": {
@@ -1360,7 +1343,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
         )
 
         # test fetch
-        self.assertRaises(ValueError, self.app.get, "/dict_doc/%s/" % doc.id)
+        self.assertRaises(ValueError, self.app.get, f"/dict_doc/{doc.id}/")
 
         # test list
         self.assertRaises(ValueError, self.app.get, "/dict_doc/")

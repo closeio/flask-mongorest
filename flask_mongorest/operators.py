@@ -104,7 +104,7 @@ class Exact(Operator):
         # Using <field>__exact causes mongoengine to generate a regular
         # expresison query, which we'd like to avoid.
         if negate:
-            return {"%s__ne" % field: value}
+            return {f"{field}__ne": value}
         else:
             return {field: value}
 
