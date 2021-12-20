@@ -1,0 +1,11 @@
+[tool.black]
+skip-magic-trailing-comma = true
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | venv
+  | src
+  | \.eggs
+)/
+'''
