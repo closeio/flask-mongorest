@@ -55,7 +55,7 @@ def register_class(app: DelayedApp, klass, *, url_prefix, **kwargs):
 
 
 class MongoRest:
-    def __init__(self, app=None, url_prefix="", template_folder=""):
+    def __init__(self, app=None, url_prefix="", template_folder="templates"):
         self.url_prefix = url_prefix
         self.template_folder = template_folder
         self._app = DelayedApp()
