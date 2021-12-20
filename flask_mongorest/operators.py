@@ -49,10 +49,11 @@ And this way, the request we mentioned above would result in:
     Student.objects.filter(score__lte=upper, score__gte=lower)
 """
 
-class Operator(object):
+
+class Operator:
     """Base class that all the other operators should inherit from."""
 
-    op = 'exact'
+    op = "exact"
 
     # Can be overridden via constructor.
     allow_negation = False
@@ -67,45 +68,53 @@ class Operator(object):
 
     def prepare_queryset_kwargs(self, field, value, negate):
         if negate:
-            return {'__'.join(filter(None, [field, 'not', self.op])): value}
+            return {"__".join(filter(None, [field, "not", self.op])): value}
         else:
-            return {'__'.join(filter(None, [field, self.op])): value}
+            return {"__".join(filter(None, [field, self.op])): value}
 
     def apply(self, queryset, field, value, negate=False):
         kwargs = self.prepare_queryset_kwargs(field, value, negate)
         return queryset.filter(**kwargs)
 
+
 class Ne(Operator):
-    op = 'ne'
+    op = "ne"
+
 
 class Lt(Operator):
-    op = 'lt'
+    op = "lt"
+
 
 class Lte(Operator):
-    op = 'lte'
+    op = "lte"
+
 
 class Gt(Operator):
-    op = 'gt'
+    op = "gt"
+
 
 class Gte(Operator):
-    op = 'gte'
+    op = "gte"
+
 
 class Exact(Operator):
-    op = 'exact'
+    op = "exact"
 
     def prepare_queryset_kwargs(self, field, value, negate):
         # Using <field>__exact causes mongoengine to generate a regular
         # expresison query, which we'd like to avoid.
         if negate:
-            return {'%s__ne' % field: value}
+            return {f"{field}__ne": value}
         else:
             return {field: value}
 
+
 class IExact(Operator):
-    op = 'iexact'
+    op = "iexact"
+
 
 class In(Operator):
-    op = 'in'
+    op = "in"
 
     def prepare_queryset_kwargs(self, field, value, negate):
         # this is null if the user submits an empty in expression (like
@@ -113,36 +122,43 @@ class In(Operator):
         value = value or []
 
         # only use 'in' or 'nin' if multiple values are specified
-        if ',' in value:
-            value = value.split(',')
-            op = negate and 'nin' or self.op
+        if "," in value:
+            value = value.split(",")
+            op = negate and "nin" or self.op
         else:
-            op = negate and 'ne' or ''
-        return {'__'.join(filter(None, [field, op])): value}
+            op = negate and "ne" or ""
+        return {"__".join(filter(None, [field, op])): value}
+
 
 class Contains(Operator):
-    op = 'contains'
+    op = "contains"
+
 
 class IContains(Operator):
-    op = 'icontains'
+    op = "icontains"
+
 
 class Startswith(Operator):
-    op = 'startswith'
+    op = "startswith"
+
 
 class IStartswith(Operator):
-    op = 'istartswith'
+    op = "istartswith"
+
 
 class Endswith(Operator):
-    op = 'endswith'
+    op = "endswith"
+
 
 class IEndswith(Operator):
-    op = 'iendswith'
+    op = "iendswith"
+
 
 class Boolean(Operator):
-    op = 'exact'
+    op = "exact"
 
     def prepare_queryset_kwargs(self, field, value, negate):
-        if value == 'false':
+        if value == "false":
             bool_value = False
         else:
             bool_value = True
@@ -151,4 +167,3 @@ class Boolean(Operator):
             bool_value = not bool_value
 
         return {field: bool_value}
-

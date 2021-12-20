@@ -7,6 +7,7 @@ workflows:
       - test-3.7
       - test-3.8
       - test-3.9
+      - static-code-analysis
 
 defaults: &defaults
   working_directory: ~/code
@@ -16,13 +17,25 @@ defaults: &defaults
       name: Install dependencies
       command: pip install --user -r requirements.txt nose
   - run:
-      name: Lint
-      command: flake8 flask_mongorest
-  - run:
       name: Test
       command: nosetests
 
 jobs:
+  static-code-analysis:
+    docker:
+      - image: circleci/python:3.8
+    working_directory: ~/code
+    steps:
+      - checkout
+
+      - run:
+          name: Prepare Environment
+          command: pip install --user -r requirements.txt lintlizard
+
+      - run:
+          name: lintlizard
+          command: lintlizard
+
   test-3.7:
     <<: *defaults
     docker:

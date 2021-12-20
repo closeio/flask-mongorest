@@ -1,29 +1,33 @@
 import json
+from typing import List, Type
 
 import mimerender
 import mongoengine
 from flask import render_template, request
 from flask.views import MethodView
-from flask_mongorest import methods
-from flask_mongorest.exceptions import ValidationError
-from flask_mongorest.utils import MongoEncoder
 from werkzeug.exceptions import NotFound, Unauthorized
+
+from flask_mongorest import methods
+from flask_mongorest.authentication import AuthenticationBase
+from flask_mongorest.exceptions import ValidationError
+from flask_mongorest.methods import METHODS_TYPE
+from flask_mongorest.utils import MongoEncoder
 
 mimerender = mimerender.FlaskMimeRender()
 
 render_json = lambda **payload: json.dumps(payload, allow_nan=False, cls=MongoEncoder)
-render_html = lambda **payload: render_template('mongorest/debug.html', data=json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4))
+render_html = lambda **payload: render_template(
+    "mongorest/debug.html",
+    data=json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4),
+)
 
-try:
-    text_type = unicode # Python 2
-except NameError:
-    text_type = str # Python 3
 
 def get_exception_message(e):
     """ME ValidationError has compatibility code with py2.6
     that doesn't follow py3 .args interface. This works around that.
     """
     from mongoengine.errors import ValidationError as MEValidationError
+
     if isinstance(e, MEValidationError) and not e.args:
         return e.message
     else:
@@ -32,32 +36,33 @@ def get_exception_message(e):
 
 def serialize_mongoengine_validation_error(e):
     """
-    Takes a MongoEngine ValidationError as an argument, and returns a
+    Take a MongoEngine ValidationError as an argument, and returns a
     serializable error dict. Note that we can have nested ValidationErrors.
     """
 
     def serialize_errors(e):
         if isinstance(e, Exception):
             return get_exception_message(e)
-        elif hasattr(e, 'items'):
-            return dict((k, serialize_errors(v)) for (k, v) in e.items())
+        elif hasattr(e, "items"):
+            return {k: serialize_errors(v) for (k, v) in e.items()}
         else:
-            return text_type(e)
+            return str(e)
 
     if e.errors:
-        return {'field-errors': serialize_errors(e.errors)}
+        return {"field-errors": serialize_errors(e.errors)}
     else:
-        return {'error': get_exception_message(e)}
+        return {"error": get_exception_message(e)}
+
 
 class ResourceView(MethodView):
     resource = None
-    methods = []
-    authentication_methods = []
+    methods: List[METHODS_TYPE] = []  # type: ignore
+    authentication_methods: List[Type[AuthenticationBase]] = []
 
     def __init__(self):
-        assert(self.resource and self.methods)
+        assert self.resource and self.methods
 
-    @mimerender(default='json', json=render_json, html=render_html)
+    @mimerender(default="json", json=render_json, html=render_html)
     def dispatch_request(self, *args, **kwargs):
         # keep all the logic in a helper method (_dispatch_request) so that
         # it's easy for subclasses to override this method (when they don't want to use
@@ -66,24 +71,24 @@ class ResourceView(MethodView):
         return self._dispatch_request(*args, **kwargs)
 
     def _dispatch_request(self, *args, **kwargs):
-        authorized = True if len(self.authentication_methods) == 0 else False
+        authorized = bool(len(self.authentication_methods) == 0)
         for authentication_method in self.authentication_methods:
             if authentication_method().authorized():
                 authorized = True
         if not authorized:
-            return {'error': 'Unauthorized'}, '401 Unauthorized'
+            return {"error": "Unauthorized"}, "401 Unauthorized"
 
         try:
             self._resource = self.requested_resource(request)
             return super(ResourceView, self).dispatch_request(*args, **kwargs)
         except mongoengine.queryset.DoesNotExist as e:
-            return {'error': 'Empty query: ' + str(e)}, '404 Not Found'
+            return {"error": "Empty query: " + str(e)}, "404 Not Found"
         except ValidationError as e:
-            return e.args[0], '400 Bad Request'
+            return e.args[0], "400 Bad Request"
         except Unauthorized:
-            return {'error': 'Unauthorized'}, '401 Unauthorized'
+            return {"error": "Unauthorized"}, "401 Unauthorized"
         except NotFound as e:
-            return {'error': str(e)}, '404 Not Found'
+            return {"error": str(e)}, "404 Not Found"
 
     def handle_validation_error(self, e):
         if isinstance(e, ValidationError):
@@ -95,14 +100,15 @@ class ResourceView(MethodView):
 
     def requested_resource(self, request):
         """In the case where the Resource that this view is associated with points to a Document class
-           that allows inheritance, this method should indicate the specific Resource class to use
-           when processing POST and PUT requests through information available in the request
-           itself or through other means."""
+        that allows inheritance, this method should indicate the specific Resource class to use
+        when processing POST and PUT requests through information available in the request
+        itself or through other means.
+        """
         # Default behavior is to use the (base) resource class
         return self.resource()
 
     def get(self, **kwargs):
-        pk = kwargs.pop('pk', None)
+        pk = kwargs.pop("pk", None)
 
         # Set the view_method on a resource instance
         if pk:
@@ -124,7 +130,7 @@ class ResourceView(MethodView):
             elif len(result) == 3:
                 objs, has_more, extra = result
             else:
-                raise ValueError('Unsupported value of resource.get_objects')
+                raise ValueError("Unsupported value of resource.get_objects")
 
             data = []
             for obj in objs:
@@ -136,12 +142,10 @@ class ResourceView(MethodView):
                         data.append(fixed_obj)
 
             # Serialize the objects one by one
-            ret = {
-                'data': data
-            }
+            ret = {"data": data}
 
             if has_more is not None:
-                ret['has_more'] = has_more
+                ret["has_more"] = has_more
 
             if extra:
                 ret.update(extra)
@@ -151,7 +155,7 @@ class ResourceView(MethodView):
         return ret
 
     def post(self, **kwargs):
-        if 'pk' in kwargs:
+        if "pk" in kwargs:
             raise NotFound("Did you mean to use PUT?")
 
         # Set the view_method on a resource instance
@@ -195,15 +199,15 @@ class ResourceView(MethodView):
         try:
             for obj in objs:
                 self.process_object(obj)
-                count += 1
+                count += 1  # noqa: SIM113
         except ValidationError as e:
-            e.args[0]['count'] = count
+            e.args[0]["count"] = count
             raise e
         else:
-            return {'count': count}
+            return {"count": count}
 
     def put(self, **kwargs):
-        pk = kwargs.pop('pk', None)
+        pk = kwargs.pop("pk", None)
 
         # Set the view_method on a resource instance
         if pk:
@@ -241,7 +245,7 @@ class ResourceView(MethodView):
             return ret
 
     def delete(self, **kwargs):
-        pk = kwargs.pop('pk', None)
+        pk = kwargs.pop("pk", None)
 
         # Set the view_method on a resource instance
         self._resource.view_method = methods.Delete

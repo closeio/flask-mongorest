@@ -1,11 +1,13 @@
-import json
-import decimal
 import datetime
+import decimal
+import json
+
+import mongoengine
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
-import mongoengine
 
-isbound = lambda m: getattr(m, 'im_self', None) is not None
+isbound = lambda m: getattr(m, "im_self", None) is not None
+
 
 def isint(int_str):
     try:
@@ -13,6 +15,7 @@ def isint(int_str):
         return True
     except (TypeError, ValueError):
         return False
+
 
 class MongoEncoder(json.JSONEncoder):
     def default(self, value, **kwargs):
@@ -29,10 +32,9 @@ class MongoEncoder(json.JSONEncoder):
         return super(MongoEncoder, self).default(value, **kwargs)
 
 
-try:
-    cmp
-except NameError: # Python 3
-    cmp = lambda a, b: (a>b)-(a<b)
+def cmp(a, b):
+    return (a > b) - (a < b)
+
 
 def cmp_fields(ordering):
     # Takes a list of fields and directions and returns a
@@ -45,26 +47,24 @@ def cmp_fields(ordering):
             if result:
                 return result
         return 0
+
     return _cmp
+
 
 def equal(a, b):
     """
-    Compares two objects. In addition to the "==" operator, this function
+    Compare two objects. In addition to the "==" operator, this function
     ensures that the data of two mongoengine objects is the same. Also, it
     assumes that a UTC-TZ-aware datetime is equal to an unaware datetime if
     the date and time components match.
     """
-
     # When comparing dicts (we serialize documents using to_dict) or lists
     # we may encounter datetime instances in the values, so compare them item
     # by item.
     if isinstance(a, dict) and isinstance(b, dict):
         if sorted(a.keys()) != sorted(b.keys()):
             return False
-        for k, v in a.items():
-            if not equal(b[k], v):
-                return False
-        return True
+        return all(equal(b[k], v) for k, v in a.items())
 
     if isinstance(a, list) and isinstance(b, list):
         if len(a) != len(b):
@@ -77,7 +77,7 @@ def equal(a, b):
     # mongoengine documents.
     if isinstance(a, mongoengine.Document) and isinstance(b, mongoengine.Document):
         # Don't evaluate lazy documents
-        if getattr(a, '_lazy', False) and getattr(b, '_lazy', False):
+        if getattr(a, "_lazy", False) and getattr(b, "_lazy", False):
             return True
         return equal(dict(a.to_mongo()), dict(b.to_mongo()))
 
@@ -95,5 +95,5 @@ def equal(a, b):
 
     try:
         return a == b
-    except Exception: # Exception during comparison, mainly datetimes.
+    except Exception:  # Exception during comparison, mainly datetimes.
         return False

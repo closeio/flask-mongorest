@@ -1,17 +1,36 @@
+import typing
+
+
 class Create:
-    method = 'POST'
+    method = "POST"
+
 
 class Update:
-    method = 'PUT'
+    method = "PUT"
+
 
 class BulkUpdate:
-    method = 'PUT'
+    method = "PUT"
+
 
 class Fetch:
-    method = 'GET'
+    method = "GET"
+
 
 class List:
-    method = 'GET'
+    method = "GET"
+
 
 class Delete:
-    method = 'DELETE'
+    method = "DELETE"
+
+
+# type alias
+METHODS_TYPE = typing.Union[
+    typing.Type[Create],
+    typing.Type[Update],
+    typing.Type[BulkUpdate],
+    typing.Type[Fetch],
+    typing.Type[List],
+    typing.Type[Delete],
+]
