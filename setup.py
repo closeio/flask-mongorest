@@ -1,11 +1,11 @@
+import contextlib
+
 from setuptools import setup
 
 # Stops exit traceback on tests
 # TODO this makes flake8's F401 fail - maybe there's a better way
-try:
+with contextlib.suppress(Exception):
     import multiprocessing  # noqa
-except Exception:
-    pass
 
 setup(
     name="Flask-MongoRest",

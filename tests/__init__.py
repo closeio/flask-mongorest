@@ -24,10 +24,12 @@ except ImportError:
 try:
     from flask_mongoengine import get_db
 
-    class query_counter(query_counter):
+    class OurQueryCounter(query_counter):
         def __init__(self):
             self.counter = 0
             self.db = get_db()
+
+    query_counter = OurQueryCounter
 
 
 except ImportError:
@@ -60,7 +62,7 @@ def response_error(response, code=None):
 def compare_req_resp(req_obj, resp_obj):
     for k, v in req_obj.items():
         assert (
-            k in resp_obj.keys()
+            k in resp_obj
         ), f"Key {k!r} not in response (keys are {resp_obj.keys()!r})"
         assert (
             resp_obj[k] == v
@@ -189,13 +191,15 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp)
         errors = resp_json(resp)
         self.assertTrue(
-            errors == {"field-errors": {"email": "Invalid email address: 💩"}}
-            or errors
-            == {
-                # Workaround for
-                # https://github.com/MongoEngine/mongoengine/pull/1384
-                "field-errors": {"email": "Invalid Mail-address: 💩"}
-            }
+            errors
+            in [
+                {"field-errors": {"email": "Invalid email address: 💩"}},
+                {
+                    # Workaround for
+                    # https://github.com/MongoEngine/mongoengine/pull/1384
+                    "field-errors": {"email": "Invalid Mail-address: 💩"}
+                },
+            ]
         )
 
         # Schema validation error
@@ -225,7 +229,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp)
         errors = resp_json(resp)
         self.assertTrue("field-errors" in errors)
-        self.assertEqual(set(errors["field-errors"]), set(["email"]))
+        self.assertEqual(set(errors["field-errors"]), {"email"})
 
         resp = self.app.put(
             f"/user/{self.user_1_obj['id']}/",
@@ -236,7 +240,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp)
         errors = resp_json(resp)
         self.assertTrue("field-errors" in errors)
-        self.assertEqual(set(errors["field-errors"]), set(["email"]))
+        self.assertEqual(set(errors["field-errors"]), {"email"})
 
         resp = self.app.put(
             f"/user/{self.user_1_obj['id']}/",
@@ -255,10 +259,8 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp)
         errors = resp_json(resp)
         self.assertTrue("field-errors" in errors)
-        self.assertEqual(set(errors["field-errors"]), set(["emails"]))
-        self.assertEqual(
-            set(errors["field-errors"]["emails"]["errors"]), set(["1", "3"])
-        )
+        self.assertEqual(set(errors["field-errors"]), {"emails"})
+        self.assertEqual(set(errors["field-errors"]["emails"]["errors"]), {"1", "3"})
 
     def test_resource_fields(self):
         resp = self.app.post(
@@ -270,7 +272,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_success(resp)
         obj = resp_json(resp)
 
-        self.assertEqual(set(obj), set(["id", "name", "upper_name"]))
+        self.assertEqual(set(obj), {"id", "name", "upper_name"})
         self.assertEqual(obj["name"], "thename")
         self.assertEqual(obj["upper_name"], "THENAME")
 
@@ -544,7 +546,7 @@ class MongoRestTestCase(unittest.TestCase):
         response_error(resp)
         data = resp_json(resp)
         self.assertEqual(data["count"], 0)
-        self.assertEqual(set(data["field-errors"]), set(["description"]))
+        self.assertEqual(set(data["field-errors"]), {"description"})
 
     def test_post_auto_art_tag(self):
         # create a post by vangogh and an 'art' tag should be added automatically
@@ -736,14 +738,14 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.get(f"/user/{self.user_1_obj['id']}/?_fields=email")
         response_success(resp)
         user = resp_json(resp)
-        self.assertEqual(set(user), set(["email"]))
+        self.assertEqual(set(user), {"email"})
 
         resp = self.app.get(
             f"/user/{self.user_1_obj['id']}/?_fields=first_name,last_name"
         )
         response_success(resp)
         user = resp_json(resp)
-        self.assertEqual(set(user), set(["first_name", "last_name"]))
+        self.assertEqual(set(user), {"first_name", "last_name"})
 
         # Make sure all fields can still be posted.
         test_user_data = {
@@ -756,7 +758,7 @@ class MongoRestTestCase(unittest.TestCase):
         resp = self.app.post("/user/?_fields=id", data=json.dumps(test_user_data))
         response_success(resp)
         user = resp_json(resp)
-        self.assertEqual(set(user), set(["id"]))
+        self.assertEqual(set(user), {"id"})
 
     def test_invalid_json(self):
         resp = self.app.post("/user/", data='{"}')
@@ -1294,7 +1296,6 @@ class MongoRestSchemaTestCase(unittest.TestCase):
         Python is stupid and by default lets us accept an invalid JSON. Test
         that flask-mongorest handles it correctly.
         """
-
         # test create
         resp = self.app.post(
             "/dict_doc/",

@@ -71,7 +71,7 @@ class PostResource(Resource):
     def get_fields(self):
         fields = super(PostResource, self).get_fields()
         if "_include_primary_user" in request.args:
-            fields = set(fields) | set(["primary_user"])
+            fields = set(fields) | {"primary_user"}
         return fields
 
     def update_object(self, obj, data=None, save=True, parent_resources=None):
@@ -117,7 +117,8 @@ class DummyAuthView(ResourceView):
 @api.register(name="restricted", url="/restricted/")
 class RestrictedPostView(ResourceView):
     """This class allows us to put restrictions in place regarding
-    who/what can be read, changed, added or deleted"""
+    who/what can be read, changed, added or deleted.
+    """
 
     resource = PostResource
     methods = [Create, Update, Fetch, List, Delete]
