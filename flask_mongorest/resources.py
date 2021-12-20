@@ -18,6 +18,7 @@ except ImportError:
 
 from mongoengine.fields import EmbeddedDocumentField, ListField, ReferenceField, GenericReferenceField
 from mongoengine.fields import DictField
+from mongoengine.errors import DoesNotExist
 
 from cleancat import ValidationError as SchemaValidationError
 from flask_mongorest import methods
@@ -477,7 +478,13 @@ class Resource(object):
 
             # if the field is callable, execute it with `obj` as the param
             if hasattr(self, field) and callable(getattr(self, field)):
-                value = getattr(self, field)(obj)
+                try:
+                    value = getattr(self, field)(obj)
+                except DoesNotExist:
+                    if kwargs.get('ignore_broken_references', False):
+                        value = None
+                    else:
+                        raise
 
                 # if the field is associated with a specific resource (via the
                 # `related_resources` map), use that resource to serialize it
