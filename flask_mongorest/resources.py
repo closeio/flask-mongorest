@@ -1,3 +1,4 @@
+import contextlib
 import json
 
 import mongoengine
@@ -40,7 +41,7 @@ class ResourceMeta(type):
         type.__init__(cls, name, bases, classdict)
 
 
-class Resource(object):
+class Resource:
     # MongoEngine Document class related to this resource (required)
     document = None
 
@@ -107,7 +108,7 @@ class Resource(object):
 
     def __init__(self, view_method=None):
         """
-        Initializes a resource. Optionally, a method class can be given to
+        Initialize a resource. Optionally, a method class can be given to
         view_method (see methods.py) so the resource can behave differently
         depending on the method.
         """
@@ -157,10 +158,11 @@ class Resource(object):
 
     def _enforce_strict_json(self, val):
         """
-        Helper method used to raise a ValueError if NaN, Infinity, or
-        -Infinity were posted. By default, json.loads accepts these values,
-        but it allows us to perform extra validation via a parse_constant
-        kwarg.
+        Enforce strict json parsing.
+
+        Raise a ValueError if NaN, Infinity, or -Infinity were posted. By
+        default, json.loads accepts these values, but it allows us to perform
+        extra validation via a parse_constant kwarg.
         """
         # according to the `json.loads` docs: "parse_constant, if specified,
         # will be called with one of the following strings: '-Infinity',
@@ -205,10 +207,10 @@ class Resource(object):
         return self._raw_data
 
     @classmethod
-    def uri(self, path):
+    def uri(cls, path):
         """Generate a URI reference for the given path"""
-        if self.uri_prefix:
-            ret = self.uri_prefix + path
+        if cls.uri_prefix:
+            ret = cls.uri_prefix + path
             return ret
         else:
             raise ValueError(
@@ -216,10 +218,10 @@ class Resource(object):
             )
 
     @classmethod
-    def _url(self, path):
+    def _url(cls, path):
         """Generate a complete URL for the given path. Requires application context."""
-        if self.uri_prefix:
-            url = url_for(self.uri_prefix.lstrip("/").rstrip("/"), _external=True)
+        if cls.uri_prefix:
+            url = url_for(cls.uri_prefix.lstrip("/").rstrip("/"), _external=True)
             ret = url + path
             return ret
         else:
@@ -548,10 +550,10 @@ class Resource(object):
                     if isinstance(value, mongoengine.document.Document):
                         value = related_resource.serialize_field(value)
                     elif isinstance(value, dict):
-                        value = dict(
-                            (k, related_resource.serialize_field(v))
+                        value = {
+                            k: related_resource.serialize_field(v)
                             for (k, v) in value.items()
-                        )
+                        }
                     else:  # assume queryset or list
                         value = [related_resource.serialize_field(o) for o in value]
                 data[renamed_field] = value
@@ -559,10 +561,8 @@ class Resource(object):
                 try:
                     data[renamed_field] = self.get_field_value(obj, field, **kwargs)
                 except UnknownFieldError:
-                    try:
+                    with contextlib.suppress(UnknownFieldError):
                         data[renamed_field] = self.value_for_field(obj, field)
-                    except UnknownFieldError:
-                        pass
 
         return data
 
@@ -620,9 +620,7 @@ class Resource(object):
         # validation
         if self.schema:
             if request.method == "PUT" and obj is not None:
-                obj_data = dict(
-                    [(key, getattr(obj, key)) for key in obj._fields.keys()]
-                )
+                obj_data = {key: getattr(obj, key) for key in obj._fields.keys()}
             else:
                 obj_data = None
 
@@ -720,7 +718,7 @@ class Resource(object):
             # For each field name, create a map of obj PKs to a list of
             # results they referenced.
             hint_index = {}
-            if field_name in self.related_resources_hints.keys():
+            if field_name in self.related_resources_hints:
                 hint_field = self.related_resources_hints[field_name]
                 for obj in document_queryset[field_name]:
                     hint_field_instance = obj._fields[hint_field]
@@ -1005,10 +1003,10 @@ class Resource(object):
         if update:
             # We want to update only the fields that appear in the request data
             # rather than re-updating all the document's existing/other fields.
-            filter_fields &= set(
+            filter_fields &= {
                 self._reverse_rename_fields.get(field, field)
                 for field in self.raw_data.keys()
-            )
+            }
         update_dict = {
             field: value for field, value in data.items() if field in filter_fields
         }

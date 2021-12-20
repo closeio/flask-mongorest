@@ -50,7 +50,7 @@ And this way, the request we mentioned above would result in:
 """
 
 
-class Operator(object):
+class Operator:
     """Base class that all the other operators should inherit from."""
 
     op = "exact"

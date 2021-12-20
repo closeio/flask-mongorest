@@ -3,7 +3,7 @@ from flask import Blueprint
 from flask_mongorest.methods import BulkUpdate, Create, List
 
 
-class MongoRest(object):
+class MongoRest:
     def __init__(self, app, **kwargs):
         self.app = app
         self.url_prefix = kwargs.pop("url_prefix", "")

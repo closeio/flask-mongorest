@@ -38,7 +38,7 @@ def get_exception_message(e):
 
 def serialize_mongoengine_validation_error(e):
     """
-    Takes a MongoEngine ValidationError as an argument, and returns a
+    Take a MongoEngine ValidationError as an argument, and returns a
     serializable error dict. Note that we can have nested ValidationErrors.
     """
 
@@ -46,7 +46,7 @@ def serialize_mongoengine_validation_error(e):
         if isinstance(e, Exception):
             return get_exception_message(e)
         elif hasattr(e, "items"):
-            return dict((k, serialize_errors(v)) for (k, v) in e.items())
+            return {k: serialize_errors(v) for (k, v) in e.items()}
         else:
             return text_type(e)
 
@@ -73,7 +73,7 @@ class ResourceView(MethodView):
         return self._dispatch_request(*args, **kwargs)
 
     def _dispatch_request(self, *args, **kwargs):
-        authorized = True if len(self.authentication_methods) == 0 else False
+        authorized = bool(len(self.authentication_methods) == 0)
         for authentication_method in self.authentication_methods:
             if authentication_method().authorized():
                 authorized = True
@@ -104,7 +104,8 @@ class ResourceView(MethodView):
         """In the case where the Resource that this view is associated with points to a Document class
         that allows inheritance, this method should indicate the specific Resource class to use
         when processing POST and PUT requests through information available in the request
-        itself or through other means."""
+        itself or through other means.
+        """
         # Default behavior is to use the (base) resource class
         return self.resource()
 
@@ -200,7 +201,7 @@ class ResourceView(MethodView):
         try:
             for obj in objs:
                 self.process_object(obj)
-                count += 1
+                count += 1  # noqa: SIM113
         except ValidationError as e:
             e.args[0]["count"] = count
             raise e

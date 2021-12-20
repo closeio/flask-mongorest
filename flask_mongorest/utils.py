@@ -55,22 +55,18 @@ def cmp_fields(ordering):
 
 def equal(a, b):
     """
-    Compares two objects. In addition to the "==" operator, this function
+    Compare two objects. In addition to the "==" operator, this function
     ensures that the data of two mongoengine objects is the same. Also, it
     assumes that a UTC-TZ-aware datetime is equal to an unaware datetime if
     the date and time components match.
     """
-
     # When comparing dicts (we serialize documents using to_dict) or lists
     # we may encounter datetime instances in the values, so compare them item
     # by item.
     if isinstance(a, dict) and isinstance(b, dict):
         if sorted(a.keys()) != sorted(b.keys()):
             return False
-        for k, v in a.items():
-            if not equal(b[k], v):
-                return False
-        return True
+        return all(equal(b[k], v) for k, v in a.items())
 
     if isinstance(a, list) and isinstance(b, list):
         if len(a) != len(b):

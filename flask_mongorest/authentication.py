@@ -1,3 +1,3 @@
-class AuthenticationBase(object):
+class AuthenticationBase:
     def authorized(self):
         return False
