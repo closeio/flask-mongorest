@@ -1,11 +1,11 @@
 from flask import Blueprint
 
-from flask_mongorest import List, Create, BulkUpdate
+from flask_mongorest import BulkUpdate, Create, List
 
 
 class DelayedApp:
     """
-    Stores URL rules for later merging with an application URL map.
+    Store URL rules for later merging with an application URL map.
     """
 
     def __init__(self):
@@ -65,11 +65,10 @@ class MongoRest:
 
     def init_app(self, app):
         """
-        Provides delayed application instance initialization to support
+        Provide delayed application instance initialization to support
         Flask application factory pattern. For further details on application
         factories see: https://flask.palletsprojects.com/en/2.0.x/extensiondev/
         """
-
         app.register_blueprint(
             Blueprint(self.url_prefix, __name__, template_folder=self.template_folder)
         )
