@@ -1,5 +1,5 @@
 import json
-from typing import List, Optional, Type, Union
+from typing import List, Type
 
 import mimerender
 import mongoengine
@@ -56,7 +56,7 @@ def serialize_mongoengine_validation_error(e):
 
 class ResourceView(MethodView):
     resource = None
-    methods: Optional[Union[List[str], List[METHODS_TYPE]]] = []
+    methods: List[METHODS_TYPE] = []  # type: ignore
     authentication_methods: List[Type[AuthenticationBase]] = []
 
     def __init__(self):
