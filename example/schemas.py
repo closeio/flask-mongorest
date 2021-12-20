@@ -5,18 +5,21 @@ from cleancat.mongo import MongoEmbeddedReference, MongoReference
 
 from example import documents
 
+
 class User(Schema):
     email = Email(required=False)
     first_name = String(required=False)
     last_name = String(required=False)
     emails = List(Email(), required=False)
-    datetime = DateTime(regex_message=u'Invalid date 💩', required=False)
+    datetime = DateTime(regex_message=u"Invalid date 💩", required=False)
     datetime_local = DateTime(required=False)
     balance = Integer(required=False)
+
 
 class Content(Schema):
     text = String()
     lang = String()
+
 
 class Post(Schema):
     title = String()
@@ -29,12 +32,17 @@ class Post(Schema):
     content = MongoEmbeddedReference(documents.Content, Content, required=False)
     is_published = Bool()
 
+
 class Language(Schema):
     name = String()
 
+
 class Person(Schema):
     name = String()
-    languages = List(MongoEmbeddedReference(documents.Language, Language), required=False)
+    languages = List(
+        MongoEmbeddedReference(documents.Language, Language), required=False
+    )
+
 
 class DateTime(Schema):
     datetime = DateTime()
