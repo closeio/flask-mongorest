@@ -1,4 +1,5 @@
 import json
+from typing import List, Optional, Type, Union
 
 import mimerender
 import mongoengine
@@ -7,7 +8,9 @@ from flask.views import MethodView
 from werkzeug.exceptions import NotFound, Unauthorized
 
 from flask_mongorest import methods
+from flask_mongorest.authentication import AuthenticationBase
 from flask_mongorest.exceptions import ValidationError
+from flask_mongorest.methods import METHODS_TYPE
 from flask_mongorest.utils import MongoEncoder
 
 mimerender = mimerender.FlaskMimeRender()
@@ -17,11 +20,6 @@ render_html = lambda **payload: render_template(
     "mongorest/debug.html",
     data=json.dumps(payload, cls=MongoEncoder, sort_keys=True, indent=4),
 )
-
-try:
-    text_type = unicode  # Python 2
-except NameError:
-    text_type = str  # Python 3
 
 
 def get_exception_message(e):
@@ -48,7 +46,7 @@ def serialize_mongoengine_validation_error(e):
         elif hasattr(e, "items"):
             return {k: serialize_errors(v) for (k, v) in e.items()}
         else:
-            return text_type(e)
+            return str(e)
 
     if e.errors:
         return {"field-errors": serialize_errors(e.errors)}
@@ -58,8 +56,8 @@ def serialize_mongoengine_validation_error(e):
 
 class ResourceView(MethodView):
     resource = None
-    methods = []
-    authentication_methods = []
+    methods: Optional[Union[List[str], List[METHODS_TYPE]]] = []
+    authentication_methods: List[Type[AuthenticationBase]] = []
 
     def __init__(self):
         assert self.resource and self.methods

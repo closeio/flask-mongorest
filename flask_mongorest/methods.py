@@ -1,3 +1,6 @@
+import typing
+
+
 class Create:
     method = "POST"
 
@@ -20,3 +23,7 @@ class List:
 
 class Delete:
     method = "DELETE"
+
+
+# type alias
+METHODS_TYPE = typing.Union[Create, Update, BulkUpdate, Fetch, List, Delete]

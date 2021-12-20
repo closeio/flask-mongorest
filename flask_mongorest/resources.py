@@ -1,15 +1,12 @@
 import contextlib
 import json
+from typing import Dict, List, Type
+from urllib.parse import urlparse
 
 import mongoengine
 from bson.dbref import DBRef
 from bson.objectid import ObjectId
 from flask import has_request_context, request, url_for
-
-try:
-    from urllib.parse import urlparse
-except ImportError:  # Python 2
-    from urlparse import urlparse
 
 try:  # closeio/mongoengine
     from mongoengine.base.proxy import DocumentProxy
@@ -41,7 +38,7 @@ class ResourceMeta(type):
         type.__init__(cls, name, bases, classdict)
 
 
-class Resource:
+class Resource(metaclass=ResourceMeta):
     # MongoEngine Document class related to this resource (required)
     document = None
 
@@ -51,13 +48,13 @@ class Resource:
 
     # Dict of original field names (as seen in `fields`) and what they should
     # be renamed to in the API response
-    rename_fields = {}
+    rename_fields: Dict[str, str] = {}
 
     # CleanCat Schema class (used for validation)
     schema = None
 
     # List of fields that the objects can be ordered by
-    allowed_ordering = []
+    allowed_ordering: List[str] = []
 
     # Define whether or not this resource supports pagination
     paginate = True
@@ -75,7 +72,7 @@ class Resource:
 
     # Map of field names and Resource classes that should be used to handle
     # these fields (for serialization, saving, etc.).
-    related_resources = {}
+    related_resources: Dict[str, "Resource"] = {}
 
     # Map of field names on this resource's document to field names on the
     # related resource's document, used as a helper in the process of
@@ -83,17 +80,17 @@ class Resource:
     #
     # TODO Behavior of this is *very* unintuitive and should be changed or
     # dropped, or at least refactored
-    related_resources_hints = {}
+    related_resources_hints: Dict[str, str] = {}
 
     # List of field names corresponding to related resources. If a field is
     # mentioned here and in `related_resources`, it can be created/updated
     # from within this resource.
-    save_related_fields = []
+    save_related_fields: List[str] = []
 
     # Map of MongoEngine Document classes to Resource class names. Defines
     # which sub-resource should be used for handling a particular subclass of
     # this resource's document.
-    child_document_resources = {}
+    child_document_resources: Dict[Type, str] = {}
 
     # Whenever a new document is posted and the system doesn't know the type
     # of it yet, it will choose a default sub-resource for this document type
@@ -1057,11 +1054,3 @@ class Resource:
 
     def delete_object(self, obj, parent_resources=None):
         obj.delete()
-
-
-# Py2/3 compatible way to do metaclasses (or six.add_metaclass)
-body = vars(Resource).copy()
-body.pop("__dict__", None)
-body.pop("__weakref__", None)
-
-Resource = ResourceMeta(Resource.__name__, Resource.__bases__, body)

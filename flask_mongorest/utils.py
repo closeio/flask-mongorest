@@ -32,10 +32,8 @@ class MongoEncoder(json.JSONEncoder):
         return super(MongoEncoder, self).default(value, **kwargs)
 
 
-try:
-    cmp
-except NameError:  # Python 3
-    cmp = lambda a, b: (a > b) - (a < b)
+def cmp(a, b):
+    return (a > b) - (a < b)
 
 
 def cmp_fields(ordering):
