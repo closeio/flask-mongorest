@@ -1,8 +1,9 @@
--e git://github.com/closeio/mongoengine.git#egg=mongoengine-dev
--e git://github.com/closeio/flask-mongoengine.git#egg=flask-mongoengine
+cleancat
+mongoengine
+flask-mongoengine
 mimerender
 python-dateutil
-cleancat>=0.3
 Flask>=0.9
-pymongo>=3.4
+pymongo
 flake8
+flake8-bugbear
