@@ -4,6 +4,7 @@ flask-mongoengine
 mimerender
 python-dateutil
 Flask>=0.9
-pymongo
+pymongo<4
 flake8
 flake8-bugbear
+click==8.0.4
