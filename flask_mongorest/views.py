@@ -240,7 +240,7 @@ class ResourceView(MethodView):
             return self.process_objects(objs)
         else:
             obj = self._resource.get_object(pk)
-            self.process_object(obj)
+            obj = self.process_object(obj)
             ret = self._resource.serialize(obj, params=request.args)
             return ret
 
