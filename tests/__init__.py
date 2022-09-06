@@ -1336,7 +1336,7 @@ class MongoRestSchemaTestCase(unittest.TestCase):
 
     def test_send_bad_json(self):
         """
-        Make sure that - even if we store invalid JSON in databse, we error out
+        Make sure that - even if we store invalid JSON in database, we error out
         instead of sending invalid data to the user.
         """
         doc = example.DictDoc.objects.create(
