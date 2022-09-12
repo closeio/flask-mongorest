@@ -102,7 +102,7 @@ class Exact(Operator):
 
     def prepare_queryset_kwargs(self, field, value, negate):
         # Using <field>__exact causes mongoengine to generate a regular
-        # expresison query, which we'd like to avoid.
+        # expression query, which we'd like to avoid.
         if negate:
             return {f"{field}__ne": value}
         else:
