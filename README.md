@@ -1,3 +1,5 @@
+*This project isn't actively maintained. We do not recommend it for production use.*
+
 Flask-MongoRest [![Build Status](https://circleci.com/gh/closeio/flask-mongorest.png?branch=master&style=shield)](https://circleci.com/gh/closeio/flask-mongorest)
 ===============
 A Restful API framework wrapped around MongoEngine.
